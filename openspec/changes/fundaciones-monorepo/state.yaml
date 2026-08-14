@@ -31,7 +31,9 @@ phases:
     artifact: tasks.md
     engram_topic: sdd/fundaciones-monorepo/tasks
   apply:
-    status: pending
+    status: in_progress
+    engram_topic: sdd/fundaciones-monorepo/apply-progress
+    notes: "PR1 (Phase 1: workspace scaffold & tooling) complete on branch feat/pr1-workspace-scaffold. GitHub repo creation pending (gh CLI unavailable). Phases 2-5 not started."
   verify:
     status: pending
   archive:
