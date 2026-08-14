@@ -1,0 +1,38 @@
+# SDD DAG state for change: fundaciones-monorepo (survives compaction)
+schema: spec-driven
+change: fundaciones-monorepo
+project: DCM_Proyecto
+artifact_store: hybrid   # amended from "engram" on 2026-08-13; phases save to BOTH Engram and OpenSpec files
+updated: 2026-08-13
+
+phases:
+  explore:
+    status: completed
+    artifact: exploration.md
+    engram_topic: sdd/fundaciones-monorepo/explore
+  proposal:
+    status: completed
+    artifact: proposal.md
+    engram_topic: sdd/fundaciones-monorepo/proposal
+  spec:
+    status: completed
+    artifacts:
+      - specs/monorepo-scaffold/spec.md
+      - specs/api-contract-pipeline/spec.md
+      - specs/migrations-infra/spec.md
+      - specs/deployment-wiring/spec.md
+    engram_topic: sdd/fundaciones-monorepo/spec
+  design:
+    status: completed
+    artifact: design.md
+    engram_topic: sdd/fundaciones-monorepo/design
+  tasks:
+    status: completed
+    artifact: tasks.md
+    engram_topic: sdd/fundaciones-monorepo/tasks
+  apply:
+    status: pending
+  verify:
+    status: pending
+  archive:
+    status: pending
