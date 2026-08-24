@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: inventienda
+          POSTGRES_PASSWORD: inventienda
+          POSTGRES_DB: inventienda
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U inventienda -d inventienda"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://inventienda:inventienda@localhost:5432/inventienda
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Check generated contract is up to date
+        run: pnpm contract:check
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Run database migrations
+        run: pnpm db:migrate
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Integration tests
+        run: pnpm test:integration
