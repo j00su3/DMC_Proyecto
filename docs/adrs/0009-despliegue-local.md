@@ -2,8 +2,10 @@
 
 ## Estado
 
-Aceptado — actualizado 2026-08-13: se agrega una condición de revisión por hito de producto
-(resuelve A11 de la Ronda 2 de `REVISION-ADVERSARIAL.md`; ver `TECH-DESIGNv2.md`).
+Reemplazado por [[0010-despliegue-tiers-gratuitos]] — el hito de producto (primer ciclo de conteo
+real, condición de revisión agregada 2026-08-13, ver A11 de la Ronda 2 de
+`REVISION-ADVERSARIAL.md`) llegó antes de mover el proyecto fuera de `localhost`, así que la
+condición de revisión que este ADR dejó escrita se resolvió con el nuevo despliegue.
 
 ## Contexto
 

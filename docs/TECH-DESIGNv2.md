@@ -56,11 +56,13 @@ Comunicación: `SPA → (HTTP/JSON, cookie de sesión) → API → (SQL/transacc
 alertas se evalúan **dentro de la transacción** de cada movimiento, protegidas por un
 **`SAVEPOINT`** (ver [Evaluación de alertas](#evaluación-de-alertas-detalle-v2), resuelve C1).
 
-**Despliegue (v1):** local, en la máquina del desarrollador (Postgres vía Docker + backend Node
-como proceso local), sin HTTPS — acceso por `localhost` ([ADR-0009](adrs/0009-despliegue-local.md)).
-La decisión de subir el proyecto a un hosting queda abierta; ese ADR fija la condición de revisión
-(HTTPS, cookie `Secure`, backup fuera del disco principal). **v2 agrega una condición de revisión
-de producto** (resuelve A11): ver [Riesgos](#riesgos-técnicos-abiertos).
+**Despliegue:** SPA en Vercel, API en Render (tier gratuito) y Postgres gestionado en Neon —
+`vercel.json` reescribe `/api/*` hacia Render para conservar un único origen y que la cookie de
+sesión siga funcionando sin CORS ([ADR-0010](adrs/0010-despliegue-tiers-gratuitos.md), que
+reemplaza a [ADR-0009](adrs/0009-despliegue-local.md)). Docker Compose se mantiene para Postgres de
+desarrollo local. El HTTPS gratuito de estos proveedores habilita `Secure` en la cookie
+([ADR-0007](adrs/0007-sesion-cookie-rbac-propio.md)) y resuelve la condición de revisión de
+producto agregada en v2 (A11): ver [Riesgos](#riesgos-técnicos-abiertos).
 
 ## Decisiones de arquitectura
 
@@ -74,7 +76,8 @@ de producto** (resuelve A11): ver [Riesgos](#riesgos-técnicos-abiertos).
 | [ADR-0006](adrs/0006-bloquear-stock-insuficiente.md) | Resiliencia — Bloquear stock insuficiente (nunca negativo) | Aceptado |
 | [ADR-0007](adrs/0007-sesion-cookie-rbac-propio.md) | Auth — Sesión con cookie httpOnly + RBAC propio | Aceptado — actualizado (A7, S10) |
 | [ADR-0008](adrs/0008-evaluador-de-alertas-detras-de-interfaz.md) | Alertas — Evaluador de reglas detrás de interfaz | Aceptado — actualizado (C1, S7, A10) |
-| [ADR-0009](adrs/0009-despliegue-local.md) | Despliegue — Local en la máquina del desarrollador | Aceptado — actualizado (A11) |
+| [ADR-0009](adrs/0009-despliegue-local.md) | Despliegue — Local en la máquina del desarrollador | Reemplazado por [ADR-0010](adrs/0010-despliegue-tiers-gratuitos.md) |
+| [ADR-0010](adrs/0010-despliegue-tiers-gratuitos.md) | Despliegue — Tiers gratuitos (Vercel + Render + Neon) | Aceptado |
 
 ## Modelo de datos
 
