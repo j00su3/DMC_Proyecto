@@ -6,6 +6,13 @@ Aceptado — actualizado 2026-08-13: se agregan el permiso por campo de `stock_m
 `SameSite=Lax` en la cookie de sesión (resuelve A7 y S10 de la Ronda 2 de
 `REVISION-ADVERSARIAL.md`; ver `TECH-DESIGNv2.md`).
 
+Actualizado 2026-08-24: implementado el hash de contraseña con **argon2id** (parámetros base
+OWASP: `memoryCost=19456`, `timeCost=2`, `parallelism=1`) sobre la alternativa bcrypt mencionada
+en la Decisión original. La sesión no usa un token separado: el `id` de la fila `sesiones`
+(aleatorio, `base64url(randomBytes(32))`) es directamente el valor firmado que viaja en la cookie
+`httpOnly`, y `@fastify/cookie` valida la firma antes de resolverlo contra el store; no hay un
+segundo secreto de sesión que mantener sincronizado con la fila. Ver `openspec/changes/auth-sesiones/design.md`.
+
 ## Contexto
 
 El PRD define un sistema multiusuario con login por cuenta individual y **dos roles**
