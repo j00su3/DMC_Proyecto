@@ -14,18 +14,18 @@ session_preflight:
   review_budget_lines: 400   # authored lines; generated/lockfile excluded
 
 # ask-on-risk fired on the tasks forecast: S4 (~410) and S5a (~430) are both
-# marginally over budget. User decision, 2026-08-25: MEASURE FIRST, split only
-# if confirmed. Build the seam, measure the actual authored diff, and split at
-# the point tasks.md already names only when it exceeds ~450 lines.
-# Rationale: the budget protects reviewer attention, and a 430-line PR is
-# reviewed as well as a 400-line one — what breaks review is a jump in scale
-# (the previous cycle's 810), not a 7% overrun. The forecasts carry their own
-# margin of error, so pre-splitting a PR that may land at 390 buys chain
-# overhead for nothing.
+# marginally over budget. User decision, 2026-08-25: SHIP THEM AS ONE PR EACH.
+# No further splitting beyond the S5 -> S5a/S5b split already in tasks.md.
+# Rationale: the budget protects reviewer attention, and a 430-line diff is read
+# as well as a 400-line one. What breaks review is a jump in scale — S5 whole
+# was ~770, and the previous cycle's overrun was 810 — not a 7% overage. Chained
+# PRs also carry real cost: the auth cycle lost a PR when its base branch was
+# deleted (GitHub closes, it does not retarget) and it had to be restored,
+# reopened and retargeted by hand. Splitting S4 and S5a would pay all of that
+# ceremony for nothing.
 delivery_decision:
-  policy: measure-then-split
-  split_threshold_authored_lines: 450
-  applies_to: [S4, S5a]
+  policy: no-further-splits
+  pr_count: 7
   decided: 2026-08-25
 
 phases:
