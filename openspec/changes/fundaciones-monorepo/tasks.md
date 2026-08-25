@@ -62,11 +62,12 @@ Chain strategy: pending
 
 ## Phase 4: Drizzle/Migrations Infra
 
-- [ ] 4.1 `apps/api/drizzle.config.ts` (postgresql dialect, empty `src/db/schema.ts`)
-- [ ] 4.2 `src/db/client.ts` (drizzle-orm/node-postgres)
-- [ ] 4.3 `docker-compose.yml`: `postgres:16-alpine`, `5432:5432`, named volume, `pg_isready` healthcheck
-- [ ] 4.4 Run `db:generate`, commit generated `apps/api/drizzle/**`
-- [ ] 4.5 Verify `db:migrate` against local Docker Postgres
+- [x] 4.1 `apps/api/drizzle.config.ts` (postgresql dialect, empty `src/db/schema.ts`)
+- [x] 4.2 `src/db/client.ts` (drizzle-orm/node-postgres)
+- [x] 4.3 `docker-compose.yml`: `postgres:16-alpine`, `5432:5432`, named volume, `pg_isready` healthcheck
+- [x] 4.4 Run `db:generate`, commit generated `apps/api/drizzle/**` — 0 tables, empty journal (`entries: []`), no migration SQL files (schema is intentionally empty in this PR)
+- [x] 4.5 Verify `db:migrate` against local Docker Postgres — applied successfully
+- [x] 4.6 (user-mandated) Integration test: `health.integration.test.ts` boots the real app (real db plugin, no stub) and asserts `GET /api/health` reflects a live DB connection against real Docker Postgres, run via a separate `test:integration` vitest suite so unit tests stay Postgres-free (TDD: RED confirmed against no DB, GREEN confirmed after `docker compose up` + `db:migrate`)
 
 ## Phase 5: CI, Deployment Wiring, ADR-0010
 
