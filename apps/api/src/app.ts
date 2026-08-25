@@ -1,3 +1,4 @@
+import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import Fastify, { type FastifyInstance } from 'fastify';
 import {
@@ -11,12 +12,23 @@ import authPlugin from './plugins/auth.js';
 import cookiePlugin from './plugins/cookie.js';
 import dbPlugin, { type DbLike } from './plugins/db.js';
 import reposPlugin, { type Repos } from './plugins/repos.js';
+import authRoutes from './routes/auth.js';
 import healthRoutes from './routes/health.js';
+
+declare module 'fastify' {
+  interface FastifyInstance {
+    // Configurable per-instance login rate limit (design.md's contract
+    // shows max: 10/minute in production; tests override to max: 1 to
+    // exercise the real @fastify/rate-limit plugin, not the error builder).
+    rateLimitMax: number;
+  }
+}
 
 export interface BuildAppOptions {
   db?: DbLike;
   repos?: Repos;
   cookieSecret?: string;
+  rateLimitMax?: number;
 }
 
 export async function buildApp(
@@ -43,8 +55,13 @@ export async function buildApp(
   // Must be registered before any route plugin below — Fastify hooks only
   // apply to routes registered after the hook (design.md risk register).
   await app.register(authPlugin);
+  // global: false — rate limiting only applies to routes that opt in via
+  // config.rateLimit (currently only POST /api/auth/login).
+  await app.register(rateLimit, { global: false });
+  app.decorate('rateLimitMax', opts.rateLimitMax ?? 10);
 
   app.register(healthRoutes, { prefix: '/api' });
+  app.register(authRoutes, { prefix: '/api' });
 
   app.setErrorHandler((error, _request, reply) => {
     const { status, body } = toErrorEnvelope(error);
