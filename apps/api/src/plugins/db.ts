@@ -1,24 +1,15 @@
 import type { FastifyInstance } from 'fastify';
 import fp from 'fastify-plugin';
-import { Pool } from 'pg';
+import { getPool } from '../db/pool.js';
 
 export interface DbLike {
   checkDb(): Promise<boolean>;
 }
 
 class PgDb implements DbLike {
-  private pool: Pool | undefined;
-
-  private getPool(): Pool {
-    if (!this.pool) {
-      this.pool = new Pool({ connectionString: process.env.DATABASE_URL });
-    }
-    return this.pool;
-  }
-
   async checkDb(): Promise<boolean> {
     try {
-      await this.getPool().query('select 1');
+      await getPool().query('select 1');
       return true;
     } catch {
       return false;
