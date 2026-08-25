@@ -146,4 +146,51 @@ describe('auth routes (integration, real Postgres, real argon2)', () => {
     expect(lockedResponse.statusCode).toBe(423);
     expect(lockedResponse.json().error.code).toBe('ACCOUNT_LOCKED');
   });
+
+  it('changes the password, revokes other sessions, and keeps the current session valid', async () => {
+    const usuario = await insertUsuario();
+    app = await buildApp({ cookieSecret: COOKIE_SECRET });
+
+    // Two independent sessions for the same user: A performs the change,
+    // B is "elsewhere" and must be revoked.
+    const loginA = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email: usuario.email, password: PASSWORD },
+    });
+    const cookieA = extractCookie(loginA.headers['set-cookie']);
+
+    const loginB = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email: usuario.email, password: PASSWORD },
+    });
+    const cookieB = extractCookie(loginB.headers['set-cookie']);
+
+    const changeResponse = await app.inject({
+      method: 'POST',
+      url: '/api/auth/password',
+      headers: { cookie: cookieA },
+      payload: {
+        currentPassword: PASSWORD,
+        newPassword: 'a-brand-new-password',
+      },
+    });
+    expect(changeResponse.statusCode).toBe(200);
+
+    const meViaB = await app.inject({
+      method: 'GET',
+      url: '/api/auth/me',
+      headers: { cookie: cookieB },
+    });
+    expect(meViaB.statusCode).toBe(401);
+
+    const meViaA = await app.inject({
+      method: 'GET',
+      url: '/api/auth/me',
+      headers: { cookie: cookieA },
+    });
+    expect(meViaA.statusCode).toBe(200);
+    expect(meViaA.json().usuario.debeCambiarPassword).toBe(false);
+  });
 });
