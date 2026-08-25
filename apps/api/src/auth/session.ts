@@ -4,7 +4,8 @@ import type { CookieSerializeOptions } from '@fastify/cookie';
 // The session cookie value IS the sesiones.id primary key (design.md D4).
 export const SESSION_COOKIE = 'sid';
 
-const SESSION_TTL_SECONDS = 43200; // 12h, fixed (design.md D15, no sliding renewal)
+// 12h, fixed (design.md D15, no sliding renewal).
+export const SESSION_TTL_SECONDS = 43200;
 
 export function createToken(): string {
   return randomBytes(32).toString('base64url');
