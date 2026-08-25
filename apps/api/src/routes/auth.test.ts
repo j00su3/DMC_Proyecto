@@ -261,4 +261,200 @@ describe('GET /api/auth/me', () => {
     expect(response.statusCode).toBe(401);
     expect(response.json().error.code).toBe('UNAUTHORIZED');
   });
+
+  it('includes debeCambiarPassword in the usuario DTO', async () => {
+    const usuario = makeUsuario({ debeCambiarPassword: true });
+    app = await buildApp({
+      repos: fakeRepos({}, { findValid: async () => usuario }),
+      cookieSecret: COOKIE_SECRET,
+    });
+    await app.ready();
+    const signed = app.signCookie('valid-token');
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/auth/me',
+      cookies: { sid: signed },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().usuario.debeCambiarPassword).toBe(true);
+  });
+
+  it('is reachable for a user with debeCambiarPassword: true (opts in)', async () => {
+    const usuario = makeUsuario({ debeCambiarPassword: true });
+    app = await buildApp({
+      repos: fakeRepos({}, { findValid: async () => usuario }),
+      cookieSecret: COOKIE_SECRET,
+    });
+    await app.ready();
+    const signed = app.signCookie('valid-token');
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/auth/me',
+      cookies: { sid: signed },
+    });
+
+    expect(response.statusCode).toBe(200);
+  });
+});
+
+describe('POST /api/auth/password', () => {
+  let app: Awaited<ReturnType<typeof buildApp>> | undefined;
+
+  afterEach(async () => {
+    await app?.close();
+    app = undefined;
+  });
+
+  it('returns 200 on a successful password change', async () => {
+    const hash = await hashPassword(PASSWORD);
+    const usuario = makeUsuario({ hashContrasena: hash });
+    app = await buildApp({
+      repos: fakeRepos(
+        { updatePassword: async () => {} },
+        { findValid: async () => usuario, deleteOthers: async () => {} },
+      ),
+      cookieSecret: COOKIE_SECRET,
+    });
+    await app.ready();
+    const signed = app.signCookie('valid-token');
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/auth/password',
+      cookies: { sid: signed },
+      payload: {
+        currentPassword: PASSWORD,
+        newPassword: 'a-brand-new-password',
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+  });
+
+  it('returns 400 INVALID_CURRENT_PASSWORD for a wrong current password', async () => {
+    const hash = await hashPassword(PASSWORD);
+    const usuario = makeUsuario({ hashContrasena: hash });
+    app = await buildApp({
+      repos: fakeRepos({}, { findValid: async () => usuario }),
+      cookieSecret: COOKIE_SECRET,
+    });
+    await app.ready();
+    const signed = app.signCookie('valid-token');
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/auth/password',
+      cookies: { sid: signed },
+      payload: {
+        currentPassword: 'totally-wrong',
+        newPassword: 'a-brand-new-password',
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('INVALID_CURRENT_PASSWORD');
+  });
+
+  it('returns 400 VALIDATION_ERROR for an empty new password', async () => {
+    const hash = await hashPassword(PASSWORD);
+    const usuario = makeUsuario({ hashContrasena: hash });
+    app = await buildApp({
+      repos: fakeRepos({}, { findValid: async () => usuario }),
+      cookieSecret: COOKIE_SECRET,
+    });
+    await app.ready();
+    const signed = app.signCookie('valid-token');
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/auth/password',
+      cookies: { sid: signed },
+      payload: { currentPassword: PASSWORD, newPassword: '' },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('returns 400 VALIDATION_ERROR when the new password matches the current one', async () => {
+    const hash = await hashPassword(PASSWORD);
+    const usuario = makeUsuario({ hashContrasena: hash });
+    app = await buildApp({
+      repos: fakeRepos({}, { findValid: async () => usuario }),
+      cookieSecret: COOKIE_SECRET,
+    });
+    await app.ready();
+    const signed = app.signCookie('valid-token');
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/auth/password',
+      cookies: { sid: signed },
+      payload: { currentPassword: PASSWORD, newPassword: PASSWORD },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('is reachable for a user with debeCambiarPassword: true (opts in)', async () => {
+    const hash = await hashPassword(PASSWORD);
+    const usuario = makeUsuario({
+      hashContrasena: hash,
+      debeCambiarPassword: true,
+    });
+    app = await buildApp({
+      repos: fakeRepos(
+        { updatePassword: async () => {} },
+        { findValid: async () => usuario, deleteOthers: async () => {} },
+      ),
+      cookieSecret: COOKIE_SECRET,
+    });
+    await app.ready();
+    const signed = app.signCookie('valid-token');
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/auth/password',
+      cookies: { sid: signed },
+      payload: {
+        currentPassword: PASSWORD,
+        newPassword: 'a-brand-new-password',
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+  });
+});
+
+describe('forced-password-change allowlist reaches routes.ts', () => {
+  let app: Awaited<ReturnType<typeof buildApp>> | undefined;
+
+  afterEach(async () => {
+    await app?.close();
+    app = undefined;
+  });
+
+  it('returns 403 PASSWORD_CHANGE_REQUIRED for an unrelated protected route when debeCambiarPassword is true', async () => {
+    const usuario = makeUsuario({ debeCambiarPassword: true });
+    app = await buildApp({
+      repos: fakeRepos({}, { findValid: async () => usuario }),
+      cookieSecret: COOKIE_SECRET,
+    });
+    app.get('/api/some-other-protected-route', async () => ({ ok: true }));
+    await app.ready();
+    const signed = app.signCookie('valid-token');
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/some-other-protected-route',
+      cookies: { sid: signed },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json().error.code).toBe('PASSWORD_CHANGE_REQUIRED');
+  });
 });

@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { login, logout } from '../auth/service.js';
+import { changePassword, login, logout } from '../auth/service.js';
 import { SESSION_COOKIE, sessionCookieOptions } from '../auth/session.js';
 import { errorEnvelopeSchema, unauthorized } from '../lib/errors.js';
 
@@ -10,11 +10,24 @@ const loginBody = z.object({
   password: z.string().min(1),
 });
 
+const changePasswordBody = z
+  .object({
+    currentPassword: z.string().min(1),
+    newPassword: z.string().min(12),
+  })
+  // Falls through to VALIDATION_ERROR via the shared Zod error handler — no
+  // dedicated code for "same password" per the Interfaces section.
+  .refine((value) => value.newPassword !== value.currentPassword, {
+    message: 'newPassword must differ from currentPassword',
+    path: ['newPassword'],
+  });
+
 const usuarioDto = z.object({
   id: z.string(),
   nombre: z.string(),
   email: z.string(),
   rol: z.enum(['encargado', 'deposito']),
+  debeCambiarPassword: z.boolean(),
 });
 
 const okUsuario = z.object({ usuario: usuarioDto });
@@ -24,12 +37,14 @@ function toDto(usuario: {
   nombre: string;
   email: string;
   rol: 'encargado' | 'deposito';
+  debeCambiarPassword: boolean;
 }) {
   return {
     id: usuario.id,
     nombre: usuario.nombre,
     email: usuario.email,
     rol: usuario.rol,
+    debeCambiarPassword: usuario.debeCambiarPassword,
   };
 }
 
@@ -86,6 +101,9 @@ const authRoutes: FastifyPluginAsync = async (app) => {
   typed.get(
     '/auth/me',
     {
+      // Opts in to the forced-change allowlist (design.md D3): the SPA needs
+      // to read the flag from here to route to the change-password screen.
+      config: { allowPasswordChangePending: true },
       schema: {
         response: {
           200: okUsuario,
@@ -101,6 +119,37 @@ const authRoutes: FastifyPluginAsync = async (app) => {
         throw unauthorized();
       }
       return { usuario: toDto(request.user) };
+    },
+  );
+
+  typed.post(
+    '/auth/password',
+    {
+      // Opts in to the forced-change allowlist (design.md D3): this is the
+      // only route a flagged user can reach to clear the flag.
+      config: { allowPasswordChangePending: true },
+      schema: {
+        body: changePasswordBody,
+        response: {
+          200: z.object({ ok: z.literal(true) }),
+          400: errorEnvelopeSchema,
+          401: errorEnvelopeSchema,
+        },
+      },
+    },
+    async (request) => {
+      // The onRequest hook already resolved request.user/sessionId for
+      // protected routes; defensive re-check for the same reason as /me.
+      if (!request.user) {
+        throw unauthorized();
+      }
+      await changePassword(app.repos, {
+        usuario: request.user,
+        sessionId: request.sessionId ?? '',
+        currentPassword: request.body.currentPassword,
+        newPassword: request.body.newPassword,
+      });
+      return { ok: true as const };
     },
   );
 };
