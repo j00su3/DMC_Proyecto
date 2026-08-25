@@ -71,12 +71,12 @@ Chain strategy: pending
 
 ## Phase 5: CI, Deployment Wiring, ADR-0010
 
-- [ ] 5.1 `.github/workflows/ci.yml`: checkout → pnpm/node22 setup → install → lint → `contract:check` → typecheck → `db:migrate` → test, with `services.postgres`
-- [ ] 5.2 `vercel.json` (installCommand, buildCommand, outputDirectory, `/api/:path*` rewrite placeholder, SPA fallback)
-- [ ] 5.3 `render.yaml` (node web service, free plan, build/start commands, `healthCheckPath: /api/health`)
-- [ ] 5.4 Manual: create Render service, capture URL, update `vercel.json` rewrite target (must precede first Vercel deploy — ordering trap)
-- [ ] 5.5 Manual: create Neon project, set `DATABASE_URL` in Render env (`sync:false`)
-- [ ] 5.6 Manual: connect Vercel project to GitHub repo, deploy
-- [ ] 5.7 `adrs/0010-despliegue-tiers-gratuitos.md` (Spanish, MADR, supersedes 0009)
-- [ ] 5.8 Update `adrs/0009-despliegue-local.md` status → "Reemplazado por [[0010-...]]"; update `TECH-DESIGNv2.md` deployment pointer
-- [ ] 5.9 Manual smoke test: Vercel→Render proxy passes `Set-Cookie`; record result in ADR-0010 consequences
+- [x] 5.1 `.github/workflows/ci.yml`: checkout → pnpm/node22 setup → install → lint → `contract:check` → typecheck → `db:migrate` → test, with `services.postgres`
+- [x] 5.2 `vercel.json` (installCommand, buildCommand, outputDirectory, `/api/:path*` rewrite placeholder, SPA fallback)
+- [x] 5.3 `render.yaml` (node web service, free plan, build/start commands, `healthCheckPath: /api/health`)
+- [ ] 5.4 **MANUAL (user, external account action) — not executable by the agent.** Create the Render web service (point it at this GitHub repo, `render.yaml` provides the build/start commands), wait for the first deploy to get its `*.onrender.com` URL, then edit `vercel.json`'s `rewrites[0].destination` to replace `https://RENDER-URL-PLACEHOLDER.onrender.com/api/:path*` with the real URL and commit that change. **This MUST happen before the first Vercel deploy** — see the "Orden de puesta en marcha" section in ADR-0010 (ordering trap: Vercel deployed with the placeholder will 404/fail every `/api/*` call until the next Vercel deploy).
+- [ ] 5.5 **MANUAL (user, external account action) — not executable by the agent.** Create a Neon Postgres project, copy its connection string, and set it as the `DATABASE_URL` environment variable in the Render service dashboard (`render.yaml` already declares the key with `sync: false`, so Render will prompt for the value instead of trying to sync it). Then run `pnpm db:migrate` locally against that Neon `DATABASE_URL` once to apply migrations (Render's free tier has no pre-deploy command).
+- [ ] 5.6 **MANUAL (user, external account action) — not executable by the agent.** Log into Vercel, import this GitHub repository as a new project, confirm the build settings match `vercel.json` (installCommand/buildCommand/outputDirectory auto-detected from the file), and trigger the deploy — only after 5.4's placeholder replacement is committed and pushed.
+- [x] 5.7 `adrs/0010-despliegue-tiers-gratuitos.md` (Spanish, MADR, supersedes 0009)
+- [x] 5.8 Update `adrs/0009-despliegue-local.md` status → "Reemplazado por [[0010-...]]"; update `TECH-DESIGNv2.md` deployment pointer
+- [ ] 5.9 **MANUAL (user, post-deploy verification) — not executable by the agent.** After 5.4–5.6 are live, log in through the deployed Vercel URL and confirm the `Set-Cookie` response header (visible in browser devtools → Network tab on the login request) survives the Vercel→Render proxy unmodified (`httpOnly`, `SameSite=Lax`, `Secure`, no `Domain` attribute). Record the result (pass/fail + date) in ADR-0010's "Pendiente" line under Consequences.
