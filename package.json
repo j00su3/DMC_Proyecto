@@ -1,0 +1,24 @@
+{
+  "name": "inventienda",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@11.21.0",
+  "engines": {
+    "node": ">=22 <23"
+  },
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "lint": "biome ci .",
+    "format": "biome check --write .",
+    "contract": "pnpm --filter @inventienda/api openapi:generate && pnpm --filter @inventienda/web types:generate",
+    "contract:check": "pnpm contract && git diff --exit-code -- apps/api/openapi.json apps/web/src/api/schema.d.ts",
+    "db:up": "docker compose up -d",
+    "db:migrate": "pnpm --filter @inventienda/api db:migrate"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4"
+  }
+}

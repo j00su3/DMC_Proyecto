@@ -28,11 +28,11 @@ Chain strategy: pending
 
 ## Phase 1: Workspace & Tooling (config, non-TDD)
 
-- [ ] 1.1 `git init`, add `.gitignore`; create private GitHub repo under personal account (manual/external)
-- [ ] 1.2 Root `package.json` (name `inventienda`, private, packageManager pin), `pnpm-workspace.yaml` (`apps/*`)
-- [ ] 1.3 `.nvmrc` (22) + `engines` in root `package.json`
-- [ ] 1.4 `tsconfig.base.json`, `biome.json`, `.npmrc`, `.env.example`
-- [ ] 1.5 Root scripts: `dev`, `build`, `typecheck`, `test`, `lint`, `format`, `contract`, `contract:check`, `db:up`, `db:migrate`
+- [x] 1.1 `git init`, add `.gitignore`; create private GitHub repo under personal account (manual/external) — git init + .gitignore done; GitHub repo creation BLOCKED, `gh` CLI not installed in this environment (pending manual step, see apply-progress)
+- [x] 1.2 Root `package.json` (name `inventienda`, private, packageManager pin), `pnpm-workspace.yaml` (`apps/*`)
+- [x] 1.3 `.nvmrc` (22) + `engines` in root `package.json`
+- [x] 1.4 `tsconfig.base.json`, `biome.json`, `.npmrc`, `.env.example`
+- [x] 1.5 Root scripts: `dev`, `build`, `typecheck`, `test`, `lint`, `format`, `contract`, `contract:check`, `db:up`, `db:migrate`
 
 ## Phase 2: API Contract Primitives (TDD)
 
