@@ -3,3 +3,4 @@ packages:
 allowBuilds:
   '@biomejs/biome': true
   esbuild: true
+  argon2: true
