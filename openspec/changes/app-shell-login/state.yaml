@@ -102,10 +102,45 @@ phases:
       byte-identical. 245 authored lines (drizzle/** excluded) against a 400
       budget and a ~300 forecast. api 69/69 (was 63), web 9/9, integration
       12/12, typecheck + lint green.
+    s3_notes: >-
+      Seam S3 (API surface + server enforcement) landed on branch
+      feat/shell-pr3-api-guard (off feat/shell-pr2-data-domain). Commits: 581b29e
+      feat(api) enforcement + endpoint + regenerated contract, 3473007 test(api)
+      integration round trip, dcf356d docs(sdd) checkboxes. All 6 Phase 3 tasks
+      done under strict TDD with verified RED (3.1: "expected 200 to be 403" and
+      "expected 'FORBIDDEN' to be 'PASSWORD_CHANGE_REQUIRED'"; 3.3: seven route
+      failures, 403/404 before the route and the DTO field existed).
+      Added: allowPasswordChangePending?: true config key (D3), request.sessionId
+      decorated in onRequest from unsigned.value (D8 — verified that the unsigned
+      cookie value IS sesiones.id, since findValid matches eq(sesiones.id, id) and
+      deleteOthers matches ne(sesiones.id, exceptId)), the forced-change branch in
+      preHandler at line 89 (D2 — after the auth === false return at 77, before
+      the roles read at 92), POST /auth/password, and debeCambiarPassword in
+      usuarioDto/toDto.
+      ORCHESTRATOR RE-VERIFIED INDEPENDENTLY: D14 honored — git show --name-only
+      on 581b29e lists apps/api/openapi.json and apps/web/src/api/schema.d.ts in
+      the SAME commit as routes/auth.ts. Exactly two routes opt in (GET /auth/me
+      line 106, POST /auth/password line 130); POST /auth/logout correctly has no
+      entry. contract:check exit 0 and byte-identical, typecheck + lint green,
+      api 82/82 (was 69), web 9/9, integration 13/13.
+      BUDGET: 421 authored lines against 400 — 5% over, 345 of it test code
+      covering 5 plugin scenarios + 9 route scenarios + 1 integration round trip.
+      Consistent with the standing no-further-splits decision; not re-litigated.
+      PRE-EXISTING DEFECT FOUND, NOT FIXED (out of S3 scope): the integration
+      suite is flaky at roughly 50% under vitest's default file parallelism.
+      apps/api/src/auth/repository.integration.test.ts:34 and
+      apps/api/src/routes/auth.integration.test.ts:49 both run
+      `truncate table sesiones, usuarios cascade` in beforeEach against the same
+      database, so one file wipes the other's freshly inserted rows mid-test.
+      VERIFIED PRE-EXISTING: both truncates are present at 840c15c, before S3.
+      VERIFIED REPRODUCIBLE: two parallel runs gave 1 failed / 12 passed then
+      13/13; three serial runs (--no-file-parallelism) gave 13/13 every time.
+      Fix belongs in apps/api/vitest.integration.config.ts, which currently sets
+      no pool or isolation options.
     seams:
       S1: done
       S2: done
-      S3: pending
+      S3: done
       S4: pending
       S5: pending
       S6: pending
