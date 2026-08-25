@@ -66,10 +66,10 @@ Maps to: *Password Hashing*, *Session Lifecycle and Lazy Expiry*, *Cookie Plugin
 
 Maps to: *RBAC Hook Contract*.
 
-- [ ] 3.1 RED: `apps/api/src/plugins/auth.test.ts` — default-deny on an unconfigured route (401 `UNAUTHORIZED`); `config: { auth: false }` opt-out proceeds without a session; `config: { roles: [...] }` mismatch returns 403 `FORBIDDEN`; unmatched routes (`request.routeOptions.url === undefined`) skip auth and 404 stays 404 (D8) — covers *Unauthenticated request to a protected route*, *Wrong role on an allowlisted route*, *Public routes stay accessible*
-- [ ] 3.2 GREEN: `apps/api/src/plugins/auth.ts` — `fp()` plugin: `decorateRequest('user', null)`, Fastify type augmentation, `onRequest` hook (resolves signed `sid` cookie via `repos.sesiones.findValid`), `preHandler` hook (`request.routeOptions.config.roles` check)
-- [ ] 3.3 GREEN (config, no test): `apps/api/src/app.ts` — modify `BuildAppOptions { db?, repos?, cookieSecret? }`; register `repos`, `auth` plugins before routes
-- [ ] 3.4 GREEN (config, no test): `apps/api/src/routes/health.ts` — add `config: { auth: false }` so `/api/health` stays public per *Public routes stay accessible* (exercised by the existing `health.test.ts`, no new test needed)
+- [x] 3.1 RED: `apps/api/src/plugins/auth.test.ts` — default-deny on an unconfigured route (401 `UNAUTHORIZED`); `config: { auth: false }` opt-out proceeds without a session; `config: { roles: [...] }` mismatch returns 403 `FORBIDDEN`; unmatched routes (`request.routeOptions.url === undefined`) skip auth and 404 stays 404 (D8) — covers *Unauthenticated request to a protected route*, *Wrong role on an allowlisted route*, *Public routes stay accessible*
+- [x] 3.2 GREEN: `apps/api/src/plugins/auth.ts` — `fp()` plugin: `decorateRequest('user', null)`, Fastify type augmentation, `onRequest` hook (resolves signed `sid` cookie via `repos.sesiones.findValid`), `preHandler` hook (`request.routeOptions.config.roles` check)
+- [x] 3.3 GREEN (config, no test): `apps/api/src/app.ts` — modify `BuildAppOptions { db?, repos?, cookieSecret? }`; register `repos`, `auth` plugins before routes
+- [x] 3.4 GREEN (config, no test): `apps/api/src/routes/health.ts` — add `config: { auth: false }` so `/api/health` stays public per *Public routes stay accessible* (exercised by the existing `health.test.ts`, no new test needed)
 
 ## Phase 4: Auth Endpoints (TDD + integration)
 
