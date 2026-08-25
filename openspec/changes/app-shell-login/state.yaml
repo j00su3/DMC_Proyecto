@@ -13,6 +13,21 @@ session_preflight:
   chain_strategy: stacked-to-main
   review_budget_lines: 400   # authored lines; generated/lockfile excluded
 
+# ask-on-risk fired on the tasks forecast: S4 (~410) and S5a (~430) are both
+# marginally over budget. User decision, 2026-08-25: MEASURE FIRST, split only
+# if confirmed. Build the seam, measure the actual authored diff, and split at
+# the point tasks.md already names only when it exceeds ~450 lines.
+# Rationale: the budget protects reviewer attention, and a 430-line PR is
+# reviewed as well as a 400-line one — what breaks review is a jump in scale
+# (the previous cycle's 810), not a 7% overrun. The forecasts carry their own
+# margin of error, so pre-splitting a PR that may land at 390 buys chain
+# overhead for nothing.
+delivery_decision:
+  policy: measure-then-split
+  split_threshold_authored_lines: 450
+  applies_to: [S4, S5a]
+  decided: 2026-08-25
+
 phases:
   explore:
     status: completed
