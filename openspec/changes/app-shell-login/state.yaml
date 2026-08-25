@@ -34,12 +34,46 @@ phases:
     artifact: design.md
     engram_topic: sdd/app-shell-login/design
   tasks:
-    status: pending
-    blocked_on: "Open Question 1 — visual direction is unapproved (no wireframe exists for either screen)."
+    status: completed
+    artifact: tasks.md
     engram_topic: sdd/app-shell-login/tasks
+    notes: >-
+      7 phases. S5 was SPLIT into 5A (router skeleton + session bootstrap +
+      guards + logout + placeholder shell) and 5B (login screen), because the
+      combined seam forecast ~770 authored lines — near the 810-line, 2x-budget
+      overrun that auth-sesiones hit on its own P4 when strict-TDD coverage was
+      underestimated. Review Workload Forecast flags two seams as
+      "decision needed before apply": S4 at ~410 and S5a at ~430, both marginally
+      over the 400-line budget, each with a proposed file-group split point if
+      the measured diff confirms the overrun.
   apply:
-    status: pending
+    status: in_progress
     engram_topic: sdd/app-shell-login/apply-progress
+    notes: >-
+      Seam S1 (frontend error contract) shipped AHEAD of the tasks phase, at the
+      user's request, because it was the one concrete defect already present in
+      the codebase. Branch feat/shell-pr1-api-errors, off
+      docs/sdd-planning-frontend. Commits: 33c7bb5 feat(web) typed ApiError,
+      b91810f chore(biome) ignore design canvas assets. Created
+      apps/web/src/api/errors.ts (ApiError with explicit fields — NOT TypeScript
+      parameter properties, which interact badly with useDefineForClassFields
+      under esbuild — plus isApiError); reworked client.ts with isErrorEnvelope()
+      narrowing and toApiError(), falling back to code UNEXPECTED_RESPONSE for a
+      non-envelope body (proxy HTML, truncated or invalid JSON) so the UI always
+      receives a typed error; rewrote client.test.ts, intentionally superseding
+      the old .rejects.toThrow('503') assertion exactly as spec and design
+      recorded in advance. RED was verified for real (vitest could not resolve
+      ./errors.js before it existed). Verified on branch: typecheck OK, lint OK,
+      contract:check OK and byte-identical (S1 touches no API file, by design
+      D14), api 63/63, web 9/9 (up from 2). 173 insertions / 11 deletions, well
+      inside the 400 authored-line budget.
+    seams:
+      S1: done
+      S2: pending
+      S3: pending
+      S4: pending
+      S5: pending
+      S6: pending
   verify:
     status: pending
     engram_topic: sdd/app-shell-login/verify-report
@@ -91,11 +125,26 @@ reconciliation:
 
 open_questions:
   - id: Q1
-    status: blocking_tasks
+    status: resolved
+    resolved: 2026-08-25
     question: >-
-      Visual direction for the login and change-password screens is unapproved.
+      Visual direction for the login and change-password screens was unapproved.
       All three .dc.html wireframes referenced by docs/design.md are absent from
-      the repository, so the screens are derived from design tokens alone.
+      the repository, so the screens had to be derived from design tokens alone.
+    resolution: >-
+      Mockups built from docs/design.md tokens, committed to docs/design/ and
+      published at
+      https://claude.ai/code/artifact/adbd0a58-ce25-4fdb-b2ab-4b560ee8f85d —
+      Main.dc.html (login), LoginError.dc.html (invalid credentials),
+      CambiarPassword.dc.html (forced change), canvas.json. Every hex in the
+      mockups was checked against docs/design.md: 16 of 17 appear verbatim, the
+      17th being #ffffff, which the document names as "blanco". One deliberate
+      deviation, recorded in docs/design.md: the login card uses the MODAL
+      shadow (0 18px 50px rgba(22,35,60,.4)) rather than the card shadow, because
+      it floats on the dark #16233c field where a 7%-opacity shadow is invisible.
+      Card radius stays 14px. The published Design System artifact also yielded
+      the sidebar navigation labels and user-card format, now recorded in
+      docs/design.md, which seam S5 needs.
     owner: user
   - id: Q2
     status: accepted
