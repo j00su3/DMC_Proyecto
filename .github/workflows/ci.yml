@@ -25,6 +25,7 @@ jobs:
 
     env:
       DATABASE_URL: postgres://inventienda:inventienda@localhost:5432/inventienda
+      COOKIE_SECRET: ci-only-cookie-secret-placeholder-not-a-real-secret-value
 
     steps:
       - name: Checkout
