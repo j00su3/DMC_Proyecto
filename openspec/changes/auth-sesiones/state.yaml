@@ -1,0 +1,38 @@
+# SDD DAG state for change: auth-sesiones (survives compaction)
+schema: spec-driven
+change: auth-sesiones
+project: inventienda
+artifact_store: hybrid   # phases save to BOTH Engram and OpenSpec files
+updated: 2026-08-24
+
+phases:
+  explore:
+    status: completed
+    artifact: exploration.md
+    engram_topic: sdd/auth-sesiones/explore
+  proposal:
+    status: completed
+    artifact: proposal.md
+    engram_topic: sdd/auth-sesiones/proposal
+  spec:
+    status: completed
+    artifacts:
+      - specs/auth-sessions/spec.md
+      - specs/deployment-wiring/spec.md
+    engram_topic: sdd/auth-sesiones/spec
+  design:
+    status: completed
+    artifact: design.md
+    engram_topic: sdd/auth-sesiones/design
+  tasks:
+    status: completed
+    artifact: tasks.md
+    engram_topic: sdd/auth-sesiones/tasks
+  apply:
+    status: in_progress
+    engram_topic: sdd/auth-sesiones/apply-progress
+    notes: "PR1 (Phase 1: data access seam) landed on branch feat/auth-pr1-data-access, all tasks 1.1-1.9 complete. Chain strategy confirmed: Stacked PRs to main (PR1..PR5), each depends on the prior, per tasks.md's Suggested Work Units. PR1 authored diff (additions+deletions across apps/api/src, excl. generated drizzle/openapi output) is ~493 lines, over the 400-line chained-pr budget despite being its own independently-scoped PR in the chain — driven by the mandatory real-Postgres integration coverage for the atomic lockout UPDATE (design.md's Testing Strategy explicitly requires this, not a fake-pool unit test). Flagged as a risk for maintainer size:exception review rather than trimming test coverage. PR2-PR5 remain pending (P2 primitives, P3 RBAC enforcement, P4 auth endpoints, P5 bootstrap+docs). Tasks 5.5 and 5.6 are MANUAL user-owned steps (COOKIE_SECRET env var provisioning, seed script dry run) — tooling never touches .env* files."
+  verify:
+    status: pending
+  archive:
+    status: pending
