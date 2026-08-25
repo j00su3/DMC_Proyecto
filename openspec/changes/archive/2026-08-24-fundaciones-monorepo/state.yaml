@@ -35,6 +35,12 @@ phases:
     engram_topic: sdd/fundaciones-monorepo/apply-progress
     notes: "PR1 (Phase 1: workspace scaffold & tooling) complete on branch feat/pr1-workspace-scaffold. GitHub repo creation pending (gh CLI unavailable). PR2 (Phase 2: API contract primitives + Fastify app + health slice, TDD) complete on branch feat/pr2-contract-primitives (committed). PR3 (Phase 3: OpenAPI/type-gen pipeline + SPA scaffold, tasks 3.1-3.9, TDD where applicable) complete on branch feat/pr3-openapi-typegen-spa (created from feat/pr2-contract-primitives), 3 commits (21caf8b, 21c4b7a, 75b4052), 253 authored changed lines (excl. lockfile and the 2 generated files) — under the 400-line cap. PR4 (Phase 4: Drizzle/migrations infra, tasks 4.1-4.5 plus a user-mandated real-Postgres integration test) complete on branch feat/pr4-drizzle-migrations (created from feat/pr3-openapi-typegen-spa), verified against local Docker Postgres (db:generate emitted an empty journal, db:migrate applied cleanly, integration test GREEN). PR5 (Phase 5: CI + deploy wiring + ADR-0010, tasks 5.1, 5.2, 5.3, 5.7, 5.8) complete on branch feat/pr5-ci-deploy (created from feat/pr4-drizzle-migrations), 4 commits — .github/workflows/ci.yml, vercel.json, render.yaml, ADR-0010 + ADR-0009/TECH-DESIGNv2 pointer updates, tasks.md/state.yaml bookkeeping. Tasks 5.4, 5.5, 5.6, 5.9 are MANUAL, external-account steps (Render service creation + URL capture into vercel.json before first Vercel deploy, Neon project + DATABASE_URL in Render, Vercel project connect/deploy, post-deploy Set-Cookie smoke test) and remain [ ] pending user execution — not automatable by the agent. This is the last planned PR (5 of 5); the change is implementation-complete pending those manual steps."
   verify:
-    status: pending
+    status: completed
+    artifact: verification report (Engram)
+    engram_topic: sdd/fundaciones-monorepo/verify-report
+    verdict: PASS — all automatable specs verified, 4 manual tasks correctly documented as deferred
   archive:
-    status: pending
+    status: completed
+    completed_at: 2026-08-24T19:15:00Z
+    engram_topic: sdd/fundaciones-monorepo/archive-report
+    notes: "Specs synced to openspec/specs/{domain}/spec.md. Change folder moved to openspec/changes/archive/2026-08-24-fundaciones-monorepo/. SDD cycle closed."
