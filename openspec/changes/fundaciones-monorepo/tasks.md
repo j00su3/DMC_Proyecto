@@ -36,17 +36,17 @@ Chain strategy: pending
 
 ## Phase 2: API Contract Primitives (TDD)
 
-- [ ] 2.1 `apps/api/package.json`, `tsconfig.json`, `vitest.config.ts` (extends base)
-- [ ] 2.2 RED: `lib/errors.test.ts` — validation/AppError/unknown/404 map to `{error:{code,message,details?}}`
-- [ ] 2.3 GREEN: `lib/errors.ts` (AppError class + envelope mapper)
-- [ ] 2.4 RED: `lib/pagination.test.ts` — defaults, explicit `page`/`pageSize`, `total`
-- [ ] 2.5 GREEN: `lib/pagination.ts` (`pageQuerySchema`, `paginated()`)
-- [ ] 2.6 GREEN: `lib/env.ts` (Zod-parsed `DATABASE_URL`/`PORT`/`NODE_ENV`, fail-fast)
-- [ ] 2.7 `plugins/db.ts` (lazy pool per D2), `plugins/cookie.ts` (`httpOnly`, `SameSite=Lax`, no session logic)
-- [ ] 2.8 `app.ts` `buildApp(opts?)`: type-provider-zod, swagger (no swagger-ui), cookie/db plugins, error/404 handlers
-- [ ] 2.9 RED: `routes/health.test.ts` — healthy 200, DB-unreachable non-2xx via error envelope (stubbed `db`)
-- [ ] 2.10 GREEN: `routes/health.ts` (`GET /api/health`)
-- [ ] 2.11 `server.ts` (`buildApp().listen({port, host:'0.0.0.0'})`)
+- [x] 2.1 `apps/api/package.json`, `tsconfig.json`, `vitest.config.ts` (extends base)
+- [x] 2.2 RED: `lib/errors.test.ts` — validation/AppError/unknown/404 map to `{error:{code,message,details?}}`
+- [x] 2.3 GREEN: `lib/errors.ts` (AppError class + envelope mapper)
+- [x] 2.4 RED: `lib/pagination.test.ts` — defaults, explicit `page`/`pageSize`, `total`
+- [x] 2.5 GREEN: `lib/pagination.ts` (`pageQuerySchema`, `paginated()`)
+- [x] 2.6 GREEN: `lib/env.ts` (Zod-parsed `DATABASE_URL`/`PORT`/`NODE_ENV`, fail-fast)
+- [x] 2.7 `plugins/db.ts` (lazy pool per D2), `plugins/cookie.ts` (`httpOnly`, `SameSite=Lax`, no session logic)
+- [x] 2.8 `app.ts` `buildApp(opts?)`: type-provider-zod, swagger (no swagger-ui), cookie/db plugins, error/404 handlers
+- [x] 2.9 RED: `routes/health.test.ts` — healthy 200, DB-unreachable non-2xx via error envelope (stubbed `db`)
+- [x] 2.10 GREEN: `routes/health.ts` (`GET /api/health`)
+- [x] 2.11 `server.ts` (`buildApp().listen({port, host:'0.0.0.0'})`)
 
 ## Phase 3: OpenAPI/Type Generation + SPA Scaffold
 
