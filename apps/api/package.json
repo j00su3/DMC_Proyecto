@@ -11,7 +11,8 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "openapi:generate": "tsx src/plugins/openapi.ts",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "seed:encargado": "tsx scripts/seed-encargado.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",

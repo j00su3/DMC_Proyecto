@@ -18,7 +18,8 @@
     "db:up": "docker compose up -d",
     "db:generate": "pnpm --filter @inventienda/api db:generate",
     "db:migrate": "pnpm --filter @inventienda/api db:migrate",
-    "test:integration": "pnpm --filter @inventienda/api test:integration"
+    "test:integration": "pnpm --filter @inventienda/api test:integration",
+    "seed:encargado": "pnpm --filter @inventienda/api seed:encargado"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4"
