@@ -13,6 +13,7 @@ const healthRoutes: FastifyPluginAsync = async (app) => {
   app.withTypeProvider<ZodTypeProvider>().get(
     '/health',
     {
+      config: { auth: false },
       schema: {
         response: {
           200: healthResponseSchema,

@@ -7,12 +7,16 @@ import {
   validatorCompiler,
 } from 'fastify-type-provider-zod';
 import { notFoundEnvelope, toErrorEnvelope } from './lib/errors.js';
+import authPlugin from './plugins/auth.js';
 import cookiePlugin from './plugins/cookie.js';
 import dbPlugin, { type DbLike } from './plugins/db.js';
+import reposPlugin, { type Repos } from './plugins/repos.js';
 import healthRoutes from './routes/health.js';
 
 export interface BuildAppOptions {
   db?: DbLike;
+  repos?: Repos;
+  cookieSecret?: string;
 }
 
 export async function buildApp(
@@ -33,8 +37,12 @@ export async function buildApp(
     transform: jsonSchemaTransform,
   });
 
-  await app.register(cookiePlugin);
+  await app.register(cookiePlugin, { secret: opts.cookieSecret });
   await app.register(dbPlugin, { db: opts.db });
+  await app.register(reposPlugin, { repos: opts.repos });
+  // Must be registered before any route plugin below — Fastify hooks only
+  // apply to routes registered after the hook (design.md risk register).
+  await app.register(authPlugin);
 
   app.register(healthRoutes, { prefix: '/api' });
 
