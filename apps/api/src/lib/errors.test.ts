@@ -5,7 +5,9 @@ import {
   accountLocked,
   forbidden,
   invalidCredentials,
+  invalidCurrentPassword,
   notFoundEnvelope,
+  passwordChangeRequired,
   toErrorEnvelope,
   unauthorized,
 } from './errors.js';
@@ -102,6 +104,20 @@ describe('auth error factories', () => {
 
     expect(error.status).toBe(401);
     expect(error.code).toBe('ACCOUNT_INACTIVE');
+  });
+
+  it('passwordChangeRequired() is a 403 AppError with code PASSWORD_CHANGE_REQUIRED', () => {
+    const error = passwordChangeRequired();
+
+    expect(error.status).toBe(403);
+    expect(error.code).toBe('PASSWORD_CHANGE_REQUIRED');
+  });
+
+  it('invalidCurrentPassword() is a 400 AppError with code INVALID_CURRENT_PASSWORD', () => {
+    const error = invalidCurrentPassword();
+
+    expect(error.status).toBe(400);
+    expect(error.code).toBe('INVALID_CURRENT_PASSWORD');
   });
 });
 

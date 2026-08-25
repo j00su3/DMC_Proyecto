@@ -1,4 +1,4 @@
-import { and, eq, gt, lte, sql } from 'drizzle-orm';
+import { and, eq, gt, lte, ne, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { sesiones, usuarios } from '../db/schema.js';
 
@@ -12,6 +12,7 @@ export interface Usuario {
   intentosFallidos: number;
   bloqueadoHasta: Date | null;
   creadoEn: Date;
+  debeCambiarPassword: boolean;
 }
 
 export interface LockoutResult {
@@ -23,6 +24,7 @@ export interface UsuariosRepo {
   findByEmail(email: string): Promise<Usuario | undefined>;
   registerFailedAttempt(id: string): Promise<LockoutResult>;
   resetAttempts(id: string): Promise<void>;
+  updatePassword(id: string, hash: string): Promise<void>;
 }
 
 export interface NuevaSesion {
@@ -36,6 +38,7 @@ export interface SesionesRepo {
   findValid(id: string, now: Date): Promise<Usuario | undefined>;
   delete(id: string): Promise<void>;
   purgeExpired(usuarioId: string): Promise<void>;
+  deleteOthers(usuarioId: string, exceptId: string): Promise<void>;
 }
 
 interface LockoutRow {
@@ -88,6 +91,17 @@ export class DrizzleUsuariosRepo implements UsuariosRepo {
       .set({ intentosFallidos: 0, bloqueadoHasta: null })
       .where(eq(usuarios.id, id));
   }
+
+  // Single UPDATE sets the hash and clears debe_cambiar_password together
+  // (design.md D6) — two statements would allow a partial failure that
+  // changes the password but leaves the flag set, trapping the user in a
+  // redirect loop while holding the new password.
+  async updatePassword(id: string, hash: string): Promise<void> {
+    await this.db
+      .update(usuarios)
+      .set({ hashContrasena: hash, debeCambiarPassword: false })
+      .where(eq(usuarios.id, id));
+  }
 }
 
 export class DrizzleSesionesRepo implements SesionesRepo {
@@ -130,5 +144,13 @@ export class DrizzleSesionesRepo implements SesionesRepo {
           lte(sesiones.expiraEn, new Date()),
         ),
       );
+  }
+
+  // Revokes every session for a user except the one that performed the
+  // password change (design.md D7 — update happens before this call).
+  async deleteOthers(usuarioId: string, exceptId: string): Promise<void> {
+    await this.db
+      .delete(sesiones)
+      .where(and(eq(sesiones.usuarioId, usuarioId), ne(sesiones.id, exceptId)));
   }
 }

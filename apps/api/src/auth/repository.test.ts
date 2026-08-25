@@ -22,12 +22,12 @@ function createFakeDb() {
       rows: [{ intentos_fallidos: 1, bloqueado_hasta: null }],
     })),
   };
-  return chain as unknown as Db;
+  return { db: chain as unknown as Db, chain };
 }
 
 describe('DrizzleUsuariosRepo', () => {
   it('exposes findByEmail, registerFailedAttempt, resetAttempts over an injected Db', async () => {
-    const db = createFakeDb();
+    const { db } = createFakeDb();
     const repo = new DrizzleUsuariosRepo(db);
 
     expect(typeof repo.findByEmail).toBe('function');
@@ -44,11 +44,24 @@ describe('DrizzleUsuariosRepo', () => {
     await repo.resetAttempts('id-1');
     expect(db.update).toHaveBeenCalled();
   });
+
+  it('updatePassword sets the hash and clears debe_cambiar_password in one UPDATE (D6)', async () => {
+    const { db, chain } = createFakeDb();
+    const repo = new DrizzleUsuariosRepo(db);
+
+    await repo.updatePassword('id-1', 'new-hash');
+
+    expect(db.update).toHaveBeenCalledTimes(1);
+    expect(chain.set).toHaveBeenCalledWith({
+      hashContrasena: 'new-hash',
+      debeCambiarPassword: false,
+    });
+  });
 });
 
 describe('DrizzleSesionesRepo', () => {
   it('exposes create, findValid, delete, purgeExpired over an injected Db', async () => {
-    const db = createFakeDb();
+    const { db } = createFakeDb();
     const repo = new DrizzleSesionesRepo(db);
 
     expect(typeof repo.create).toBe('function');
@@ -67,5 +80,15 @@ describe('DrizzleSesionesRepo', () => {
 
     await repo.purgeExpired('u1');
     expect(db.delete).toHaveBeenCalled();
+  });
+
+  it('deleteOthers deletes only the given user sessions except the excepted one', async () => {
+    const { db, chain } = createFakeDb();
+    const repo = new DrizzleSesionesRepo(db);
+
+    await repo.deleteOthers('u1', 'keep-me');
+
+    expect(db.delete).toHaveBeenCalled();
+    expect(chain.where).toHaveBeenCalled();
   });
 });

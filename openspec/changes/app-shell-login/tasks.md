@@ -45,29 +45,29 @@ spec); *Usuario and Sesion Tables* (`auth-sessions` delta). **No route file chan
 must stay byte-identical after this phase (verified in 2.9's sibling `contract:check`, not regenerated
 here).
 
-- [ ] 2.1 GREEN (config, no test) `apps/api/src/db/schema.ts` — modify: `debeCambiarPassword: boolean('debe_cambiar_password').notNull().default(false)` on `usuarios` (D1)
-- [ ] 2.2 Run `pnpm db:generate`; commit `apps/api/drizzle/0001_*.sql` + meta snapshot (generated,
+- [x] 2.1 GREEN (config, no test) `apps/api/src/db/schema.ts` — modify: `debeCambiarPassword: boolean('debe_cambiar_password').notNull().default(false)` on `usuarios` (D1)
+- [x] 2.2 Run `pnpm db:generate`; commit `apps/api/drizzle/0001_*.sql` + meta snapshot (generated,
       exempt from TDD) — `ADD COLUMN ... NOT NULL DEFAULT false`, no table rewrite on PG 11+
-- [ ] 2.3 RED: extend `apps/api/src/auth/repository.test.ts` — `UsuariosRepo.updatePassword(id, hash)`
+- [x] 2.3 RED: extend `apps/api/src/auth/repository.test.ts` — `UsuariosRepo.updatePassword(id, hash)`
       sets the hash **and** clears the flag in one UPDATE (D6); `SesionesRepo.deleteOthers(usuarioId, exceptId)`
       deletes only the other rows for that user, using an in-memory fake pool (interface-shape level,
       same precedent as `auth-sesiones` 1.5)
-- [ ] 2.4 GREEN `apps/api/src/auth/repository.ts` — implement `UsuariosRepo.updatePassword`,
+- [x] 2.4 GREEN `apps/api/src/auth/repository.ts` — implement `UsuariosRepo.updatePassword`,
       `SesionesRepo.deleteOthers`; `Usuario` type gains `debeCambiarPassword` (read from the existing
       `findValid` JOIN, D1 — zero extra queries)
-- [ ] 2.5 RED: extend `apps/api/src/lib/errors.test.ts` — `passwordChangeRequired()` → 403
+- [x] 2.5 RED: extend `apps/api/src/lib/errors.test.ts` — `passwordChangeRequired()` → 403
       `PASSWORD_CHANGE_REQUIRED` (R1: reconciled from spec's `MUST_CHANGE_PASSWORD`);
       `invalidCurrentPassword()` → 400 `INVALID_CURRENT_PASSWORD` (R2: reconciled from spec's 401
       `INVALID_CREDENTIALS`)
-- [ ] 2.6 GREEN `apps/api/src/lib/errors.ts` — add the two factories to the shared envelope builder
-- [ ] 2.7 RED (new file): `apps/api/src/auth/service.test.ts` extend for `changePassword()` — wrong
+- [x] 2.6 GREEN `apps/api/src/lib/errors.ts` — add the two factories to the shared envelope builder
+- [x] 2.7 RED (new file): `apps/api/src/auth/service.test.ts` extend for `changePassword()` — wrong
       current password → `INVALID_CURRENT_PASSWORD` **and no repo writes** (D5); success → `updatePassword`
       then `deleteOthers(usuarioId, sessionId)` called in that exact order (D7); new hash verifies via
       real argon2, old hash does not
-- [ ] 2.8 GREEN `apps/api/src/auth/service.ts` — `changePassword(repos, { usuario, sessionId, currentPassword, newPassword })`
+- [x] 2.8 GREEN `apps/api/src/auth/service.ts` — `changePassword(repos, { usuario, sessionId, currentPassword, newPassword })`
       per the Data Flow diagram (D5–D7): `verifyPassword` → on failure return `invalidCurrentPassword()`
       with no writes; on success `updatePassword` then `deleteOthers`
-- [ ] 2.9 Integration RED→GREEN: extend `apps/api/src/auth/repository.integration.test.ts` (real Docker
+- [x] 2.9 Integration RED→GREEN: extend `apps/api/src/auth/repository.integration.test.ts` (real Docker
       Postgres, `test:integration` suite) — migration applies (`debe_cambiar_password` column exists,
       default `false` for pre-existing rows); `deleteOthers` removes only the other sessions and the
       current cookie's session still resolves via `findValid`
