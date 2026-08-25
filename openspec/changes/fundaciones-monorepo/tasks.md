@@ -50,15 +50,15 @@ Chain strategy: pending
 
 ## Phase 3: OpenAPI/Type Generation + SPA Scaffold
 
-- [ ] 3.1 `plugins/openapi.ts` script: `buildApp()` → `ready()` → `app.swagger()` → write `apps/api/openapi.json`, `app.close()` (no `listen()`, per D1)
-- [ ] 3.2 Commit generated `apps/api/openapi.json`
-- [ ] 3.3 `apps/web/package.json`, `tsconfig.json`, `vite.config.ts` (proxy `/api`→`localhost:3000`), `index.html`
-- [ ] 3.4 `types:generate` script (`openapi-typescript`) → `apps/web/src/api/schema.d.ts` (generated, committed)
-- [ ] 3.5 RED: `api/client.test.ts` — builds `/api` URL, sends `credentials:'include'`
-- [ ] 3.6 GREEN: `api/client.ts`
-- [ ] 3.7 RED: `App.test.tsx` — renders under `QueryClientProvider`
-- [ ] 3.8 GREEN: `main.tsx`, `App.tsx`, `test/setup.ts`
-- [ ] 3.9 Verify `pnpm contract:check` passes byte-identical
+- [x] 3.1 `plugins/openapi.ts` script: `buildApp()` → `ready()` → `app.swagger()` → write `apps/api/openapi.json`, `app.close()` (no `listen()`, per D1)
+- [x] 3.2 Commit generated `apps/api/openapi.json`
+- [x] 3.3 `apps/web/package.json`, `tsconfig.json`, `vite.config.ts` (proxy `/api`→`localhost:3000`), `index.html`
+- [x] 3.4 `types:generate` script (`openapi-typescript`) → `apps/web/src/api/schema.d.ts` (generated, committed)
+- [x] 3.5 RED: `api/client.test.ts` — builds `/api` URL, sends `credentials:'include'`
+- [x] 3.6 GREEN: `api/client.ts`
+- [x] 3.7 RED: `App.test.tsx` — renders under `QueryClientProvider`
+- [x] 3.8 GREEN: `main.tsx`, `App.tsx`, `test/setup.ts`
+- [x] 3.9 Verify `pnpm contract:check` passes byte-identical
 
 ## Phase 4: Drizzle/Migrations Infra
 
