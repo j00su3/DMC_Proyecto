@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { AppError, notFoundEnvelope, toErrorEnvelope } from './errors.js';
+import {
+  AppError,
+  accountInactive,
+  accountLocked,
+  forbidden,
+  invalidCredentials,
+  notFoundEnvelope,
+  toErrorEnvelope,
+  unauthorized,
+} from './errors.js';
 
 describe('toErrorEnvelope', () => {
   it('maps a Fastify schema-validation error to a 400 VALIDATION_ERROR envelope with flattened details', () => {
@@ -54,5 +63,61 @@ describe('notFoundEnvelope', () => {
 
     expect(result.status).toBe(404);
     expect(result.body.error.code).toBe('NOT_FOUND');
+  });
+});
+
+describe('auth error factories', () => {
+  it('unauthorized() is a 401 AppError with code UNAUTHORIZED', () => {
+    const error = unauthorized();
+
+    expect(error).toBeInstanceOf(AppError);
+    expect(error.status).toBe(401);
+    expect(error.code).toBe('UNAUTHORIZED');
+  });
+
+  it('forbidden() is a 403 AppError with code FORBIDDEN', () => {
+    const error = forbidden();
+
+    expect(error.status).toBe(403);
+    expect(error.code).toBe('FORBIDDEN');
+  });
+
+  it('accountLocked() is a 423 AppError carrying details.retryAfter in seconds', () => {
+    const error = accountLocked(120);
+
+    expect(error.status).toBe(423);
+    expect(error.code).toBe('ACCOUNT_LOCKED');
+    expect(error.details).toEqual({ retryAfter: 120 });
+  });
+
+  it('invalidCredentials() is a 401 AppError with code INVALID_CREDENTIALS', () => {
+    const error = invalidCredentials();
+
+    expect(error.status).toBe(401);
+    expect(error.code).toBe('INVALID_CREDENTIALS');
+  });
+
+  it('accountInactive() is a 401 AppError with code ACCOUNT_INACTIVE', () => {
+    const error = accountInactive();
+
+    expect(error.status).toBe(401);
+    expect(error.code).toBe('ACCOUNT_INACTIVE');
+  });
+});
+
+describe('toErrorEnvelope — rate limit mapping', () => {
+  it('maps a Fastify rate-limit error (statusCode: 429) to a RATE_LIMITED envelope, not INTERNAL_ERROR', () => {
+    // Shape actually thrown by @fastify/rate-limit, not a hand-rolled fake:
+    // it is a plain Error decorated with statusCode/code, no AppError, no
+    // `validation` array.
+    const rateLimitError = Object.assign(new Error('Rate limit exceeded'), {
+      statusCode: 429,
+      code: 'FST_ERR_RATE_LIMIT_EXCEEDED',
+    });
+
+    const result = toErrorEnvelope(rateLimitError);
+
+    expect(result.status).toBe(429);
+    expect(result.body.error.code).toBe('RATE_LIMITED');
   });
 });
