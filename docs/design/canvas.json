@@ -1,0 +1,31 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1240, "h": 780, "title": "Login" },
+    { "file": "LoginError.dc.html", "x": 1360, "y": 0, "w": 1240, "h": 780, "title": "Login · credenciales incorrectas" },
+    { "file": "CambiarPassword.dc.html", "x": 2720, "y": 0, "w": 1240, "h": 780, "title": "Cambio de contraseña obligatorio" }
+  ],
+  "annotations": [
+    {
+      "id": "tokens",
+      "x": 0,
+      "y": -190,
+      "w": 460,
+      "text": "Todo sale de docs/design.md.\nFondo #16233c · tarjeta radio 14 · inputs radio 10, borde #dde3ea, padding 9px 14px · botón #3b82f6 peso 700 con sombra 0 2px 6px rgba(59,130,246,.35) · Public Sans 400-800.\nÚnica decisión propia: la sombra de la tarjeta es la de modal (0 18px 50px), no la de tarjeta, porque flota sobre fondo oscuro."
+    },
+    {
+      "id": "estados",
+      "x": 1360,
+      "y": -190,
+      "w": 460,
+      "text": "El estado bloqueado (423 ACCOUNT_LOCKED) usa este mismo banner rojo con otro texto: incluye los minutos que faltan, tomados de details.retryAfter."
+    },
+    {
+      "id": "forzado",
+      "x": 2720,
+      "y": -190,
+      "w": 460,
+      "text": "Esta pantalla es la única alcanzable mientras debe_cambiar_password sea true. El servidor lo impone (403 PASSWORD_CHANGE_REQUIRED), no el router.\n«Cerrar sesión» queda disponible a propósito: logout es auth:false y nunca pasa por esa guarda."
+    }
+  ],
+  "launch": { "view": "canvas" }
+}

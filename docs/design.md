@@ -96,9 +96,17 @@ Candado 🔒 junto a lo restringido. Matriz de permisos: ✓ verde / ◐ ámbar 
 
 ## Archivos
 
+**En el repositorio:**
+- `design/Main.dc.html` — login, estado normal.
+- `design/LoginError.dc.html` — login con credenciales incorrectas.
+- `design/CambiarPassword.dc.html` — cambio de contraseña obligatorio.
+- `design/canvas.json` — disposición de los tres artboards.
+
 **Publicado y accesible:**
 - Design System v1.0 (agosto 2026), versión renderizada de este documento con ejemplos
   de componentes vivos: <https://claude.ai/code/artifact/88cebdeb-b155-44e1-9544-347efcd7b639>
+- Maqueta de acceso (login + cambio de contraseña), generada el 2026-08-25 a partir de los
+  tokens de este documento: <https://claude.ai/code/artifact/adbd0a58-ce25-4fdb-b2ab-4b560ee8f85d>
 
 **Referenciados pero AUSENTES del repositorio** (verificado el 2026-08-25: cero coincidencias
 de `*.dc.html` en todo el árbol, `node_modules` excluido):
@@ -106,9 +114,13 @@ de `*.dc.html` en todo el árbol, `node_modules` excluido):
 - `UI Dashboard.dc.html` — exploración de 3 direcciones; **1b elegida**.
 - `UI Vistas.dc.html` — las 7 vistas restantes en la dirección elegida.
 
-Ninguno de los tres está contenido en el artifact publicado; ese artifact es la referencia
-de sistema, no las pantallas compuestas. Consecuencia práctica: **no existe maqueta aprobada
-de login ni de cambio de contraseña**, porque esas dos pantallas nunca aparecieron en la
-exploración visual (el Design System no las menciona). El cambio `app-shell-login`
-(backlog #2.1) las construye a partir de los tokens de este documento. Si los tres archivos
-aparecen, bajarlos a `docs/` y actualizar esta sección.
+Ninguno de los tres está contenido en el artifact del Design System; ese artifact es la
+referencia de sistema, no las pantallas compuestas. Login y cambio de contraseña nunca
+aparecieron en la exploración visual original, y por eso se maquetaron aparte (ver «En el
+repositorio»). Si los tres archivos ausentes aparecen, bajarlos a `docs/design/` y
+actualizar esta sección.
+
+Única decisión de diseño tomada fuera de este documento: la tarjeta de login usa la sombra
+de **modal** (`0 18px 50px rgba(22,35,60,.4)`) en vez de la de tarjeta
+(`0 1px 3px rgba(22,35,60,.07)`), porque flota sobre el fondo oscuro `#16233c` y la sombra
+de tarjeta es invisible ahí. El radio sigue siendo el de tarjeta (14px).

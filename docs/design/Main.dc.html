@@ -1,0 +1,62 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700;800&display=swap">
+  <style>
+    body { margin: 0; }
+    a { color: #aebad0; }
+    a:hover { color: #ffffff; }
+    input:focus-visible {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, .18);
+    }
+    button:focus-visible {
+      outline: 2px solid #ffffff;
+      outline-offset: 2px;
+    }
+  </style>
+</helmet>
+
+<div style="width: 1240px; height: 780px; background: #16233c; font-family: 'Public Sans', system-ui, sans-serif; color: #1e2733; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px">
+
+  <div style="width: 380px; background: #ffffff; border-radius: 14px; box-shadow: 0 18px 50px rgba(22, 35, 60, .4); padding: 32px 30px; display: flex; flex-direction: column; gap: 24px">
+
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 10px">
+      <div style="width: 44px; height: 44px; border-radius: 12px; background: linear-gradient(135deg, #3b82f6, #2456c8); color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 17px; letter-spacing: -.01em">it</div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 3px">
+        <div style="font-size: 17px; font-weight: 800; line-height: 1.15">InvenTienda</div>
+        <div style="font-size: 13px; color: #8794a5">Sistema de Gestión de Inventario</div>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 16px">
+
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <label for="email" style="font-size: 13px; font-weight: 600; color: #1e2733">Correo electrónico</label>
+        <input id="email" type="email" autocomplete="username" placeholder="usuario@tienda.com" style="width: 100%; box-sizing: border-box; background: #ffffff; border: 1px solid #dde3ea; border-radius: 10px; padding: 9px 14px; font-family: inherit; font-size: 14px; color: #1e2733">
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <label for="password" style="font-size: 13px; font-weight: 600; color: #1e2733">Contraseña</label>
+        <input id="password" type="password" autocomplete="current-password" placeholder="••••••••••••" style="width: 100%; box-sizing: border-box; background: #ffffff; border: 1px solid #dde3ea; border-radius: 10px; padding: 9px 14px; font-family: inherit; font-size: 14px; color: #1e2733">
+      </div>
+
+      <button type="submit" style="width: 100%; min-height: 44px; background: #3b82f6; color: #ffffff; font-family: inherit; font-size: 14px; font-weight: 700; border: none; border-radius: 10px; box-shadow: 0 2px 6px rgba(59, 130, 246, .35); cursor: pointer">Ingresar</button>
+
+    </div>
+
+  </div>
+
+  <div style="font-size: 12px; color: #69788c">Si olvidó su contraseña, solicítesela al encargado.</div>
+
+</div>
+</x-dc>
+</body>
+</html>
