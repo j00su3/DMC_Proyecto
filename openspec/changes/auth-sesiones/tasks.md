@@ -50,17 +50,17 @@ Maps to: *Usuario and Sesion Tables* (auth-sessions spec).
 
 Maps to: *Password Hashing*, *Session Lifecycle and Lazy Expiry*, *Cookie Plugin Foundation* (deployment-wiring spec).
 
-- [ ] 2.1 RED: `apps/api/src/auth/password.test.ts` — `hash→verify` round trip (real argon2, no mock); wrong password fails verify; stored hash is never the plaintext — covers *Password stored as argon2id hash*
-- [ ] 2.2 GREEN: `apps/api/src/auth/password.ts` — `hashPassword`/`verifyPassword` (argon2id, OWASP params) + exported `DUMMY_HASH` constant (D11)
-- [ ] 2.3 RED: `apps/api/src/auth/session.test.ts` — token length/entropy shape (`base64url(randomBytes(32))`, D4); `sessionCookieOptions()` never includes a `domain` key (ADR-0010 regression guard); `secure` flips true/false with `NODE_ENV`
-- [ ] 2.4 GREEN: `apps/api/src/auth/session.ts` — `SESSION_COOKIE` constant, `createToken()`, `sessionCookieOptions()` (D15, 12h `maxAge`)
-- [ ] 2.5 RED: extend `apps/api/src/lib/errors.test.ts` — new factories `unauthorized()`, `forbidden()`, `accountLocked()` (with `details.retryAfter`, D9), `invalidCredentials()`, `accountInactive()` map to the correct status/code envelope
-- [ ] 2.6 GREEN: `apps/api/src/lib/errors.ts` — add the five factories + shared `errorEnvelopeSchema`
-- [ ] 2.7 RED: extend `apps/api/src/lib/errors.test.ts` — a 429 thrown by `@fastify/rate-limit`'s Fastify error (`statusCode: 429`) maps to `RATE_LIMITED`, not `INTERNAL_ERROR`, in `toErrorEnvelope`
-- [ ] 2.8 GREEN: `apps/api/src/lib/errors.ts` — add the 429 branch to `toErrorEnvelope`
-- [ ] 2.9 GREEN (config, no test): `apps/api/src/lib/env.ts` — add `COOKIE_SECRET: z.string().min(32)` (fail-fast on missing/invalid, per *Missing signing secret fails fast* scenario, verified at 3.x plugin-wiring level, not here)
-- [ ] 2.10 GREEN (config, no test): `apps/api/src/plugins/cookie.ts` — `secret` from `buildApp({ cookieSecret })` → `process.env.COOKIE_SECRET` → dev fallback with production hard-throw (D13), explicit `path`
-- [ ] 2.11 GREEN (config, non-TDD): `apps/api/package.json` — add `argon2`, `@fastify/rate-limit` deps; root `package.json` `pnpm.onlyBuiltDependencies: ["argon2"]`; `.github/workflows/ci.yml` — add `COOKIE_SECRET` to job `env` block
+- [x] 2.1 RED: `apps/api/src/auth/password.test.ts` — `hash→verify` round trip (real argon2, no mock); wrong password fails verify; stored hash is never the plaintext — covers *Password stored as argon2id hash*
+- [x] 2.2 GREEN: `apps/api/src/auth/password.ts` — `hashPassword`/`verifyPassword` (argon2id, OWASP params) + exported `DUMMY_HASH` constant (D11)
+- [x] 2.3 RED: `apps/api/src/auth/session.test.ts` — token length/entropy shape (`base64url(randomBytes(32))`, D4); `sessionCookieOptions()` never includes a `domain` key (ADR-0010 regression guard); `secure` flips true/false with `NODE_ENV`
+- [x] 2.4 GREEN: `apps/api/src/auth/session.ts` — `SESSION_COOKIE` constant, `createToken()`, `sessionCookieOptions()` (D15, 12h `maxAge`)
+- [x] 2.5 RED: extend `apps/api/src/lib/errors.test.ts` — new factories `unauthorized()`, `forbidden()`, `accountLocked()` (with `details.retryAfter`, D9), `invalidCredentials()`, `accountInactive()` map to the correct status/code envelope
+- [x] 2.6 GREEN: `apps/api/src/lib/errors.ts` — add the five factories + shared `errorEnvelopeSchema`
+- [x] 2.7 RED: extend `apps/api/src/lib/errors.test.ts` — a 429 thrown by `@fastify/rate-limit`'s Fastify error (`statusCode: 429`) maps to `RATE_LIMITED`, not `INTERNAL_ERROR`, in `toErrorEnvelope`
+- [x] 2.8 GREEN: `apps/api/src/lib/errors.ts` — add the 429 branch to `toErrorEnvelope`
+- [x] 2.9 GREEN (config, no test): `apps/api/src/lib/env.ts` — add `COOKIE_SECRET: z.string().min(32)` (fail-fast on missing/invalid, per *Missing signing secret fails fast* scenario, verified at 3.x plugin-wiring level, not here)
+- [x] 2.10 GREEN (config, no test): `apps/api/src/plugins/cookie.ts` — `secret` from `buildApp({ cookieSecret })` → `process.env.COOKIE_SECRET` → dev fallback with production hard-throw (D13), explicit `path`
+- [x] 2.11 GREEN (config, non-TDD): `apps/api/package.json` — add `argon2`, `@fastify/rate-limit` deps; root `package.json` `pnpm.onlyBuiltDependencies: ["argon2"]`; `.github/workflows/ci.yml` — add `COOKIE_SECRET` to job `env` block — DEVIATION: this repo already uses `pnpm-workspace.yaml`'s `allowBuilds` map (not root `package.json` `pnpm.onlyBuiltDependencies`) for native postinstall approval (e.g. `esbuild`, `@biomejs/biome`); added `argon2: true` there for consistency with the existing convention instead of introducing a second mechanism
 
 ## Phase 3: RBAC Enforcement (TDD)
 

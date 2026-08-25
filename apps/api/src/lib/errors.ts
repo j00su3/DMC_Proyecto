@@ -1,3 +1,13 @@
+import { z } from 'zod';
+
+export const errorEnvelopeSchema = z.object({
+  error: z.object({
+    code: z.string(),
+    message: z.string(),
+    details: z.unknown().optional(),
+  }),
+});
+
 export interface ErrorEnvelope {
   error: {
     code: string;
@@ -46,6 +56,42 @@ function hasValidationErrors(
   );
 }
 
+interface FastifyRateLimitLikeError {
+  statusCode: 429;
+}
+
+function isRateLimitError(error: unknown): error is FastifyRateLimitLikeError {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'statusCode' in error &&
+    (error as { statusCode: unknown }).statusCode === 429
+  );
+}
+
+export function unauthorized(message = 'Authentication required'): AppError {
+  return new AppError('UNAUTHORIZED', message, 401);
+}
+
+export function forbidden(message = 'Insufficient permissions'): AppError {
+  return new AppError('FORBIDDEN', message, 403);
+}
+
+// retryAfter is seconds until the lockout lifts (design.md D9).
+export function accountLocked(retryAfter: number): AppError {
+  return new AppError('ACCOUNT_LOCKED', 'Account is temporarily locked', 423, {
+    retryAfter,
+  });
+}
+
+export function invalidCredentials(): AppError {
+  return new AppError('INVALID_CREDENTIALS', 'Invalid email or password', 401);
+}
+
+export function accountInactive(): AppError {
+  return new AppError('ACCOUNT_INACTIVE', 'Account is inactive', 401);
+}
+
 export function toErrorEnvelope(error: unknown): MappedError {
   if (hasValidationErrors(error)) {
     return {
@@ -68,6 +114,18 @@ export function toErrorEnvelope(error: unknown): MappedError {
           code: error.code,
           message: error.message,
           ...(error.details !== undefined ? { details: error.details } : {}),
+        },
+      },
+    };
+  }
+
+  if (isRateLimitError(error)) {
+    return {
+      status: 429,
+      body: {
+        error: {
+          code: 'RATE_LIMITED',
+          message: 'Too many requests',
         },
       },
     };

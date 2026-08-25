@@ -7,6 +7,7 @@ const envSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'test', 'production'])
     .default('development'),
+  COOKIE_SECRET: z.string().min(32),
 });
 
 function parseEnv() {
