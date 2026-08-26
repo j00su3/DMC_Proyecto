@@ -147,46 +147,46 @@ no router, no network.
 Maps to: *Route Guard Layout Split*, *Session Bootstrap*, *Logout Action*,
 *Client-Side Forced-Password-Change Redirect* (`app-shell` spec).
 
-- [ ] 5A.1 GREEN `apps/web/src/api/session.ts` — `sessionQueryOptions` (D12/D13): `queryFn` calls
+- [x] 5A.1 GREEN `apps/web/src/api/session.ts` — `sessionQueryOptions` (D12/D13): `queryFn` calls
       `GET /api/auth/me`, catches a 401 `ApiError` and returns `null` (does not rethrow), `retry: false`,
       `staleTime: 30_000`; `Usuario` type imported from `schema.d.ts`
-- [ ] 5A.2 RED `apps/web/src/api/session.test.ts` — `queryFn` returns `usuario` on 200; returns `null`
+- [x] 5A.2 RED `apps/web/src/api/session.test.ts` — `queryFn` returns `usuario` on 200; returns `null`
       on a 401 `ApiError`; rethrows any other `ApiError`/error
-- [ ] 5A.3 GREEN `apps/web/src/app/queryClient.tsx` — `QueryClient` instance; `QueryCache`/`MutationCache`
+- [x] 5A.3 GREEN `apps/web/src/app/queryClient.tsx` — `QueryClient` instance; `QueryCache`/`MutationCache`
       `onError` invalidates `['session']` and calls `router.invalidate()` on `ApiError` codes
       `UNAUTHORIZED` or `PASSWORD_CHANGE_REQUIRED` (router accessed via a late-bound `setRouter()` to
       avoid a `queryClient`↔`router` construction cycle, per Data Flow)
-- [ ] 5A.4 GREEN `apps/web/src/app/router.tsx` — `createRouter({ queryClient })` context; **code-based**
+- [x] 5A.4 GREEN `apps/web/src/app/router.tsx` — `createRouter({ queryClient })` context; **code-based**
       route tree via `createRoute` (D10 — no `@tanstack/router-plugin`, no generated `routeTree.gen.ts`,
       to avoid a second generated-artifact drift gate alongside `contract:check`)
-- [ ] 5A.5 GREEN `apps/web/src/app/providers.tsx` — `QueryClientProvider` + `RouterProvider` composition
-- [ ] 5A.6 GREEN `apps/web/src/routes/__root.tsx` — root route, `{ queryClient }` context type
-- [ ] 5A.7 GREEN `apps/web/src/routes/publicLayout.tsx` — pathless layout route, no guard
-- [ ] 5A.8 RED `apps/web/src/routes/authLayout.test.ts` — call `beforeLoad` directly with a stub
+- [x] 5A.5 GREEN `apps/web/src/app/providers.tsx` — `QueryClientProvider` + `RouterProvider` composition
+- [x] 5A.6 GREEN `apps/web/src/routes/__root.tsx` — root route, `{ queryClient }` context type
+- [x] 5A.7 GREEN `apps/web/src/routes/publicLayout.tsx` — pathless layout route, no guard
+- [x] 5A.8 RED `apps/web/src/routes/authLayout.test.ts` — call `beforeLoad` directly with a stub
       `{ queryClient }` context: `ensureQueryData(['session'])` resolving `null` → throws `redirect`
       to `/ingresar`; resolving a `usuario` → passes through
-- [ ] 5A.9 GREEN `apps/web/src/routes/authLayout.tsx` — session-required pathless layout guard (D11 —
+- [x] 5A.9 GREEN `apps/web/src/routes/authLayout.tsx` — session-required pathless layout guard (D11 —
       client mirror of the server allowlist's "session required" half)
-- [ ] 5A.10 RED `apps/web/src/routes/shellLayout.test.ts` — `beforeLoad`: `usuario.debeCambiarPassword === true`
+- [x] 5A.10 RED `apps/web/src/routes/shellLayout.test.ts` — `beforeLoad`: `usuario.debeCambiarPassword === true`
       → throws `redirect` to `/cambiar-password`; `false` → passes through. Test name/comment MUST
       note this is UX convenience only — the server allowlist (Phase 3) is the enforcement authority
       (D2–D4)
-- [ ] 5A.11 GREEN `apps/web/src/routes/shellLayout.tsx` — forced-change client guard, nested under
+- [x] 5A.11 GREEN `apps/web/src/routes/shellLayout.tsx` — forced-change client guard, nested under
       `authLayout`; `cambiarPassword` (Phase 6) is a child of `authLayout` directly, NOT of
       `shellLayout`, so it stays reachable while the flag is `true`
-- [ ] 5A.12 GREEN `apps/web/src/routes/index.tsx` — placeholder authenticated shell: sidebar nav labels
+- [x] 5A.12 GREEN `apps/web/src/routes/index.tsx` — placeholder authenticated shell: sidebar nav labels
       from `docs/design.md` (Panel general, Inventario, Punto de venta, Movimientos, Proveedores,
       Reportes, Usuarios), the documented user-card format, and a logout control
-- [ ] 5A.13 GREEN `apps/web/src/features/auth/useLogout.ts` — `POST /api/auth/logout`,
+- [x] 5A.13 GREEN `apps/web/src/features/auth/useLogout.ts` — `POST /api/auth/logout`,
       `queryClient.setQueryData(['session'], null)`, `router.invalidate()`, redirect to `/ingresar`
       regardless of response outcome
-- [ ] 5A.14 GREEN `apps/web/src/test/renderWithProviders.tsx` — fresh `QueryClient` per test, optional
+- [x] 5A.14 GREEN `apps/web/src/test/renderWithProviders.tsx` — fresh `QueryClient` per test, optional
       memory router wiring for later route-level tests
-- [ ] 5A.15 Integration RED→GREEN `apps/web/src/app/router.test.tsx` (jsdom) — `createMemoryHistory` +
+- [x] 5A.15 Integration RED→GREEN `apps/web/src/app/router.test.tsx` (jsdom) — `createMemoryHistory` +
       `RouterProvider` + stubbed `fetch`: `/` with no session lands on `/ingresar`; a session with
       `debeCambiarPassword: true` lands on `/cambiar-password` and `/` stays unreachable (full login
       submission flow is verified in Phase 5B's extension of this same file)
-- [ ] 5A.16 GREEN `apps/web/src/main.tsx` — modify: wire `providers.tsx` + `RouterProvider`; **delete**
+- [x] 5A.16 GREEN `apps/web/src/main.tsx` — modify: wire `providers.tsx` + `RouterProvider`; **delete**
       `apps/web/src/App.tsx` and `apps/web/src/App.test.tsx` (scaffolding health-check screen,
       superseded by `routes/index.tsx`)
 
