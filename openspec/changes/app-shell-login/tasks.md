@@ -224,24 +224,24 @@ Maps to: *Change Password Endpoint* (client side, `password-change` spec);
 *Client-Side Forced-Password-Change Redirect* — "reaches change-password directly" scenario
 (`app-shell` spec). Visual source of truth: `docs/design/CambiarPassword.dc.html`.
 
-- [ ] 6.1 GREEN: extend `apps/web/src/features/auth/schemas.ts` — `changePasswordSchema` (`currentPassword`
+- [x] 6.1 GREEN: extend `apps/web/src/features/auth/schemas.ts` — `changePasswordSchema` (`currentPassword`
       min 1, `newPassword` min 12, `.refine(v => v.newPassword !== v.currentPassword)` — client mirror
       of the server's `refine`, same message contract)
-- [ ] 6.2 RED `apps/web/src/features/auth/ChangePasswordForm.test.tsx` — zod errors render; a valid
+- [x] 6.2 RED `apps/web/src/features/auth/ChangePasswordForm.test.tsx` — zod errors render; a valid
       submit calls `onSubmit`; a server `INVALID_CURRENT_PASSWORD` error renders bound to the
       `currentPassword` field (D5 — the whole point of the distinct 400 code); submit disabled while
       pending
-- [ ] 6.3 GREEN `apps/web/src/features/auth/ChangePasswordForm.tsx` — `react-hook-form` +
+- [x] 6.3 GREEN `apps/web/src/features/auth/ChangePasswordForm.tsx` — `react-hook-form` +
       `zodResolver(changePasswordSchema)` per `docs/design/CambiarPassword.dc.html`
-- [ ] 6.4 GREEN `apps/web/src/features/auth/useChangePassword.ts` — mutation `POST /api/auth/password`;
+- [x] 6.4 GREEN `apps/web/src/features/auth/useChangePassword.ts` — mutation `POST /api/auth/password`;
       on success merge `debeCambiarPassword: false` into the `['session']` cache and call
       `router.invalidate()` (re-runs `shellLayout`'s guard so the redirect clears immediately)
-- [ ] 6.5 GREEN `apps/web/src/routes/cambiarPassword.tsx` — child of `authLayout`, **not** of
+- [x] 6.5 GREEN `apps/web/src/routes/cambiarPassword.tsx` — child of `authLayout`, **not** of
       `shellLayout` (built in 5A.11, verified here) so the route stays reachable while the flag is
       `true`; wires `ChangePasswordForm` + `useChangePassword`
-- [ ] 6.6 RED `apps/web/src/routes/cambiarPassword.test.ts` — the route's own `beforeLoad` (if any)
+- [x] 6.6 RED `apps/web/src/routes/cambiarPassword.test.ts` — the route's own `beforeLoad` (if any)
       applies only `authLayout`'s session guard, with no forced-change redirect on itself
-- [ ] 6.7 Integration: extend `apps/web/src/app/router.test.tsx` — a session with
+- [x] 6.7 Integration: extend `apps/web/src/app/router.test.tsx` — a session with
       `debeCambiarPassword: true` lands on `/cambiar-password`; submitting a valid change clears the
       flag and the shell becomes reachable; a wrong current password shows the field error and the
       user stays on `/cambiar-password`
