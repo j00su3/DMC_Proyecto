@@ -11,7 +11,8 @@
       "**/node_modules/**",
       "apps/api/openapi.json",
       "apps/web/src/api/schema.d.ts",
-      "apps/api/drizzle/**"
+      "apps/api/drizzle/**",
+      "docs/design/**"
     ]
   },
   "formatter": {

@@ -43,6 +43,20 @@ Gradiente de marca (solo logo): `linear-gradient(135deg, #3b82f6, #2456c8)`.
 ### Sidebar (210px)
 Fondo `#16233c`. Logo arriba (marca 30×30, radio 8). Ítems 9px 12px, radio 8; activo fondo `#3b82f6` texto blanco. Abajo, tarjeta de usuario con avatar circular 30px (iniciales; azul encargado, verde depósito) sobre `rgba(255,255,255,.06)`.
 
+Rótulos de navegación (tomados del Design System publicado, ver «Archivos»):
+
+| Ítem | Backlog |
+|---|---|
+| Panel general | #13 |
+| Inventario | #5 |
+| Punto de venta | #7 |
+| Movimientos | #6 |
+| Proveedores | #4 |
+| Reportes | #12 |
+| Usuarios | #3 |
+
+Tarjeta de usuario: iniciales en el avatar, nombre completo, y una línea de rol en 12px muted con el formato `Encargada · Admin`.
+
 ### Encabezado de vista (60px)
 Título + subtítulo (12px muted) a la izquierda; búsqueda/filtros/acciones a la derecha. Botón primario siempre al extremo derecho.
 
@@ -81,6 +95,32 @@ Candado 🔒 junto a lo restringido. Matriz de permisos: ✓ verde / ◐ ámbar 
 - Objetivo responsive: colapsar sidebar a iconos en tablet; POS apilado en móvil (pendiente de diseño).
 
 ## Archivos
+
+**En el repositorio:**
+- `design/Main.dc.html` — login, estado normal.
+- `design/LoginError.dc.html` — login con credenciales incorrectas.
+- `design/CambiarPassword.dc.html` — cambio de contraseña obligatorio.
+- `design/canvas.json` — disposición de los tres artboards.
+
+**Publicado y accesible:**
+- Design System v1.0 (agosto 2026), versión renderizada de este documento con ejemplos
+  de componentes vivos: <https://claude.ai/code/artifact/88cebdeb-b155-44e1-9544-347efcd7b639>
+- Maqueta de acceso (login + cambio de contraseña), generada el 2026-08-25 a partir de los
+  tokens de este documento: <https://claude.ai/code/artifact/adbd0a58-ce25-4fdb-b2ab-4b560ee8f85d>
+
+**Referenciados pero AUSENTES del repositorio** (verificado el 2026-08-25: cero coincidencias
+de `*.dc.html` en todo el árbol, `node_modules` excluido):
 - `Wireframes.dc.html` — wireframes aprobados (turno 1).
 - `UI Dashboard.dc.html` — exploración de 3 direcciones; **1b elegida**.
 - `UI Vistas.dc.html` — las 7 vistas restantes en la dirección elegida.
+
+Ninguno de los tres está contenido en el artifact del Design System; ese artifact es la
+referencia de sistema, no las pantallas compuestas. Login y cambio de contraseña nunca
+aparecieron en la exploración visual original, y por eso se maquetaron aparte (ver «En el
+repositorio»). Si los tres archivos ausentes aparecen, bajarlos a `docs/design/` y
+actualizar esta sección.
+
+Única decisión de diseño tomada fuera de este documento: la tarjeta de login usa la sombra
+de **modal** (`0 18px 50px rgba(22,35,60,.4)`) en vez de la de tarjeta
+(`0 1px 3px rgba(22,35,60,.07)`), porque flota sobre el fondo oscuro `#16233c` y la sombra
+de tarjeta es invisible ahí. El radio sigue siendo el de tarjeta (14px).

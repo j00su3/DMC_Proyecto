@@ -1,0 +1,111 @@
+# SDD DAG state for change: app-shell-login (survives compaction)
+schema: spec-driven
+change: app-shell-login
+project: inventienda
+backlog_item: "2.1"
+artifact_store: hybrid   # phases save to BOTH Engram and OpenSpec files
+updated: 2026-08-25
+
+session_preflight:
+  execution_mode: interactive
+  artifact_store: hybrid
+  delivery_strategy: ask-on-risk
+  chain_strategy: stacked-to-main
+  review_budget_lines: 400   # authored lines; generated/lockfile excluded
+
+phases:
+  explore:
+    status: completed
+    artifact: exploration.md
+    engram_topic: sdd/app-shell-login/explore
+  proposal:
+    status: completed
+    artifact: proposal.md
+    engram_topic: sdd/app-shell-login/proposal
+  spec:
+    status: completed
+    artifacts:
+      - specs/app-shell/spec.md          # NEW capability
+      - specs/password-change/spec.md    # NEW capability
+      - specs/auth-sessions/spec.md      # DELTA, 4 MODIFIED requirements
+    engram_topic: sdd/app-shell-login/spec
+  design:
+    status: completed
+    artifact: design.md
+    engram_topic: sdd/app-shell-login/design
+  tasks:
+    status: pending
+    blocked_on: "Open Question 1 — visual direction is unapproved (no wireframe exists for either screen)."
+    engram_topic: sdd/app-shell-login/tasks
+  apply:
+    status: pending
+    engram_topic: sdd/app-shell-login/apply-progress
+  verify:
+    status: pending
+    engram_topic: sdd/app-shell-login/verify-report
+  archive:
+    status: pending
+    engram_topic: sdd/app-shell-login/archive-report
+
+# Orchestrator gatekeeper ran after spec and design. Five drifts were found and
+# reconciled in the spec's favour only where the spec was right; where the design
+# had read the actual code, the spec was corrected to match it.
+reconciliation:
+  - id: R1
+    was: "spec named the forced-change error code MUST_CHANGE_PASSWORD"
+    now: "PASSWORD_CHANGE_REQUIRED (design D4)"
+    why: >-
+      Existing codes are state descriptions (ACCOUNT_LOCKED, ACCOUNT_INACTIVE,
+      RATE_LIMITED), not imperatives. The design's name matches that convention.
+  - id: R2
+    was: "spec returned 401 INVALID_CREDENTIALS for a wrong current password"
+    now: "400 INVALID_CURRENT_PASSWORD (design D5)"
+    why: >-
+      The session is valid; a 401 would trip the SPA's global session-expiry
+      recovery and discard the user's typed input. 400 maps to a field error.
+  - id: R3
+    was: "spec allowlisted three routes (password, logout, me) by hardcoded URL"
+    now: >-
+      Opt-in route config key allowPasswordChangePending on exactly two routes
+      (GET /api/auth/me, POST /api/auth/password) — design D3.
+    why: >-
+      VERIFIED against apps/api/src/routes/auth.ts:66 — POST /api/auth/logout
+      already declares config: { auth: false } and unsigns the cookie itself, so
+      it skips both hooks and never reaches the forced-change check. A config
+      opt-in also mirrors the existing auth:false / roles pattern and is
+      default-deny: a route added later is blocked until it opts in.
+  - id: R4
+    was: "spec used UNKNOWN_ERROR as the unparseable-body fallback code"
+    now: "UNEXPECTED_RESPONSE (design, apps/web/src/api/errors.ts)"
+    why: "More precise: the body was unparseable, not the error unknown."
+  - id: R5
+    was: >-
+      spec prose carried hash_contraseña forward from the archived auth-sesiones
+      spec; design.md titled the change backlog #4
+    now: "hash_contrasena; backlog #2.1"
+    why: >-
+      VERIFIED against apps/api/src/db/schema.ts:22 and
+      apps/api/drizzle/0000_old_omega_flight.sql:13 — the shipped column is
+      ASCII. This delta promotes into the live spec at archive time, so the
+      error had to be corrected here or it would become the contract.
+
+open_questions:
+  - id: Q1
+    status: blocking_tasks
+    question: >-
+      Visual direction for the login and change-password screens is unapproved.
+      All three .dc.html wireframes referenced by docs/design.md are absent from
+      the repository, so the screens are derived from design tokens alone.
+    owner: user
+  - id: Q2
+    status: accepted
+    question: >-
+      Rate limiting on POST /api/auth/password is deferred; the endpoint already
+      requires a valid session. Revisit if gestion-usuarios adds an
+      unauthenticated reset path.
+  - id: Q3
+    status: open_at_install
+    question: >-
+      Pin versions at install: @hookform/resolvers must support zod v4 (the repo
+      is on ^4.4.3); @tanstack/react-router must support React 19. Neither was
+      installed or verified during design.
