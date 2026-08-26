@@ -1,0 +1,59 @@
+/**
+ * Design tokens transcribed 1:1 from docs/design.md (InvenTienda Design
+ * System v1.0). Values, not vocabulary, are the source of truth — the
+ * document itself is in Spanish.
+ */
+:root {
+  /* Color */
+  --color-bg-app: #eef1f5;
+  --color-sidebar: #16233c;
+  --color-sidebar-text: #aebad0;
+  --color-sidebar-text-active: #ffffff;
+  --color-accent: #3b82f6;
+  --color-accent-dark: #2456c8;
+  --color-text: #1e2733;
+  --color-text-muted-strong: #69788c;
+  --color-text-muted-soft: #8794a5;
+  --color-border: #dde3ea;
+  --color-divider: #eef1f5;
+
+  --color-danger: #e04f3a;
+  --color-danger-bg: #fdecea;
+  --color-danger-border: #f6d5cf;
+  --color-danger-row-bg: #fdf5f4;
+
+  --color-warning: #eba13c;
+  --color-warning-text: #b7791a;
+  --color-warning-bg: #fdf3e3;
+  --color-warning-notice-text: #8a5c12;
+
+  --color-success: #2f9e63;
+  --color-success-bg: #e6f6ec;
+
+  --gradient-brand: linear-gradient(135deg, #3b82f6, #2456c8);
+
+  /* Typography */
+  --font-family-base: "Public Sans", system-ui, sans-serif;
+
+  /* Radii */
+  --radius-card: 14px;
+  --radius-control: 10px;
+  --radius-modal: 18px;
+  --radius-pill: 99px;
+
+  /* Shadows */
+  --shadow-card: 0 1px 3px rgba(22, 35, 60, 0.07);
+  --shadow-button-primary: 0 2px 6px rgba(59, 130, 246, 0.35);
+  --shadow-modal: 0 18px 50px rgba(22, 35, 60, 0.4);
+
+  /* Overlay */
+  --overlay-modal: rgba(22, 35, 60, 0.55);
+
+  /*
+   * The login card floats on the dark sidebar background (#16233c), where
+   * the 7%-opacity card shadow is invisible. It intentionally uses the
+   * modal shadow instead while keeping the card radius (14px) — a
+   * documented deviation, see docs/design.md's "Archivos" section.
+   */
+  --shadow-login-card: var(--shadow-modal);
+}
