@@ -81,29 +81,29 @@ Maps to: *RBAC Hook Contract* (`auth-sessions` delta); *Change Password Endpoint
 in the SAME commit — a mid-chain PR that edits routes without regenerating the contract fails
 `pnpm contract:check` in CI.**
 
-- [ ] 3.1 RED: extend `apps/api/src/plugins/auth.test.ts` — flagged user (`debeCambiarPassword: true`):
+- [x] 3.1 RED: extend `apps/api/src/plugins/auth.test.ts` — flagged user (`debeCambiarPassword: true`):
       plain protected route → 403 `PASSWORD_CHANGE_REQUIRED`; `allowPasswordChangePending` route → 200;
       `auth: false` route unaffected; unflagged user unaffected; forced-change beats `roles` (403 code
       is `PASSWORD_CHANGE_REQUIRED`, not `FORBIDDEN`) — throwaway routes on `buildApp()` before
       `ready()`, existing precedent
-- [ ] 3.2 GREEN `apps/api/src/plugins/auth.ts` — `allowPasswordChangePending?: true` config key (D3);
+- [x] 3.2 GREEN `apps/api/src/plugins/auth.ts` — `allowPasswordChangePending?: true` config key (D3);
       `request.sessionId` decoration in `onRequest` (D8, feeds `changePassword`'s `sessionId` param
       without re-deriving the cookie); forced-change branch in `preHandler`, placed **after** the
       `auth === false` early return and **before** the `roles` check (D2)
-- [ ] 3.3 RED: extend `apps/api/src/routes/auth.test.ts` — `POST /auth/password` status/envelope codes
+- [x] 3.3 RED: extend `apps/api/src/routes/auth.test.ts` — `POST /auth/password` status/envelope codes
       (200 success; 400 `INVALID_CURRENT_PASSWORD`; 400 `VALIDATION_ERROR` for empty/matching new
       password); `debeCambiarPassword` present in `login`/`me` DTOs; `GET /auth/me` and
       `POST /auth/password` reachable with the flag `true`; an unrelated protected route returns 403
       with the flag `true`
-- [ ] 3.4 GREEN `apps/api/src/routes/auth.ts` — `POST /auth/password` with `config: { allowPasswordChangePending: true }`,
+- [x] 3.4 GREEN `apps/api/src/routes/auth.ts` — `POST /auth/password` with `config: { allowPasswordChangePending: true }`,
       body `z.object({ currentPassword: z.string().min(1), newPassword: z.string().min(12) }).refine(v => v.newPassword !== v.currentPassword)`
       (mismatch → 400 `VALIDATION_ERROR`, no new code, per Interfaces section); `usuarioDto` + `toDto`
       gain `debeCambiarPassword`; `GET /auth/me` gains `config: { allowPasswordChangePending: true }`
       (exactly two opted-in routes per R3/D3 — `POST /auth/logout` already declares `auth: false` and
       needs no entry)
-- [ ] 3.5 Regenerate contract (non-TDD, generated, **same commit as 3.2/3.4**) — `pnpm contract` →
+- [x] 3.5 Regenerate contract (non-TDD, generated, **same commit as 3.2/3.4**) — `pnpm contract` →
       commit `apps/api/openapi.json`, `apps/web/src/api/schema.d.ts`; verify `pnpm contract:check` passes
-- [ ] 3.6 Integration RED→GREEN: extend `apps/api/src/routes/auth.integration.test.ts` (real Docker
+- [x] 3.6 Integration RED→GREEN: extend `apps/api/src/routes/auth.integration.test.ts` (real Docker
       Postgres, real argon2, `test:integration` suite) — change-password round trip: login → change
       password → session B (elsewhere) revoked and returns 401 → session A (current) still resolves
       via `/me` with `debeCambiarPassword: false`

@@ -130,4 +130,106 @@ describe('auth plugin (RBAC enforcement)', () => {
     expect(response.statusCode).toBe(404);
     expect(response.json().error.code).toBe('NOT_FOUND');
   });
+
+  it('returns 403 PASSWORD_CHANGE_REQUIRED for a flagged user on a plain protected route', async () => {
+    const usuario = makeUsuario({ debeCambiarPassword: true });
+    app = await buildApp({
+      repos: fakeRepos({ findValid: async () => usuario }),
+      cookieSecret: COOKIE_SECRET,
+    });
+    app.get('/api/protected', async () => ({ ok: true }));
+    await app.ready();
+
+    const signed = app.signCookie('any-token-value');
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/protected',
+      cookies: { sid: signed },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json().error.code).toBe('PASSWORD_CHANGE_REQUIRED');
+  });
+
+  it('allows a flagged user through a route with config.allowPasswordChangePending', async () => {
+    const usuario = makeUsuario({ debeCambiarPassword: true });
+    app = await buildApp({
+      repos: fakeRepos({ findValid: async () => usuario }),
+      cookieSecret: COOKIE_SECRET,
+    });
+    app.get(
+      '/api/change-password',
+      { config: { allowPasswordChangePending: true } },
+      async () => ({ ok: true }),
+    );
+    await app.ready();
+
+    const signed = app.signCookie('any-token-value');
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/change-password',
+      cookies: { sid: signed },
+    });
+
+    expect(response.statusCode).toBe(200);
+  });
+
+  it('does not force-change a route that opts out with config: { auth: false }, even with a flagged user', async () => {
+    const usuario = makeUsuario({ debeCambiarPassword: true });
+    app = await buildApp({
+      repos: fakeRepos({ findValid: async () => usuario }),
+      cookieSecret: COOKIE_SECRET,
+    });
+    app.get('/api/open', { config: { auth: false } }, async () => ({
+      ok: true,
+    }));
+    await app.ready();
+
+    const response = await app.inject({ method: 'GET', url: '/api/open' });
+
+    expect(response.statusCode).toBe(200);
+  });
+
+  it('does not affect an unflagged user on a plain protected route', async () => {
+    const usuario = makeUsuario({ debeCambiarPassword: false });
+    app = await buildApp({
+      repos: fakeRepos({ findValid: async () => usuario }),
+      cookieSecret: COOKIE_SECRET,
+    });
+    app.get('/api/protected', async () => ({ ok: true }));
+    await app.ready();
+
+    const signed = app.signCookie('any-token-value');
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/protected',
+      cookies: { sid: signed },
+    });
+
+    expect(response.statusCode).toBe(200);
+  });
+
+  it('returns PASSWORD_CHANGE_REQUIRED (not FORBIDDEN) when a flagged user also fails the roles check', async () => {
+    const usuario = makeUsuario({ debeCambiarPassword: true, rol: 'deposito' });
+    app = await buildApp({
+      repos: fakeRepos({ findValid: async () => usuario }),
+      cookieSecret: COOKIE_SECRET,
+    });
+    app.get(
+      '/api/encargado-only',
+      { config: { roles: ['encargado'] } },
+      async () => ({ ok: true }),
+    );
+    await app.ready();
+
+    const signed = app.signCookie('any-token-value');
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/encargado-only',
+      cookies: { sid: signed },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json().error.code).toBe('PASSWORD_CHANGE_REQUIRED');
+  });
 });
