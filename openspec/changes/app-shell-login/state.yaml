@@ -82,9 +82,29 @@ phases:
       contract:check OK and byte-identical (S1 touches no API file, by design
       D14), api 63/63, web 9/9 (up from 2). 173 insertions / 11 deletions, well
       inside the 400 authored-line budget.
+    s2_notes: >-
+      Seam S2 (data + domain) landed on branch feat/shell-pr2-data-domain (off
+      feat/shell-pr1-api-errors), commit 1eec0a0, ledger attempt settled
+      "passed". All 9 Phase 2 tasks done under strict TDD with verified RED —
+      including the integration RED, which failed against real Docker Postgres
+      with `column "debe_cambiar_password" of relation "usuarios" does not
+      exist` before the migration was applied. Added: schema column
+      (NOT NULL DEFAULT false) + migration 0001_friendly_frightful_four.sql,
+      UsuariosRepo.updatePassword (D6 — hash and flag in ONE UPDATE),
+      SesionesRepo.deleteOthers (ne()), Usuario.debeCambiarPassword via the
+      existing findValid JOIN (D1, zero extra queries), service.changePassword
+      (D5-D7 + the D9 audit-hook-point comment), and the two error factories
+      passwordChangeRequired() 403 / invalidCurrentPassword() 400.
+      ORCHESTRATOR RE-VERIFIED INDEPENDENTLY: zero route source files touched;
+      the only change under routes/ is a single `debeCambiarPassword: false`
+      fixture line in routes/auth.test.ts, a mechanical consequence of widening
+      the shared Usuario type, not a D14 violation. contract:check green and
+      byte-identical. 245 authored lines (drizzle/** excluded) against a 400
+      budget and a ~300 forecast. api 69/69 (was 63), web 9/9, integration
+      12/12, typecheck + lint green.
     seams:
       S1: done
-      S2: pending
+      S2: done
       S3: pending
       S4: pending
       S5: pending

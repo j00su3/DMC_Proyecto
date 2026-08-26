@@ -21,6 +21,7 @@ function makeUsuario(overrides: Partial<Usuario> = {}): Usuario {
     intentosFallidos: 0,
     bloqueadoHasta: null,
     creadoEn: new Date(),
+    debeCambiarPassword: false,
     ...overrides,
   };
 }

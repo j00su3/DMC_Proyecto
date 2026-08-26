@@ -2,8 +2,9 @@ import {
   accountInactive,
   accountLocked,
   invalidCredentials,
+  invalidCurrentPassword,
 } from '../lib/errors.js';
-import { DUMMY_HASH, verifyPassword } from './password.js';
+import { DUMMY_HASH, hashPassword, verifyPassword } from './password.js';
 import type { SesionesRepo, Usuario, UsuariosRepo } from './repository.js';
 import { SESSION_TTL_SECONDS, createToken } from './session.js';
 
@@ -92,4 +93,39 @@ export async function resolveSession(
   token: string,
 ): Promise<Usuario | undefined> {
   return repos.sesiones.findValid(token, new Date());
+}
+
+export interface ChangePasswordInput {
+  usuario: Usuario;
+  sessionId: string;
+  currentPassword: string;
+  newPassword: string;
+}
+
+// Single funnel every password mutation passes through (design.md D9) — the
+// hook point backlog #2.2's audit change will use once immutable event rows
+// replace this mutable-column approach.
+//
+// Order matters (design.md D5-D7): verify BEFORE any write; on success,
+// update the hash (and clear debe_cambiar_password, one UPDATE) BEFORE
+// revoking other sessions, so a revoke failure leaves stale sessions for at
+// most the TTL instead of locking other devices out with an unchanged
+// password.
+export async function changePassword(
+  repos: Repos,
+  input: ChangePasswordInput,
+): Promise<void> {
+  const { usuario, sessionId, currentPassword, newPassword } = input;
+
+  const currentOk = await verifyPassword(
+    usuario.hashContrasena,
+    currentPassword,
+  );
+  if (!currentOk) {
+    throw invalidCurrentPassword();
+  }
+
+  const hash = await hashPassword(newPassword);
+  await repos.usuarios.updatePassword(usuario.id, hash);
+  await repos.sesiones.deleteOthers(usuario.id, sessionId);
 }

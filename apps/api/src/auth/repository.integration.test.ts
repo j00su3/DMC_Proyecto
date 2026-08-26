@@ -51,6 +51,51 @@ describe('auth repository (integration, real Postgres)', () => {
     ).rejects.toThrow();
   });
 
+  it('migration applies: debe_cambiar_password exists and defaults to false for a fresh row', async () => {
+    const usuario = await insertUsuario();
+
+    expect(usuario.debeCambiarPassword).toBe(false);
+  });
+
+  it('updatePassword sets the hash and clears debe_cambiar_password together', async () => {
+    const usuario = await insertUsuario();
+    await db
+      .update(usuarios)
+      .set({ debeCambiarPassword: true })
+      .where(eq(usuarios.id, usuario.id));
+
+    await usuariosRepo.updatePassword(usuario.id, 'new-hash-value');
+
+    const [row] = await db
+      .select()
+      .from(usuarios)
+      .where(eq(usuarios.id, usuario.id));
+    expect(row?.hashContrasena).toBe('new-hash-value');
+    expect(row?.debeCambiarPassword).toBe(false);
+  });
+
+  it('deleteOthers removes only the other sessions and the current cookie session still resolves via findValid', async () => {
+    const usuario = await insertUsuario();
+    await sesionesRepo.create({
+      id: 'session-a',
+      usuarioId: usuario.id,
+      expiraEn: new Date(Date.now() + 100_000),
+    });
+    await sesionesRepo.create({
+      id: 'session-b',
+      usuarioId: usuario.id,
+      expiraEn: new Date(Date.now() + 100_000),
+    });
+
+    await sesionesRepo.deleteOthers(usuario.id, 'session-a');
+
+    const stillValid = await sesionesRepo.findValid('session-a', new Date());
+    expect(stillValid?.id).toBe(usuario.id);
+
+    const revoked = await sesionesRepo.findValid('session-b', new Date());
+    expect(revoked).toBeUndefined();
+  });
+
   it('registerFailedAttempt increments the counter below the lockout threshold', async () => {
     const usuario = await insertUsuario();
 

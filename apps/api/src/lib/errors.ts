@@ -92,6 +92,27 @@ export function accountInactive(): AppError {
   return new AppError('ACCOUNT_INACTIVE', 'Account is inactive', 401);
 }
 
+// R1 (reconciled from spec's MUST_CHANGE_PASSWORD): existing codes are state
+// descriptions, not imperatives (design.md D4).
+export function passwordChangeRequired(): AppError {
+  return new AppError(
+    'PASSWORD_CHANGE_REQUIRED',
+    'Password change required before continuing',
+    403,
+  );
+}
+
+// R2 (reconciled from spec's 401 INVALID_CREDENTIALS): the session is valid,
+// so a 401 would trip the SPA's global session-expiry recovery and discard
+// the user's typed input (design.md D5).
+export function invalidCurrentPassword(): AppError {
+  return new AppError(
+    'INVALID_CURRENT_PASSWORD',
+    'Current password is incorrect',
+    400,
+  );
+}
+
 export function toErrorEnvelope(error: unknown): MappedError {
   if (hasValidationErrors(error)) {
     return {

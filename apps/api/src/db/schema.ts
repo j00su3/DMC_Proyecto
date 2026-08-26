@@ -30,6 +30,9 @@ export const usuarios = pgTable('usuarios', {
   creadoEn: timestamp('creado_en', { withTimezone: true, mode: 'date' })
     .notNull()
     .defaultNow(),
+  debeCambiarPassword: boolean('debe_cambiar_password')
+    .notNull()
+    .default(false),
 });
 
 export const sesiones = pgTable(

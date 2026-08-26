@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { hashPassword } from './password.js';
+import { hashPassword, verifyPassword } from './password.js';
 import type { SesionesRepo, Usuario, UsuariosRepo } from './repository.js';
-import { login, logout, resolveSession } from './service.js';
+import { changePassword, login, logout, resolveSession } from './service.js';
 
 function makeUsuario(overrides: Partial<Usuario> = {}): Usuario {
   return {
@@ -14,6 +14,7 @@ function makeUsuario(overrides: Partial<Usuario> = {}): Usuario {
     intentosFallidos: 0,
     bloqueadoHasta: null,
     creadoEn: new Date(),
+    debeCambiarPassword: false,
     ...overrides,
   };
 }
@@ -30,6 +31,7 @@ function fakeRepos(
         bloqueadoHasta: null,
       }),
       resetAttempts: async () => {},
+      updatePassword: async () => {},
       ...usuarios,
     } as UsuariosRepo,
     sesiones: {
@@ -37,6 +39,7 @@ function fakeRepos(
       findValid: async () => undefined,
       delete: async () => {},
       purgeExpired: async () => {},
+      deleteOthers: async () => {},
       ...sesiones,
     } as SesionesRepo,
   };
@@ -171,5 +174,63 @@ describe('resolveSession', () => {
     const result = await resolveSession(repos, 'missing-token');
 
     expect(result).toBeUndefined();
+  });
+});
+
+describe('changePassword', () => {
+  it('rejects a wrong current password with INVALID_CURRENT_PASSWORD and performs no repo writes (D5)', async () => {
+    const hash = await hashPassword('correct-horse-battery-staple');
+    const usuario = makeUsuario({ hashContrasena: hash });
+    const updatePassword = vi.fn(async () => {});
+    const deleteOthers = vi.fn(async () => {});
+    const repos = fakeRepos({ updatePassword }, { deleteOthers });
+
+    await expect(
+      changePassword(repos, {
+        usuario,
+        sessionId: 'session-a',
+        currentPassword: 'wrong-current',
+        newPassword: 'a-new-valid-password',
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_CURRENT_PASSWORD' });
+
+    expect(updatePassword).not.toHaveBeenCalled();
+    expect(deleteOthers).not.toHaveBeenCalled();
+  });
+
+  it('on success calls updatePassword then deleteOthers in that exact order (D7), and the new hash verifies while the old one does not', async () => {
+    const currentPassword = 'correct-horse-battery-staple';
+    const newPassword = 'a-brand-new-valid-password';
+    const hash = await hashPassword(currentPassword);
+    const usuario = makeUsuario({ hashContrasena: hash });
+    const callOrder: string[] = [];
+    let capturedHash: string | undefined;
+    const updatePassword = vi.fn(async (_id: string, newHash: string) => {
+      callOrder.push('updatePassword');
+      capturedHash = newHash;
+    });
+    const deleteOthers = vi.fn(async () => {
+      callOrder.push('deleteOthers');
+    });
+    const repos = fakeRepos({ updatePassword }, { deleteOthers });
+
+    await changePassword(repos, {
+      usuario,
+      sessionId: 'session-a',
+      currentPassword,
+      newPassword,
+    });
+
+    expect(callOrder).toEqual(['updatePassword', 'deleteOthers']);
+    expect(updatePassword).toHaveBeenCalledWith(usuario.id, expect.any(String));
+    expect(deleteOthers).toHaveBeenCalledWith(usuario.id, 'session-a');
+
+    if (!capturedHash) {
+      throw new Error('expected updatePassword to receive a hash');
+    }
+    await expect(verifyPassword(capturedHash, newPassword)).resolves.toBe(true);
+    await expect(verifyPassword(capturedHash, currentPassword)).resolves.toBe(
+      false,
+    );
   });
 });
