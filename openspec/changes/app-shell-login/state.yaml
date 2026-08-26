@@ -137,11 +137,43 @@ phases:
       13/13; three serial runs (--no-file-parallelism) gave 13/13 every time.
       Fix belongs in apps/api/vitest.integration.config.ts, which currently sets
       no pool or isolation options.
+    s4_notes: >-
+      Seam S4 (visual foundation) landed on branch feat/shell-pr4-visual-foundation
+      (off fix/integration-test-isolation, which is off feat/shell-pr3-api-guard).
+      Commits: 35bd1e1 deps, 6bc77fa tokens + global stylesheet, 1bfbbfb RTL
+      cleanup, 6abc445 the four UI primitives, b16ff67 checkboxes, 27dbb5e
+      orchestrator brand-mark correction.
+      Q3 RESOLVED (was open_at_install). Orchestrator read both installed
+      peerDependencies blocks directly rather than trusting the agent:
+      @hookform/resolvers 5.9.1 declares zod "^3.25.0 || ^4.0.0", and
+      @tanstack/react-router 1.170.32 declares react ">=18.0.0 || >=19.0.0".
+      Both are PINNED EXACT (no caret) in apps/web/package.json so this cannot
+      drift. zod ^4.4.3 added to apps/web to match apps/api.
+      DEFECT FOUND AND FIXED BY THE ORCHESTRATOR: AuthCard's brand mark was built
+      at 30x30 radius-8. That is docs/design.md line 44's SIDEBAR logo spec, and
+      task 4.7's text had copied it by mistake. The approved login mockup
+      docs/design/Main.dc.html line 32 renders the login mark at 44x44 radius-12
+      on the same gradient. Mockups win — they are the Q1 resolution and the
+      approved visual source of truth. Component and task text both corrected in
+      27dbb5e, with a CSS comment warning against reverting it.
+      UNPLANNED FIX, KEPT: apps/web/src/test/setup.ts had no RTL cleanup. RTL only
+      self-registers cleanup when it detects a global afterEach, and this repo
+      never sets vitest test.globals: true, so components leaked between tests and
+      any file with 2+ render() calls hit false "multiple elements found"
+      failures. afterEach(cleanup) added; this unblocks all future web component
+      tests, not just S4's.
+      VERIFIED: typecheck + lint green, contract:check exit 0 and byte-identical
+      (S4 touches no API file), api 82/82, web 18/18 (was 9).
+      BUDGET: 563 authored lines against 400 — 41% over, and materially larger
+      than the 410 forecast the no-further-splits decision was reasoned on.
+      Composition matters here: ~290 lines are CSS (169 module.css + 59 tokens.css
+      + 62 global.css), 117 are tests, leaving ~156 lines of TypeScript. Reported
+      to the user rather than split unilaterally, since no-further-splits stands.
     seams:
       S1: done
       S2: done
       S3: done
-      S4: pending
+      S4: done
       S5: pending
       S6: pending
   verify:

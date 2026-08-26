@@ -1,0 +1,42 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.input {
+  width: 100%;
+  box-sizing: border-box;
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  padding: 9px 14px;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--color-text);
+}
+
+.input::placeholder {
+  color: var(--color-text-muted-soft);
+}
+
+.input:focus-visible {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+}
+
+.invalid {
+  border-color: var(--color-danger-border);
+}
+
+.error {
+  font-size: 12px;
+  color: var(--color-danger);
+}

@@ -116,28 +116,31 @@ scenario). Visual source of truth: `docs/design/Main.dc.html`, `docs/design/Logi
 user-card format, the documented modal-shadow deviation for the login card). Pure presentational —
 no router, no network.
 
-- [ ] 4.1 GREEN (config, non-TDD) `apps/web/package.json` — add `@tanstack/react-router`,
+- [x] 4.1 GREEN (config, non-TDD) `apps/web/package.json` — add `@tanstack/react-router`,
       `react-hook-form`, `@hookform/resolvers`, `zod`, `@fontsource/public-sans`; dev
       `@testing-library/user-event` (not currently installed). **PIN exact versions**: verify
       `@hookform/resolvers` supports zod v4 (`apps/web`'s `zod` is `^4.4.3`, matching `apps/api`) and
       `@tanstack/react-router` supports React 19 (Q3, `open_at_install` — both were unverified
       assumptions at design time)
-- [ ] 4.2 GREEN `apps/web/src/styles/tokens.css` — custom properties transcribed 1:1 from `docs/design.md`
+- [x] 4.2 GREEN `apps/web/src/styles/tokens.css` — custom properties transcribed 1:1 from `docs/design.md`
       (colors, radii, shadows); login card uses the **modal shadow** `0 18px 50px rgba(22,35,60,.4)`,
       not the card shadow (documented deviation — the 7%-opacity card shadow is invisible on the dark
       `#16233c` field), radius stays 14px
-- [ ] 4.3 GREEN `apps/web/src/styles/global.css` — base resets, self-hosted Public Sans import
+- [x] 4.3 GREEN `apps/web/src/styles/global.css` — base resets, self-hosted Public Sans import
       (400–800 weights, `system-ui` fallback), `prefers-reduced-motion` respected
-- [ ] 4.4 RED→GREEN `apps/web/src/components/ui/Button.{tsx,module.css}` + `Button.test.tsx` — primary
+- [x] 4.4 RED→GREEN `apps/web/src/components/ui/Button.{tsx,module.css}` + `Button.test.tsx` — primary
       variant renders label/`onClick`; disabled/pending state disables the button; visible keyboard
       focus ring
-- [ ] 4.5 RED→GREEN `apps/web/src/components/ui/TextField.{tsx,module.css}` + `TextField.test.tsx` —
+- [x] 4.5 RED→GREEN `apps/web/src/components/ui/TextField.{tsx,module.css}` + `TextField.test.tsx` —
       label bound to input via `htmlFor`/`id`; `aria-invalid` + `aria-describedby` wired when an `error`
       prop is present
-- [ ] 4.6 RED→GREEN `apps/web/src/components/ui/FormError.{tsx,module.css}` + `FormError.test.tsx` —
+- [x] 4.6 RED→GREEN `apps/web/src/components/ui/FormError.{tsx,module.css}` + `FormError.test.tsx` —
       renders the message text with `role="alert"`
-- [ ] 4.7 GREEN `apps/web/src/components/ui/AuthCard.{tsx,module.css}` — centered white card (radius
-      14, modal shadow per 4.2), max-width ~380px, 30×30 brand mark on `linear-gradient(135deg,#3b82f6,#2456c8)`
+- [x] 4.7 GREEN `apps/web/src/components/ui/AuthCard.{tsx,module.css}` — centered white card (radius
+      14, modal shadow per 4.2), max-width ~380px, **44×44 radius-12** brand mark on
+      `linear-gradient(135deg,#3b82f6,#2456c8)` — corrected 2026-08-25: this task originally said 30×30
+      radius-8, which is `docs/design.md`'s SIDEBAR logo spec, not the login card. The approved mockups
+      (`docs/design/Main.dc.html`) render the login mark at 44×44 radius-12; the mockups win.
 
 ## Phase 5A: S5a — Router Skeleton + Session Bootstrap + Guards (TDD)
 
