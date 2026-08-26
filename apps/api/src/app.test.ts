@@ -12,6 +12,18 @@ import type { SesionesRepo, UsuariosRepo } from './auth/repository.js';
  * a plain `process.env.LOG_LEVEL = undefined` would store the *string*
  * "undefined", which is truthy and would silently defeat the `??` default.
  */
+/**
+ * `satisfies`, not `as`: it validates conformance instead of asserting it, so
+ * a stub missing a member fails immediately and names the member, rather than
+ * waiting until the two types stop overlapping "sufficiently".
+ *
+ * That was NOT what broke this file, though, and the distinction matters. It
+ * reached main broken because it was written on a branch cut from main while
+ * a nine-PR chain was still open; that chain widened `UsuariosRepo` and
+ * `SesionesRepo` with `updatePassword`/`deleteOthers`. CI was green on both
+ * sides because neither ever compiled the other's code. No annotation
+ * prevents that — only typechecking the merged result does.
+ */
 function fakeRepos() {
   return {
     usuarios: {
@@ -21,13 +33,15 @@ function fakeRepos() {
         bloqueadoHasta: null,
       }),
       resetAttempts: async () => {},
-    } as UsuariosRepo,
+      updatePassword: async () => {},
+    } satisfies UsuariosRepo,
     sesiones: {
       create: async () => {},
       findValid: async () => undefined,
       delete: async () => {},
       purgeExpired: async () => {},
-    } as SesionesRepo,
+      deleteOthers: async () => {},
+    } satisfies SesionesRepo,
   };
 }
 
