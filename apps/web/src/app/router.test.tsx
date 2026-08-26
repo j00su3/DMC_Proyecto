@@ -263,18 +263,18 @@ describe('app router', () => {
       screen.getByRole('button', { name: 'Guardar contraseña' }),
     );
 
-    // useChangePassword's onSuccess only clears the cached flag and
-    // invalidates the router (design.md 6.4) — it does not navigate on its
-    // own. "The shell becomes reachable" means shellLayout's guard no
-    // longer redirects once the flag is cleared, which this proves.
     await waitFor(() =>
       expect(
         queryClient.getQueryData<{ debeCambiarPassword: boolean }>(['session'])
           ?.debeCambiarPassword,
       ).toBe(false),
     );
-    await router.navigate({ to: '/' });
-    expect(router.state.location.pathname).toBe('/');
+
+    // The user must be carried into the shell, not left on the form they
+    // just submitted. Clearing the flag alone does not move them:
+    // /cambiar-password hangs off authLayout, so shellLayout's guard only
+    // stops redirecting INTO it. onSuccess navigates explicitly.
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'));
   });
 
   it('shows the field error and keeps the user on /cambiar-password for a wrong current password', async () => {

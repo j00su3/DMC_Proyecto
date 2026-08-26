@@ -34,6 +34,11 @@ export function useChangePassword() {
       );
       // Re-runs shellLayout's beforeLoad so the redirect clears immediately.
       await router.invalidate();
+      // Nothing pulls the user off this screen on its own: /cambiar-password
+      // is a child of authLayout, so clearing the flag only stops shellLayout
+      // from redirecting INTO it. Without this the user would sit on the form
+      // they just submitted. useLogin navigates the same way on success.
+      await router.navigate({ to: '/' });
     },
   });
 }
