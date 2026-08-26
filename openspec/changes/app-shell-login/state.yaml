@@ -322,31 +322,90 @@ phases:
       7.2 (the local integration run) was executed at 13/13 and is what surfaced
       the pre-existing parallelism flake. 7.4 was likewise already satisfied.
       All three are now checked in tasks.md with their evidence.
-  unexplained_one_off:
+  diagnosed_flake:
     id: F2
-    severity: unknown
-    status: open
+    severity: flaky-test
+    status: diagnosed
     observed: 2026-08-26
+    diagnosed: 2026-08-26
+    verdict: >-
+      TIMEOUT, not an assertion failure. NO production bug. The cookie code is
+      correct; the test's 5s budget was too small for a contended machine.
     what: >-
       `apps/api/src/routes/auth.test.ts` — "returns 200 with the usuario and a
       Set-Cookie with the expected attributes on success" failed ONCE, giving
       api 81/82. It had passed minutes earlier and no file under apps/api had
       been touched between the two runs.
-    could_not_reproduce: >-
-      6 consecutive runs of that file alone and 3 consecutive full `pnpm -r test`
-      runs afterwards were all green (api 82/82, web 50/50). 12 clean runs total.
-    honest_limit: >-
-      The failure output was NOT captured before the rerun, so there is no
-      diagnosis — only a hypothesis. The failing run happened inside a single
-      chained command that also ran format, typecheck, lint and contract:check,
-      so the machine was under heavy contention, and this test does a real argon2
-      hash, which is deliberately slow and memory-hard. A default vitest timeout
-      under that load would fit, but nothing here proves it.
-    next_step: >-
-      Do NOT "fix" this blind. If it recurs, capture the full failure output
-      first — a timeout and an assertion failure need opposite responses. Note
-      that CI runs the same suite on a smaller runner, so contention is plausible
-      there too.
+    reproduced: >-
+      REPRODUCED deliberately on 2026-08-26 at the user's request, after 12
+      earlier clean runs had failed to surface it. Method: run the api suite
+      against 16 busy `while` loops on an 8-core machine, keeping the FULL
+      output of every run. Result: 1 failure in 12 contended runs. Baselines in
+      the same script stayed green — 30 runs of the login file alone and 10
+      uncontended full-suite runs, 0 failures.
+    captured_evidence: >-
+      `Error: Test timed out in 5000ms.` at src/routes/auth.test.ts:61, with the
+      test itself measured at 5628ms. In the SAME run
+      src/plugins/openapi.test.ts also timed out at 6306ms.
+    decisive_observation: >-
+      The openapi test does NO argon2 work at all, and it timed out too. So the
+      deliberately-slow hash is NOT the special cause — the run's cost is
+      dominated by cold-start module import (76s of import time in that run),
+      and under CPU starvation ANY test in this suite can exceed 5s. This also
+      explains why the failing test is the FIRST in its file: it absorbs module
+      import, the argon2 native binding load, and the first Fastify app build.
+      The original hypothesis (argon2 being slow) was too narrow.
+    evidence_loss_cause: >-
+      CORRECTED 2026-08-26. The original note blamed "rerun before capture".
+      That is wrong. The failing command was recovered verbatim from the session
+      transcript:
+      `pnpm typecheck 2>&1 | tail -2 && pnpm lint 2>&1 | tail -1 &&
+      pnpm contract:check 2>&1 | tail -1 && pnpm -r test 2>&1 | rg "Tests  |FAIL"
+      | head -3`.
+      vitest DID print the full diagnostic; the `rg "Tests  |FAIL" | head -3`
+      filter discarded it at the moment of capture. The rerun destroyed nothing.
+    lesson: >-
+      Never filter test output down to counts when a failure is possible. Write
+      the full output to a file and search the FILE. A filter that keeps only
+      "FAIL" and the totals throws away the one thing that distinguishes a
+      timeout from an assertion failure — which need opposite fixes.
+    contention_source: >-
+      CORRECTED 2026-08-26. The preceding typecheck/lint/contract:check were
+      `&&`-sequential and had already finished, so they were NOT the concurrent
+      load. The real overlap is inside `pnpm -r test` itself: workspace-concurrency
+      is unset, so pnpm defaults to running the api and web suites CONCURRENTLY.
+      web's jsdom environment is heavy (~20s, ~70s environment time) and the api
+      login test does TWO real argon2 operations (setup hash + route verify) at
+      memoryCost 19456 KiB. That overlap is the plausible path to vitest's 5s
+      default timeout.
+    ruled_out: >-
+      Every assertion in the test is on a STATIC value (sid=, HttpOnly,
+      SameSite=Lax, absence of Domain=), so none can flake on its own. The token
+      is randomBytes(32).toString('base64url'), which has no '=' padding, so the
+      `not.toMatch(/Domain=/i)` guard cannot false-positive on a random value.
+      session.test.ts mutates process.env.NODE_ENV but restores it in both
+      beforeEach and afterEach, and this test asserts nothing about Secure. That
+      leaves exactly two candidates: a timeout, or login not returning 200
+      (argon2 erroring under memory pressure). Both are environmental, not a
+      logic bug in the cookie code.
+    fix: >-
+      apps/api/vitest.config.ts now sets testTimeout: 15_000 (~2.4x the worst
+      observed 6306ms). This is the evidence-backed fix, not the blind one the
+      earlier note warned against: raising a timeout is only safe BECAUSE the
+      captured output proved a timeout. Had it been an assertion failure, this
+      same change would have hidden a real bug — which is exactly why the fix
+      waited for evidence.
+    why_not_other_fixes: >-
+      Precomputing the argon2 setup hash was considered and rejected: the
+      openapi test proves argon2 is not the driver, so that would treat a
+      symptom that is not the cause. Raising the timeout cannot mask a logic
+      bug — every assertion still runs unchanged and a genuine hang still fails.
+    scope_note: >-
+      Only apps/api/vitest.config.ts was changed. apps/web and the integration
+      config were left alone: there is no evidence of a timeout in either, and
+      the whole point of this finding is not to change things without evidence.
+      If web ever flakes the same way under CI contention, apply the same fix —
+      but capture the output first.
   resolved_finding:
     id: F1
     severity: suggestion
