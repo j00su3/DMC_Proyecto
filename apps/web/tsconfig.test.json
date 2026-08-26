@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "// types": "Tests may reach for Node APIs — reading a stylesheet off disk is the only way to assert a CSS Module's values, since jsdom never applies one. App code may not, which is why this lives here and not in tsconfig.json.",
+  "// exclude": "Reset to empty so the tests tsconfig.json filters out are compiled here. `include` is inherited as [\"src\"] deliberately: narrowing it to test files alone drops src/app/router.tsx, whose `declare module '@tanstack/react-router'` augmentation types the router context — without it useRouteContext() silently degrades to `any` and unrelated files fail with implicit-any errors.",
+  "compilerOptions": {
+    "types": ["vite/client", "node"]
+  },
+  "exclude": []
+}
