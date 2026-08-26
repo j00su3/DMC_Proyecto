@@ -8,5 +8,7 @@
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": ["vite/client"]
   },
-  "include": ["src"]
+  "include": ["src"],
+  "// exclude": "Tests are typechecked by tsconfig.test.json, the only config that sees @types/node. Keeping them out here is what keeps this narrow `types` list meaningful: app code is still compiled without Node globals, so a stray `process.env` in a component fails typecheck instead of exploding in the browser. `src/test` stays IN — setup.ts loads the jest-dom matcher augmentations that the test config inherits, and dropping it here breaks unrelated inference.",
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
 }

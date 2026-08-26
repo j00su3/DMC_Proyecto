@@ -207,4 +207,119 @@ describe('app router', () => {
     ).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/ingresar');
   });
+
+  function stubFetchForChangePassword(
+    changePasswordResponse: () => {
+      ok: boolean;
+      status: number;
+      json: () => Promise<unknown>;
+    },
+  ) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string | URL | Request) => {
+        const url = String(input);
+        if (url.includes('/api/auth/me')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              usuario: { ...usuario, debeCambiarPassword: true },
+            }),
+          });
+        }
+        if (url.includes('/api/auth/password')) {
+          return Promise.resolve(changePasswordResponse());
+        }
+        throw new Error(`unexpected fetch: ${url}`);
+      }),
+    );
+  }
+
+  it('submitting a valid password change clears the flag and the shell becomes reachable', async () => {
+    const user = userEvent.setup();
+    stubFetchForChangePassword(() => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: true }),
+    }));
+
+    const { router, queryClient } = buildTestRouter('/');
+    renderRouter(router, queryClient);
+
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe('/cambiar-password'),
+    );
+
+    await user.type(
+      await screen.findByLabelText('Contraseña actual'),
+      'temporal123',
+    );
+    await user.type(
+      screen.getByLabelText('Contraseña nueva'),
+      'unaContraseñaSegura',
+    );
+    await user.type(
+      screen.getByLabelText('Repita la contraseña nueva'),
+      'unaContraseñaSegura',
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Guardar contraseña' }),
+    );
+
+    await waitFor(() =>
+      expect(
+        queryClient.getQueryData<{ debeCambiarPassword: boolean }>(['session'])
+          ?.debeCambiarPassword,
+      ).toBe(false),
+    );
+
+    // The user must be carried into the shell, not left on the form they
+    // just submitted. Clearing the flag alone does not move them:
+    // /cambiar-password hangs off authLayout, so shellLayout's guard only
+    // stops redirecting INTO it. onSuccess navigates explicitly.
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'));
+  });
+
+  it('shows the field error and keeps the user on /cambiar-password for a wrong current password', async () => {
+    const user = userEvent.setup();
+    stubFetchForChangePassword(() => ({
+      ok: false,
+      status: 400,
+      json: async () => ({
+        error: {
+          code: 'INVALID_CURRENT_PASSWORD',
+          message: 'Current password is incorrect',
+        },
+      }),
+    }));
+
+    const { router, queryClient } = buildTestRouter('/');
+    renderRouter(router, queryClient);
+
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe('/cambiar-password'),
+    );
+
+    await user.type(
+      await screen.findByLabelText('Contraseña actual'),
+      'incorrecta12',
+    );
+    await user.type(
+      screen.getByLabelText('Contraseña nueva'),
+      'unaContraseñaSegura',
+    );
+    await user.type(
+      screen.getByLabelText('Repita la contraseña nueva'),
+      'unaContraseñaSegura',
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Guardar contraseña' }),
+    );
+
+    expect(
+      await screen.findByText('La contraseña actual es incorrecta.'),
+    ).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/cambiar-password');
+  });
 });

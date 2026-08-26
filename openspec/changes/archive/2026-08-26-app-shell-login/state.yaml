@@ -27,6 +27,28 @@ delivery_decision:
   policy: no-further-splits
   pr_count: 7
   decided: 2026-08-25
+  # The chain actually shipped as 9 PRs, not the 7 forecast. The two extra are
+  # not seam splits and do not reopen the no-further-splits decision: #16 is the
+  # planning-docs PR that predates the seams, and #20 is the integration-test
+  # isolation fix, which was kept INSIDE the chain rather than branched off main
+  # so every downstream PR runs CI against the fixed config.
+  pull_requests:
+    opened: 2026-08-26
+    merge_order: strictly bottom-up, #16 first
+    warning: >-
+      NEVER delete a base branch while a dependent PR is open — GitHub closes
+      the dependent instead of retargeting it. This already cost a PR during the
+      auth-sesiones cycle. Retarget each PR to main immediately before merging.
+    chain:
+      - "#16 docs/sdd-planning-frontend        <- main"
+      - "#17 feat/shell-pr1-api-errors         <- docs/sdd-planning-frontend"
+      - "#18 feat/shell-pr2-data-domain        <- feat/shell-pr1-api-errors"
+      - "#19 feat/shell-pr3-api-guard          <- feat/shell-pr2-data-domain"
+      - "#20 fix/integration-test-isolation    <- feat/shell-pr3-api-guard"
+      - "#21 feat/shell-pr4-visual-foundation  <- fix/integration-test-isolation"
+      - "#22 feat/shell-pr5a-router-session    <- feat/shell-pr4-visual-foundation"
+      - "#23 feat/shell-pr5b-login-screen      <- feat/shell-pr5a-router-session"
+      - "#24 feat/shell-pr6-change-password    <- feat/shell-pr5b-login-screen"
 
 phases:
   explore:
@@ -251,6 +273,48 @@ phases:
       S5a: 295 of those lines are tests, leaving roughly 209 lines of source
       across four small units. The agent reported the overrun itself and stated
       plainly that it had failed to measure mid-flight as instructed.
+    s6_notes: >-
+      Seam S6 (change-password screen) landed on branch
+      feat/shell-pr6-change-password in four agent commits (2f48950..d17daa2)
+      plus two orchestrator commits.
+      ORCHESTRATOR RE-VERIFIED INDEPENDENTLY:
+      (1) D5 BINDING CORRECT — cambiarPassword.tsx passes currentPasswordError
+      only when isApiError(error) && error.code === 'INVALID_CURRENT_PASSWORD',
+      and ChangePasswordForm renders it on the currentPassword TextField, not as
+      a banner. The distinct 400 finally pays off here.
+      (2) CACHE MERGED, NOT REPLACED — setQueryData spreads the existing usuario
+      and flips only debeCambiarPassword, so id/nombre/email/rol survive.
+      (3) ROUTE PARENTAGE HELD — still a child of authLayout with no beforeLoad
+      of its own.
+      DEFECT FOUND AND FIXED BY THE ORCHESTRATOR (96b6e7e): after a successful
+      change the user was left sitting on the form. Clearing the flag only stops
+      shellLayout from redirecting INTO /cambiar-password; that route hangs off
+      authLayout, so nothing moved the user anywhere. The spec never specified
+      post-success navigation, so the agent was right not to invent it, but the
+      resulting flow was broken. onSuccess now navigates to '/', the way useLogin
+      already did. The integration assertion was strengthened and PROVEN
+      load-bearing: removing the navigate fails it with
+      "expected '/cambiar-password' to be '/'".
+      CONFIRM-PASSWORD FIELD ADDED AT THE USER'S DECISION (08acbe3): the approved
+      mockup docs/design/CambiarPassword.dc.html shows a third field, "Repita la
+      contraseña nueva", which task 6.1 omitted because it enumerated the API
+      body. The agent flagged the divergence instead of silently choosing —
+      correct behaviour. Raised with the user, who chose to add it. Rationale:
+      this is the only screen where a typo is irreversible, since a mistyped new
+      password locks the user out until an admin resets them.
+      Implemented as changePasswordFormSchema, deliberately WIDER than
+      changePasswordSchema. The request-body mirror stays exactly two fields, and
+      ChangePasswordForm strips confirmPassword before calling onSubmit rather
+      than relying on the server to discard it. Two tests pin this: one for the
+      mismatch error, one asserting onSubmit receives exactly two fields.
+      RED verified before GREEN: "Unable to find a label with the text of:
+      Repita la contraseña nueva".
+      A typecheck-only failure surfaced during this work and was fixed: `path:
+      ['newPassword'] as const` produced a readonly tuple where zod wants a
+      mutable PropertyKey[]. Vitest never sees it — only `pnpm typecheck` caught
+      it, which is why the full gate runs and not just the suite.
+      VERIFIED: typecheck + lint green, contract:check exit 0 and byte-identical,
+      api 82/82, web 50/50 (was 48).
     seams:
       S1: done
       S2: done
@@ -258,9 +322,161 @@ phases:
       S4: done
       S5a: done
       S5b: done
-      S6: pending
+      S6: done
   verify:
-    status: pending
+    status: completed
+    verdict: PASS WITH FINDINGS
+    notes: >-
+      sdd-verify ran adversarially against the tip of the chain
+      (feat/shell-pr6-change-password) on 2026-08-26. Verdict: PASS WITH
+      FINDINGS — 1 SUGGESTION, 0 WARNING, 0 CRITICAL. It ran all five gates
+      itself: typecheck and lint clean, contract:check byte-identical, api
+      82/82, web 50/50, integration 13/13 deterministic. It confirmed D1-D16
+      against the code rather than against these notes, including D14 via
+      git show --name-only on 581b29e, the exactly-two allowPasswordChangePending
+      routes, the guard's position between the auth-false return and the roles
+      check, the one-UPDATE password write ordering, the absence of
+      routeTree.gen and createContext, and the cambiarPassword-under-authLayout
+      nesting. All five recorded deliberate deviations were confirmed real.
+      ORCHESTRATOR CORRECTED THE VERIFIER: it reported tasks 7.1 and 7.2 as
+      "correctly left unchecked, MANUAL, not attempted". That is wrong. 7.1 (the
+      Neon migration) was applied before S3 shipped and verified in production;
+      7.2 (the local integration run) was executed at 13/13 and is what surfaced
+      the pre-existing parallelism flake. 7.4 was likewise already satisfied.
+      All three are now checked in tasks.md with their evidence.
+  diagnosed_flake:
+    id: F2
+    severity: flaky-test
+    status: diagnosed
+    observed: 2026-08-26
+    diagnosed: 2026-08-26
+    verdict: >-
+      TIMEOUT, not an assertion failure. NO production bug. The cookie code is
+      correct; the test's 5s budget was too small for a contended machine.
+    what: >-
+      `apps/api/src/routes/auth.test.ts` — "returns 200 with the usuario and a
+      Set-Cookie with the expected attributes on success" failed ONCE, giving
+      api 81/82. It had passed minutes earlier and no file under apps/api had
+      been touched between the two runs.
+    reproduced: >-
+      REPRODUCED deliberately on 2026-08-26 at the user's request, after 12
+      earlier clean runs had failed to surface it. Method: run the api suite
+      against 16 busy `while` loops on an 8-core machine, keeping the FULL
+      output of every run. Result: 1 failure in 12 contended runs. Baselines in
+      the same script stayed green — 30 runs of the login file alone and 10
+      uncontended full-suite runs, 0 failures.
+    captured_evidence: >-
+      `Error: Test timed out in 5000ms.` at src/routes/auth.test.ts:61, with the
+      test itself measured at 5628ms. In the SAME run
+      src/plugins/openapi.test.ts also timed out at 6306ms.
+    decisive_observation: >-
+      The openapi test does NO argon2 work at all, and it timed out too. So the
+      deliberately-slow hash is NOT the special cause — the run's cost is
+      dominated by cold-start module import (76s of import time in that run),
+      and under CPU starvation ANY test in this suite can exceed 5s. This also
+      explains why the failing test is the FIRST in its file: it absorbs module
+      import, the argon2 native binding load, and the first Fastify app build.
+      The original hypothesis (argon2 being slow) was too narrow.
+    evidence_loss_cause: >-
+      CORRECTED 2026-08-26. The original note blamed "rerun before capture".
+      That is wrong. The failing command was recovered verbatim from the session
+      transcript:
+      `pnpm typecheck 2>&1 | tail -2 && pnpm lint 2>&1 | tail -1 &&
+      pnpm contract:check 2>&1 | tail -1 && pnpm -r test 2>&1 | rg "Tests  |FAIL"
+      | head -3`.
+      vitest DID print the full diagnostic; the `rg "Tests  |FAIL" | head -3`
+      filter discarded it at the moment of capture. The rerun destroyed nothing.
+    lesson: >-
+      Never filter test output down to counts when a failure is possible. Write
+      the full output to a file and search the FILE. A filter that keeps only
+      "FAIL" and the totals throws away the one thing that distinguishes a
+      timeout from an assertion failure — which need opposite fixes.
+    contention_source: >-
+      CORRECTED 2026-08-26. The preceding typecheck/lint/contract:check were
+      `&&`-sequential and had already finished, so they were NOT the concurrent
+      load. The real overlap is inside `pnpm -r test` itself: workspace-concurrency
+      is unset, so pnpm defaults to running the api and web suites CONCURRENTLY.
+      web's jsdom environment is heavy (~20s, ~70s environment time) and the api
+      login test does TWO real argon2 operations (setup hash + route verify) at
+      memoryCost 19456 KiB. That overlap is the plausible path to vitest's 5s
+      default timeout.
+    ruled_out: >-
+      Every assertion in the test is on a STATIC value (sid=, HttpOnly,
+      SameSite=Lax, absence of Domain=), so none can flake on its own. The token
+      is randomBytes(32).toString('base64url'), which has no '=' padding, so the
+      `not.toMatch(/Domain=/i)` guard cannot false-positive on a random value.
+      session.test.ts mutates process.env.NODE_ENV but restores it in both
+      beforeEach and afterEach, and this test asserts nothing about Secure. That
+      leaves exactly two candidates: a timeout, or login not returning 200
+      (argon2 erroring under memory pressure). Both are environmental, not a
+      logic bug in the cookie code.
+    fix: >-
+      apps/api/vitest.config.ts now sets testTimeout: 15_000 (~2.4x the worst
+      observed 6306ms). This is the evidence-backed fix, not the blind one the
+      earlier note warned against: raising a timeout is only safe BECAUSE the
+      captured output proved a timeout. Had it been an assertion failure, this
+      same change would have hidden a real bug — which is exactly why the fix
+      waited for evidence.
+    why_not_other_fixes: >-
+      Precomputing the argon2 setup hash was considered and rejected: the
+      openapi test proves argon2 is not the driver, so that would treat a
+      symptom that is not the cause. Raising the timeout cannot mask a logic
+      bug — every assertion still runs unchanged and a genuine hang still fails.
+    scope_note: >-
+      Only apps/api/vitest.config.ts was changed. apps/web and the integration
+      config were left alone: there is no evidence of a timeout in either, and
+      the whole point of this finding is not to change things without evidence.
+      If web ever flakes the same way under CI contention, apply the same fix —
+      but capture the output first.
+  resolved_finding:
+    id: F1
+    severity: suggestion
+    status: closed
+    closed: 2026-08-26
+    closed_by: 3743bbb
+    finding: >-
+      The app-shell spec scenario "Login background matches documented token"
+      (#16233c) has no test. The value is implemented correctly — AuthCard's
+      .screen paints var(--color-sidebar) and tokens.css defines it — but no
+      test asserts it, so a token drifting away from docs/design.md would go
+      unnoticed by the suite.
+    attempted: >-
+      A src/styles/tokens.test.ts was written and works: 53/53 green, and proven
+      load-bearing by changing --color-sidebar and observing the failure. It
+      reads the stylesheets from disk, because jsdom never applies a CSS Module's
+      stylesheet (getComputedStyle reports nothing) and vitest resolves CSS
+      `?raw` imports to an empty string.
+    blocked_on: >-
+      It fails pnpm typecheck: apps/web has no @types/node, and the test imports
+      node:fs. Closing this needs @types/node as a web devDependency, imported as
+      node:process rather than the global so tsconfig's types: ["vite/client"]
+      stays narrow and app code still cannot reach Node APIs by accident.
+    resolution: >-
+      CLOSED on 2026-08-26 by commit 3743bbb, at the user's request after an
+      initial deferral. @types/node was added as an apps/web devDependency and
+      the test now lives at src/styles/tokens.test.ts. Web suite went 50 -> 53.
+    resolution_approach: >-
+      The narrow types: ["vite/client"] was NOT widened. Tests compile under a
+      new apps/web/tsconfig.test.json (types: ["vite/client", "node"]) while
+      tsconfig.json excludes test files, so all app source is still compiled
+      without Node globals. `pnpm typecheck` in apps/web now runs both configs.
+    resolution_pitfall: >-
+      tsconfig.test.json must inherit include: ["src"]. Narrowing it to test
+      files alone drops src/app/router.tsx, whose
+      `declare module '@tanstack/react-router'` augmentation types the router
+      context — losing it degrades useRouteContext() to `any` and makes
+      unrelated files fail with implicit-any errors. This was hit and fixed
+      during the work; do not "tidy" that include back to a narrow list.
+    resolution_evidence: >-
+      Both guards proven load-bearing, not assumed: changing --color-sidebar to
+      #16233d failed "defines the documented login background", and a
+      process.env reference added to src/routes/index.tsx failed the app config
+      with TS2591. Full gate green afterwards — lint, contract:check, api and
+      web typecheck, api 82/82, web 53/53.
+    honest_caveat: >-
+      This test's real value is modest. It guards against token drift; it does
+      NOT prove the screen looks right. A layout could break completely with the
+      token untouched and it would still pass.
     engram_topic: sdd/app-shell-login/verify-report
   archive:
     status: pending

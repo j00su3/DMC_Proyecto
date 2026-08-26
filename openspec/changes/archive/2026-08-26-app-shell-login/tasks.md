@@ -224,43 +224,53 @@ Maps to: *Change Password Endpoint* (client side, `password-change` spec);
 *Client-Side Forced-Password-Change Redirect* — "reaches change-password directly" scenario
 (`app-shell` spec). Visual source of truth: `docs/design/CambiarPassword.dc.html`.
 
-- [ ] 6.1 GREEN: extend `apps/web/src/features/auth/schemas.ts` — `changePasswordSchema` (`currentPassword`
+- [x] 6.1 GREEN: extend `apps/web/src/features/auth/schemas.ts` — `changePasswordSchema` (`currentPassword`
       min 1, `newPassword` min 12, `.refine(v => v.newPassword !== v.currentPassword)` — client mirror
       of the server's `refine`, same message contract)
-- [ ] 6.2 RED `apps/web/src/features/auth/ChangePasswordForm.test.tsx` — zod errors render; a valid
+- [x] 6.2 RED `apps/web/src/features/auth/ChangePasswordForm.test.tsx` — zod errors render; a valid
       submit calls `onSubmit`; a server `INVALID_CURRENT_PASSWORD` error renders bound to the
       `currentPassword` field (D5 — the whole point of the distinct 400 code); submit disabled while
       pending
-- [ ] 6.3 GREEN `apps/web/src/features/auth/ChangePasswordForm.tsx` — `react-hook-form` +
+- [x] 6.3 GREEN `apps/web/src/features/auth/ChangePasswordForm.tsx` — `react-hook-form` +
       `zodResolver(changePasswordSchema)` per `docs/design/CambiarPassword.dc.html`
-- [ ] 6.4 GREEN `apps/web/src/features/auth/useChangePassword.ts` — mutation `POST /api/auth/password`;
+- [x] 6.4 GREEN `apps/web/src/features/auth/useChangePassword.ts` — mutation `POST /api/auth/password`;
       on success merge `debeCambiarPassword: false` into the `['session']` cache and call
       `router.invalidate()` (re-runs `shellLayout`'s guard so the redirect clears immediately)
-- [ ] 6.5 GREEN `apps/web/src/routes/cambiarPassword.tsx` — child of `authLayout`, **not** of
+- [x] 6.5 GREEN `apps/web/src/routes/cambiarPassword.tsx` — child of `authLayout`, **not** of
       `shellLayout` (built in 5A.11, verified here) so the route stays reachable while the flag is
       `true`; wires `ChangePasswordForm` + `useChangePassword`
-- [ ] 6.6 RED `apps/web/src/routes/cambiarPassword.test.ts` — the route's own `beforeLoad` (if any)
+- [x] 6.6 RED `apps/web/src/routes/cambiarPassword.test.ts` — the route's own `beforeLoad` (if any)
       applies only `authLayout`'s session guard, with no forced-change redirect on itself
-- [ ] 6.7 Integration: extend `apps/web/src/app/router.test.tsx` — a session with
+- [x] 6.7 Integration: extend `apps/web/src/app/router.test.tsx` — a session with
       `debeCambiarPassword: true` lands on `/cambiar-password`; submitting a valid change clears the
       flag and the shell becomes reachable; a wrong current password shows the field error and the
       user stays on `/cambiar-password`
 
 ## Phase 7: Manual Steps + Bookkeeping
 
-- [ ] 7.1 MANUAL (user, external/local action — not executable by the agent). Apply migration
+- [x] 7.1 MANUAL (user, external/local action — not executable by the agent). Apply migration
       `0001_*.sql` against Neon per ADR-0010 (`pnpm db:migrate` with the Neon connection string) —
       **before** Phase 3 (S3) deploys, since the guard reads the new column live on every request.
-      Tooling never reads or writes `.env*` files; this is a manual, user-owned step
-- [ ] 7.2 MANUAL (user, local verification — not executable by the agent). Run
+      Tooling never reads or writes `.env*` files; this is a manual, user-owned step.
+      **DONE 2026-08-25**, before S3 shipped. Verified in production afterwards: the column reports
+      `boolean / NOT NULL / default false`, `usuarios: { total: 1, flagged: 0 }`, and health returns
+      200 `db:up` both directly against Render and through the Vercel `/api` proxy
+- [x] 7.2 MANUAL (user, local verification — not executable by the agent). Run
       `pnpm --filter @inventienda/api test:integration` locally against Docker Postgres to confirm
-      Phase 2 and Phase 3's integration suites pass before requesting review on their respective PRs
+      Phase 2 and Phase 3's integration suites pass before requesting review on their respective PRs.
+      **DONE**: 13/13 green. Note this task also surfaced a pre-existing ~50% flake — the suites share
+      one database and truncate the same tables under vitest's default file parallelism — fixed in
+      `d588840` (`fileParallelism: false`) and confirmed by five consecutive clean runs
 - [ ] 7.3 Bookkeeping: mark completed checkboxes in this file as each PR lands; the orchestrator
       advances `openspec/changes/app-shell-login/state.yaml` phase statuses (this agent does not edit
       `state.yaml`)
-- [ ] 7.4 Confirm `pnpm contract:check` is green specifically on Phase 3 (S3)'s PR — the only seam
+- [x] 7.4 Confirm `pnpm contract:check` is green specifically on Phase 3 (S3)'s PR — the only seam
       that can move the contract — and confirm `pnpm -r typecheck` stays green on every later PR
-      (5A, 5B, 6) as a regression guard against accidental route/schema drift
+      (5A, 5B, 6) as a regression guard against accidental route/schema drift.
+      **DONE**: `contract:check` verified byte-identical on S3 and on every seam after it, and
+      `git show --name-only 581b29e` confirms `openapi.json` and `schema.d.ts` landed in the same
+      commit as the route change. `typecheck` green on 5A, 5B and 6 — it caught one real defect the
+      test suite could not see, a `readonly` tuple passed where zod wants a mutable `PropertyKey[]`
 
 ## Review Workload Forecast
 
