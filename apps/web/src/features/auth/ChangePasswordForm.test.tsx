@@ -41,6 +41,60 @@ describe('ChangePasswordForm', () => {
       screen.getByLabelText('Contraseña nueva'),
       'unaContraseñaSegura',
     );
+    await user.type(
+      screen.getByLabelText('Repita la contraseña nueva'),
+      'unaContraseñaSegura',
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Guardar contraseña' }),
+    );
+
+    expect(onSubmit).toHaveBeenCalledWith({
+      currentPassword: 'temporal123',
+      newPassword: 'unaContraseñaSegura',
+    });
+  });
+
+  it('blocks the submit when the confirmation does not match the new password', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+
+    render(<ChangePasswordForm onSubmit={onSubmit} />);
+
+    await user.type(screen.getByLabelText('Contraseña actual'), 'temporal123');
+    await user.type(
+      screen.getByLabelText('Contraseña nueva'),
+      'unaContraseñaSegura',
+    );
+    await user.type(
+      screen.getByLabelText('Repita la contraseña nueva'),
+      'unaContraseñaSeguro',
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Guardar contraseña' }),
+    );
+
+    expect(
+      await screen.findByText('Las contraseñas no coinciden.'),
+    ).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('never sends the confirmation field to the caller — the API body has two fields only', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+
+    render(<ChangePasswordForm onSubmit={onSubmit} />);
+
+    await user.type(screen.getByLabelText('Contraseña actual'), 'temporal123');
+    await user.type(
+      screen.getByLabelText('Contraseña nueva'),
+      'unaContraseñaSegura',
+    );
+    await user.type(
+      screen.getByLabelText('Repita la contraseña nueva'),
+      'unaContraseñaSegura',
+    );
     await user.click(
       screen.getByRole('button', { name: 'Guardar contraseña' }),
     );

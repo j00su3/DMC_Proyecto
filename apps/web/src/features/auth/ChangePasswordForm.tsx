@@ -4,7 +4,11 @@ import { AuthCard } from '../../components/ui/AuthCard.js';
 import { Button } from '../../components/ui/Button.js';
 import { TextField } from '../../components/ui/TextField.js';
 import styles from './ChangePasswordForm.module.css';
-import { type ChangePasswordInput, changePasswordSchema } from './schemas.js';
+import {
+  type ChangePasswordFormInput,
+  type ChangePasswordInput,
+  changePasswordFormSchema,
+} from './schemas.js';
 
 type ChangePasswordFormProps = {
   onSubmit: (values: ChangePasswordInput) => void;
@@ -35,12 +39,15 @@ export function ChangePasswordForm({
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<ChangePasswordInput>({
-    resolver: zodResolver(changePasswordSchema),
+  } = useForm<ChangePasswordFormInput>({
+    resolver: zodResolver(changePasswordFormSchema),
   });
 
-  const submit = handleSubmit((values) => {
-    onSubmit(values);
+  // confirmPassword is a client-side guard against a typo that would lock the
+  // user out; the API body has two fields only, so it is dropped here rather
+  // than relying on the server to strip it.
+  const submit = handleSubmit(({ confirmPassword: _confirmation, ...body }) => {
+    onSubmit(body satisfies ChangePasswordInput);
   });
 
   return (
@@ -87,6 +94,20 @@ export function ChangePasswordForm({
               Mínimo 12 caracteres. No puede ser igual a la actual.
             </div>
           </div>
+
+          <TextField
+            id="confirmPassword"
+            label="Repita la contraseña nueva"
+            type="password"
+            autoComplete="new-password"
+            placeholder="••••••••••••"
+            error={
+              errors.confirmPassword
+                ? 'Las contraseñas no coinciden.'
+                : undefined
+            }
+            {...register('confirmPassword')}
+          />
 
           <Button type="submit" variant="primary" isPending={isPending}>
             Guardar contraseña

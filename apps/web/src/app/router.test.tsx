@@ -259,6 +259,10 @@ describe('app router', () => {
       screen.getByLabelText('Contraseña nueva'),
       'unaContraseñaSegura',
     );
+    await user.type(
+      screen.getByLabelText('Repita la contraseña nueva'),
+      'unaContraseñaSegura',
+    );
     await user.click(
       screen.getByRole('button', { name: 'Guardar contraseña' }),
     );
@@ -303,6 +307,10 @@ describe('app router', () => {
     );
     await user.type(
       screen.getByLabelText('Contraseña nueva'),
+      'unaContraseñaSegura',
+    );
+    await user.type(
+      screen.getByLabelText('Repita la contraseña nueva'),
       'unaContraseñaSegura',
     );
     await user.click(
