@@ -217,13 +217,47 @@ phases:
       isolation. Note the design had already anticipated the sibling cycle
       (queryClient <-> router, solved with the late-bound setRouter) but this
       third edge was not foreseen.
+    s5b_notes: >-
+      Seam S5b (login screen) landed on branch feat/shell-pr5b-login-screen in
+      six work-unit commits, 8b8dc35 through 735094d. The commit-granularity
+      instruction from the S5a postmortem was followed this time.
+      ORCHESTRATOR RE-VERIFIED INDEPENDENTLY:
+      (1) FEATURES BOUNDARY HELD — LoginForm.tsx imports only hookform, the four
+      S4 primitives, its CSS module and the schema. No router, no react-query, no
+      apiFetch. Its test renders with no router at all, which is the entire point:
+      the form stays testable in isolation and useLogin owns the mutation and
+      navigation.
+      (2) retryAfter READ CORRECTLY — the mapper treats details.retryAfter as
+      SECONDS and converts to minutes, matching accountLocked() at
+      apps/api/src/lib/errors.ts:80-83. The agent read the real factory instead of
+      assuming a unit, and narrows `details: unknown` defensively. A minutes/
+      seconds mix-up here would have shown users a lockout 60x too short.
+      (3) UI COPY MATCHES THE MOCKUP verbatim — "Correo electrónico",
+      "Contraseña", "Ingresar" all appear in docs/design/Main.dc.html. Spanish
+      here is correct: it is transcribed user-facing copy from the approved
+      design, not persona drift. Identifiers and comments stay English.
+      (4) ingresar.tsx beforeLoad throws redirect({ to: '/' }) when a session
+      already resolves, so an authenticated user never sits on the login screen.
+      VERIFIED: typecheck + lint green, contract:check exit 0 and byte-identical,
+      api 82/82, web 40/40 (was 27).
+      TEST-HELPER GAP FOUND AND FIXED BY THE AGENT: buildTestRouter wrapped only
+      RouterProvider, never QueryClientProvider. It went unnoticed in S5a because
+      no route component reached in those guard-redirect tests actually called a
+      react-query hook. The first login test surfaced it as "No QueryClient set".
+      Now buildTestRouter returns { router, queryClient } and renderRouter wraps
+      both, matching how AppProviders composes the real app. This is the correct
+      fix rather than a workaround.
+      BUDGET: 504 changed lines against 400 — over, but materially healthier than
+      S5a: 295 of those lines are tests, leaving roughly 209 lines of source
+      across four small units. The agent reported the overrun itself and stated
+      plainly that it had failed to measure mid-flight as instructed.
     seams:
       S1: done
       S2: done
       S3: done
       S4: done
       S5a: done
-      S5b: pending
+      S5b: done
       S6: pending
   verify:
     status: pending

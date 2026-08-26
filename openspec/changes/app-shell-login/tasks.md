@@ -196,24 +196,24 @@ Maps to: *Login Screen*, *Screens Built From Design Tokens* (`app-shell` spec). 
 truth: `docs/design/Main.dc.html` (normal state), `docs/design/LoginError.dc.html` (invalid
 credentials state).
 
-- [ ] 5B.1 GREEN `apps/web/src/features/auth/schemas.ts` — `loginSchema = z.object({ email: z.string().email(), password: z.string().min(1) })`
-- [ ] 5B.2 RED `apps/web/src/features/auth/errorMessages.test.ts` — `ACCOUNT_LOCKED` → a message
+- [x] 5B.1 GREEN `apps/web/src/features/auth/schemas.ts` — `loginSchema = z.object({ email: z.string().email(), password: z.string().min(1) })`
+- [x] 5B.2 RED `apps/web/src/features/auth/errorMessages.test.ts` — `ACCOUNT_LOCKED` → a message
       derived from `details.retryAfter` (minutes); `INVALID_CREDENTIALS` / `ACCOUNT_INACTIVE` /
       `RATE_LIMITED` / unknown code → distinct messages
-- [ ] 5B.3 GREEN `apps/web/src/features/auth/errorMessages.ts` — pure function `(ApiError) => string`
-- [ ] 5B.4 RED `apps/web/src/features/auth/LoginForm.test.tsx` — zod validation errors render; a valid
+- [x] 5B.3 GREEN `apps/web/src/features/auth/errorMessages.ts` — pure function `(ApiError) => string`
+- [x] 5B.4 RED `apps/web/src/features/auth/LoginForm.test.tsx` — zod validation errors render; a valid
       submit calls `onSubmit` with trimmed `email`/`password`; a server error message renders; submit
       is disabled while pending — `render()` with **no router** (route-module boundary: `features/*`
       takes props/callbacks only) + `@testing-library/user-event`
-- [ ] 5B.5 GREEN `apps/web/src/features/auth/LoginForm.tsx` — `react-hook-form` +
+- [x] 5B.5 GREEN `apps/web/src/features/auth/LoginForm.tsx` — `react-hook-form` +
       `zodResolver(loginSchema)`; composes `AuthCard`/`TextField`/`Button`/`FormError` per
       `docs/design/Main.dc.html` and `LoginError.dc.html`
-- [ ] 5B.6 GREEN `apps/web/src/features/auth/useLogin.ts` — mutation `POST /api/auth/login`; on success
+- [x] 5B.6 GREEN `apps/web/src/features/auth/useLogin.ts` — mutation `POST /api/auth/login`; on success
       `queryClient.setQueryData(['session'], usuario)` and navigate away from `/ingresar` (container —
       imports router/react-query, unlike `LoginForm`)
-- [ ] 5B.7 GREEN `apps/web/src/routes/ingresar.tsx` — child of `publicLayout`, wires `LoginForm` +
+- [x] 5B.7 GREEN `apps/web/src/routes/ingresar.tsx` — child of `publicLayout`, wires `LoginForm` +
       `useLogin`; already-authenticated visit redirects to the protected shell's default route
-- [ ] 5B.8 Integration: extend `apps/web/src/app/router.test.tsx` (same file as 5A.15) — submitting
+- [x] 5B.8 Integration: extend `apps/web/src/app/router.test.tsx` (same file as 5A.15) — submitting
       valid credentials via stubbed `fetch` populates the session and navigates into the shell; wrong
       credentials keep the user on `/ingresar` with an error; a locked-account response shows the
       `retryAfter`-derived message
