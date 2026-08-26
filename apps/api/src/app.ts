@@ -1,6 +1,9 @@
 import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, {
+  type FastifyInstance,
+  type FastifyServerOptions,
+} from 'fastify';
 import {
   type ZodTypeProvider,
   jsonSchemaTransform,
@@ -29,12 +32,44 @@ export interface BuildAppOptions {
   repos?: Repos;
   cookieSecret?: string;
   rateLimitMax?: number;
+  logger?: FastifyServerOptions['logger'];
+}
+
+/**
+ * Logging is OFF everywhere except production.
+ *
+ * It has to be on in production: `server.ts` reports a failed `listen()` with
+ * `app.log.error(error)`, and with logging disabled Fastify installs a no-op
+ * logger — the process would exit(1) having printed nothing at all, leaving a
+ * dead service with no diagnostic. It has to stay off elsewhere because the
+ * unit suite builds an app per test and would drown in request lines.
+ *
+ * `LOG_LEVEL` is read so the level can be turned up on a running deployment
+ * without a redeploy.
+ *
+ * `process.env` is read directly rather than through `lib/env.ts`, matching
+ * `plugins/cookie.ts`: importing that module here would require DATABASE_URL
+ * at import time and drag Postgres into the unit suite (design.md D13).
+ *
+ * Note that Fastify's default logger records the request line, status and
+ * timing — NOT request bodies — so enabling this does not put the login
+ * password in the logs. Verified by probe, not assumed. Any future change that
+ * starts logging bodies or error objects needs a `redact` list first.
+ */
+function defaultLogger(): FastifyServerOptions['logger'] {
+  if (process.env.NODE_ENV !== 'production') {
+    return false;
+  }
+
+  return { level: process.env.LOG_LEVEL ?? 'info' };
 }
 
 export async function buildApp(
   opts: BuildAppOptions = {},
 ): Promise<FastifyInstance> {
-  const app = Fastify().withTypeProvider<ZodTypeProvider>();
+  const app = Fastify({
+    logger: opts.logger ?? defaultLogger(),
+  }).withTypeProvider<ZodTypeProvider>();
 
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);

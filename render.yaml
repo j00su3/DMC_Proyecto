@@ -11,7 +11,10 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
-      # Gates the cookie's Secure flag and the missing-secret hard failure.
+      # Gates the cookie's Secure flag, the missing-secret hard failure, and
+      # request logging (off everywhere else so the unit suite stays quiet).
+      # Set LOG_LEVEL here or in the dashboard to raise/lower the level without
+      # a redeploy; it defaults to "info".
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
