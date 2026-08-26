@@ -1,17 +1,41 @@
-import { createRoute } from '@tanstack/react-router';
+import { createRoute, redirect } from '@tanstack/react-router';
+import { sessionQueryOptions } from '../api/session.js';
+import { isApiError } from '../api/errors.js';
+import { loginErrorMessage } from '../features/auth/errorMessages.js';
+import { LoginForm } from '../features/auth/LoginForm.js';
+import { useLogin } from '../features/auth/useLogin.js';
 import { publicLayout } from './publicLayout.js';
 
 /**
- * Barest placeholder — the login form, its submission and its error states
- * ship in Phase 5B (S5b). This route exists here only so the guards in this
- * seam have a real target to redirect to.
+ * A logged-in user should never sit on the login screen: an already
+ * authenticated visit bounces to `/`, and `shellLayout`'s guard takes it
+ * from there (to `/cambiar-password` when the flag is set).
  */
 export const ingresarRoute = createRoute({
   getParentRoute: () => publicLayout,
   path: '/ingresar',
-  component: IngresarPlaceholder,
+  beforeLoad: async ({ context }) => {
+    const usuario =
+      await context.queryClient.ensureQueryData(sessionQueryOptions);
+    if (usuario) {
+      throw redirect({ to: '/' });
+    }
+  },
+  component: IngresarScreen,
 });
 
-function IngresarPlaceholder() {
-  return <div>Ingresar (placeholder — Phase 5B)</div>;
+function IngresarScreen() {
+  const login = useLogin();
+
+  return (
+    <LoginForm
+      onSubmit={(values) => login.mutate(values)}
+      isPending={login.isPending}
+      errorMessage={
+        login.error && isApiError(login.error)
+          ? loginErrorMessage(login.error)
+          : undefined
+      }
+    />
+  );
 }
