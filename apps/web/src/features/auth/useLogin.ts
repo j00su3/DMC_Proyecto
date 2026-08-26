@@ -1,8 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from '@tanstack/react-router';
 import { apiFetch } from '../../api/client.js';
-import type { Usuario } from '../../api/session.js';
 import type { paths } from '../../api/schema.js';
+import type { Usuario } from '../../api/session.js';
 import type { LoginInput } from './schemas.js';
 
 type LoginResponse =

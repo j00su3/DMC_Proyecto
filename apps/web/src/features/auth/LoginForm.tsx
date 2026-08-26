@@ -19,7 +19,11 @@ type LoginFormProps = {
  * layout transcribed verbatim from `docs/design/Main.dc.html` /
  * `LoginError.dc.html`.
  */
-export function LoginForm({ onSubmit, errorMessage, isPending }: LoginFormProps) {
+export function LoginForm({
+  onSubmit,
+  errorMessage,
+  isPending,
+}: LoginFormProps) {
   const {
     register,
     handleSubmit,
@@ -49,9 +53,7 @@ export function LoginForm({ onSubmit, errorMessage, isPending }: LoginFormProps)
             autoComplete="username"
             placeholder="usuario@tienda.com"
             error={
-              errors.email
-                ? 'Ingrese un correo electrónico válido.'
-                : undefined
+              errors.email ? 'Ingrese un correo electrónico válido.' : undefined
             }
             {...register('email')}
           />

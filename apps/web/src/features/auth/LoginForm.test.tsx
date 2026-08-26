@@ -19,9 +19,7 @@ describe('LoginForm', () => {
     expect(
       await screen.findByText('Ingrese un correo electrónico válido.'),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText('Ingrese su contraseña.'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Ingrese su contraseña.')).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
   });
 

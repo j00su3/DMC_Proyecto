@@ -4,7 +4,11 @@ import { loginErrorMessage } from './errorMessages.js';
 
 describe('loginErrorMessage', () => {
   it('returns a message for INVALID_CREDENTIALS', () => {
-    const error = new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
+    const error = new ApiError(
+      401,
+      'INVALID_CREDENTIALS',
+      'Invalid email or password',
+    );
 
     expect(loginErrorMessage(error)).toBe(
       'El correo o la contraseña son incorrectos. Verifique los datos e intente de nuevo.',
@@ -28,9 +32,14 @@ describe('loginErrorMessage', () => {
   });
 
   it('derives ACCOUNT_LOCKED message from details.retryAfter (seconds -> minutes, rounded up)', () => {
-    const error = new ApiError(423, 'ACCOUNT_LOCKED', 'Account is temporarily locked', {
-      retryAfter: 90,
-    });
+    const error = new ApiError(
+      423,
+      'ACCOUNT_LOCKED',
+      'Account is temporarily locked',
+      {
+        retryAfter: 90,
+      },
+    );
 
     expect(loginErrorMessage(error)).toBe(
       'La cuenta está bloqueada temporalmente. Intente de nuevo en 2 minutos.',
@@ -38,9 +47,14 @@ describe('loginErrorMessage', () => {
   });
 
   it('pluralizes ACCOUNT_LOCKED message for a single minute', () => {
-    const error = new ApiError(423, 'ACCOUNT_LOCKED', 'Account is temporarily locked', {
-      retryAfter: 60,
-    });
+    const error = new ApiError(
+      423,
+      'ACCOUNT_LOCKED',
+      'Account is temporarily locked',
+      {
+        retryAfter: 60,
+      },
+    );
 
     expect(loginErrorMessage(error)).toBe(
       'La cuenta está bloqueada temporalmente. Intente de nuevo en 1 minuto.',
@@ -48,7 +62,11 @@ describe('loginErrorMessage', () => {
   });
 
   it('returns a distinct message for an unknown code', () => {
-    const error = new ApiError(500, 'INTERNAL_ERROR', 'An unexpected error occurred');
+    const error = new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'An unexpected error occurred',
+    );
 
     expect(loginErrorMessage(error)).toBe(
       'Ocurrió un error inesperado. Intente de nuevo.',
