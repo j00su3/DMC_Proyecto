@@ -347,10 +347,12 @@ phases:
       first — a timeout and an assertion failure need opposite responses. Note
       that CI runs the same suite on a smaller runner, so contention is plausible
       there too.
-  open_finding:
+  resolved_finding:
     id: F1
     severity: suggestion
-    status: deferred
+    status: closed
+    closed: 2026-08-26
+    closed_by: 3743bbb
     finding: >-
       The app-shell spec scenario "Login background matches documented token"
       (#16233c) has no test. The value is implemented correctly — AuthCard's
@@ -368,11 +370,28 @@ phases:
       node:fs. Closing this needs @types/node as a web devDependency, imported as
       node:process rather than the global so tsconfig's types: ["vite/client"]
       stays narrow and app code still cannot reach Node APIs by accident.
-    decision: >-
-      DEFERRED by the user on 2026-08-26 — not blocking, since the finding is a
-      SUGGESTION. The working file is parked outside the repo at the session
-      scratchpad (tokens.test.ts) so nothing was lost. The repo was left green:
-      the test file is NOT committed, and typecheck passes.
+    resolution: >-
+      CLOSED on 2026-08-26 by commit 3743bbb, at the user's request after an
+      initial deferral. @types/node was added as an apps/web devDependency and
+      the test now lives at src/styles/tokens.test.ts. Web suite went 50 -> 53.
+    resolution_approach: >-
+      The narrow types: ["vite/client"] was NOT widened. Tests compile under a
+      new apps/web/tsconfig.test.json (types: ["vite/client", "node"]) while
+      tsconfig.json excludes test files, so all app source is still compiled
+      without Node globals. `pnpm typecheck` in apps/web now runs both configs.
+    resolution_pitfall: >-
+      tsconfig.test.json must inherit include: ["src"]. Narrowing it to test
+      files alone drops src/app/router.tsx, whose
+      `declare module '@tanstack/react-router'` augmentation types the router
+      context — losing it degrades useRouteContext() to `any` and makes
+      unrelated files fail with implicit-any errors. This was hit and fixed
+      during the work; do not "tidy" that include back to a narrow list.
+    resolution_evidence: >-
+      Both guards proven load-bearing, not assumed: changing --color-sidebar to
+      #16233d failed "defines the documented login background", and a
+      process.env reference added to src/routes/index.tsx failed the app config
+      with TS2591. Full gate green afterwards — lint, contract:check, api and
+      web typecheck, api 82/82, web 53/53.
     honest_caveat: >-
       This test's real value is modest. It guards against token drift; it does
       NOT prove the screen looks right. A layout could break completely with the
