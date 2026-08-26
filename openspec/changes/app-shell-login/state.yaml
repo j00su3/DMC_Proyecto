@@ -169,12 +169,61 @@ phases:
       Composition matters here: ~290 lines are CSS (169 module.css + 59 tokens.css
       + 62 global.css), 117 are tests, leaving ~156 lines of TypeScript. Reported
       to the user rather than split unilaterally, since no-further-splits stands.
+    s5a_notes: >-
+      Seam S5a (router skeleton + session bootstrap + guards) landed on branch
+      feat/shell-pr5a-router-session, single commit ca849b3, all 16 tasks.
+      ORCHESTRATOR RE-VERIFIED INDEPENDENTLY, focusing on the three decisions
+      that could not be caught later by a test:
+      (1) ROUTE NESTING CORRECT — routeTree.ts nests cambiarPasswordRoute as a
+      DIRECT child of authLayout, sibling to shellLayout, so the forced-change
+      guard cannot expel the user from the one screen that clears the flag.
+      This was the loop hazard; it is avoided.
+      (2) SESSION SEMANTICS CORRECT — session.ts returns null only on
+      error.status === 401 and rethrows everything else, so a 500 is not read as
+      "logged out". No createContext exists anywhere under apps/web/src, so D12
+      holds: the session lives only in the react-query cache under ['session'].
+      (3) D10 HELD — no routeTree.gen anywhere in the index, no
+      @tanstack/router-plugin in package.json or the vite config. The tree is
+      hand-written in routes/routeTree.ts.
+      useLogout uses onSettled, so the redirect to /ingresar fires on failure as
+      well as success (5A.13).
+      VERIFIED: typecheck + lint green, contract:check exit 0 and byte-identical,
+      api 82/82, web 27/27 (was 18; -2 from deleting the App.tsx scaffolding,
+      +11 new).
+      TWO REVIEW CONCERNS RAISED WITH THE USER, NOT SILENTLY ACCEPTED:
+      (a) BUDGET — 736 changed lines (675 insertions + 61 deletions) against a
+      400 budget and a ~430 forecast. Unlike S4, the bulk here is logic: 258 test
+      lines and 80 CSS lines leave roughly 400 lines of logic-bearing TypeScript
+      across router construction, two route guards, a query client that
+      intercepts errors, and logout. The tasks phase had already split S5 (~770
+      forecast) into S5a + S5b specifically to avoid this, and S5a alone came in
+      at nearly the whole unsplit estimate. This is the "jump in scale" the
+      no-further-splits rationale named as the thing that actually breaks review.
+      (b) COMMIT GRANULARITY — all 16 tasks arrived as ONE commit, so the diff
+      could not be reviewed or bisected incrementally.
+      RESOLVED at the user's instruction: ca849b3 was unwound with a mixed reset
+      and re-committed as 8 work units in dependency order — session query,
+      query client, guards, route tree assembly, shell + logout, test helper +
+      router integration tests, entry-point rewire, docs. Content is byte-for-byte
+      identical to ca849b3 except the useLogout fix below; re-verified after the
+      split (typecheck, lint, contract:check, api 82/82, web 27/27).
+      IMPORT CYCLE FOUND AND FIXED BY THE ORCHESTRATOR: useLogout imported the
+      router and queryClient module singletons, closing the cycle
+      router -> routeTree -> index -> useLogout -> router. It worked only because
+      `router` was read inside the onSettled callback rather than at module scope
+      — too subtle to depend on, and it would break the moment anyone hoisted
+      that read. The hook now takes both from context via useRouter() and
+      useQueryClient(), which removes the cycle and makes it testable in
+      isolation. Note the design had already anticipated the sibling cycle
+      (queryClient <-> router, solved with the late-bound setRouter) but this
+      third edge was not foreseen.
     seams:
       S1: done
       S2: done
       S3: done
       S4: done
-      S5: pending
+      S5a: done
+      S5b: pending
       S6: pending
   verify:
     status: pending
