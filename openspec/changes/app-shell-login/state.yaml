@@ -27,6 +27,28 @@ delivery_decision:
   policy: no-further-splits
   pr_count: 7
   decided: 2026-08-25
+  # The chain actually shipped as 9 PRs, not the 7 forecast. The two extra are
+  # not seam splits and do not reopen the no-further-splits decision: #16 is the
+  # planning-docs PR that predates the seams, and #20 is the integration-test
+  # isolation fix, which was kept INSIDE the chain rather than branched off main
+  # so every downstream PR runs CI against the fixed config.
+  pull_requests:
+    opened: 2026-08-26
+    merge_order: strictly bottom-up, #16 first
+    warning: >-
+      NEVER delete a base branch while a dependent PR is open — GitHub closes
+      the dependent instead of retargeting it. This already cost a PR during the
+      auth-sesiones cycle. Retarget each PR to main immediately before merging.
+    chain:
+      - "#16 docs/sdd-planning-frontend        <- main"
+      - "#17 feat/shell-pr1-api-errors         <- docs/sdd-planning-frontend"
+      - "#18 feat/shell-pr2-data-domain        <- feat/shell-pr1-api-errors"
+      - "#19 feat/shell-pr3-api-guard          <- feat/shell-pr2-data-domain"
+      - "#20 fix/integration-test-isolation    <- feat/shell-pr3-api-guard"
+      - "#21 feat/shell-pr4-visual-foundation  <- fix/integration-test-isolation"
+      - "#22 feat/shell-pr5a-router-session    <- feat/shell-pr4-visual-foundation"
+      - "#23 feat/shell-pr5b-login-screen      <- feat/shell-pr5a-router-session"
+      - "#24 feat/shell-pr6-change-password    <- feat/shell-pr5b-login-screen"
 
 phases:
   explore:
