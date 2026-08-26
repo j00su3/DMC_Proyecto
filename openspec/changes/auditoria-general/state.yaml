@@ -97,7 +97,15 @@ phases:
       reported. The artifact itself survived complete — 231 lines, all sections
       present, verified not truncated. Nothing was re-run.
   tasks:
-    status: in_progress
+    status: completed
+    artifact: tasks.md
+    engram_topic: sdd/auditoria-general/tasks
+    shape: 36 tasks across 5 phases; phases 1-4 map one-to-one onto the four PRs
+    orchestrator_note: >-
+      Task 5.1 was written as "restate the proposal's Success Criteria bullet",
+      but the orchestrator had already done that during reconciliation (51262dc).
+      Marked done with that evidence rather than left open, so sdd-verify reads
+      the deferral as deliberate instead of forgotten.
   apply:
     status: pending
   verify:
