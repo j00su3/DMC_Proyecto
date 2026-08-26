@@ -78,6 +78,8 @@ producto agregada en v2 (A11): ver [Riesgos](#riesgos-técnicos-abiertos).
 | [ADR-0008](adrs/0008-evaluador-de-alertas-detras-de-interfaz.md) | Alertas — Evaluador de reglas detrás de interfaz | Aceptado — actualizado (C1, S7, A10) |
 | [ADR-0009](adrs/0009-despliegue-local.md) | Despliegue — Local en la máquina del desarrollador | Reemplazado por [ADR-0010](adrs/0010-despliegue-tiers-gratuitos.md) |
 | [ADR-0010](adrs/0010-despliegue-tiers-gratuitos.md) | Despliegue — Tiers gratuitos (Vercel + Render + Neon) | Aceptado |
+| [ADR-0011](adrs/0011-claves-primarias-uuid.md) | Modelo de datos — Claves primarias UUID para las entidades de dominio | Aceptado |
+| [ADR-0012](adrs/0012-frontera-auditoria-y-ledger.md) | Modelo de datos — Frontera entre el ledger de movimientos y la auditoría de registros | Aceptado |
 
 ## Modelo de datos
 
@@ -125,7 +127,10 @@ siquiera el alta o la edición de producto.**
   solo aplicable a `tipo = ajuste` — `CHECK`; resuelve A9), `usuario_id`, `fecha`, `venta_id`
   (obligatorio en `venta` y `anulacion`, nulo en el resto), `stock_resultante` (calculado dentro
   de la misma transacción que el update de stock). Es la traza de auditoría de todo cambio de
-  stock ([ADR-0003](adrs/0003-postgres-stock-guardado-ledger.md)).
+  stock ([ADR-0003](adrs/0003-postgres-stock-guardado-ledger.md)) — **de stock, y solo de stock**:
+  el rastro de cambios sobre registros (usuarios, proveedores, productos) es la tabla `auditoria`
+  del backlog #2.2, que es otra cosa y no se mezcla con esta
+  ([ADR-0012](adrs/0012-frontera-auditoria-y-ledger.md)).
   - **`anulacion` como tipo propio (resuelve A8):** la reversión de una venta anulada deja de ser
     un movimiento genérico: es `tipo = anulacion`, positivo, ligado a la `venta_id` original. El
     chip ANULACIÓN del Design.md mapea directo a este tipo.
