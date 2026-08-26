@@ -48,8 +48,8 @@ export function ChangePasswordForm({
       <form onSubmit={submit} noValidate>
         <div className={styles.fields}>
           <div className={styles.notice}>
-            Su contraseña es temporal. Debe definir una nueva antes de usar
-            el sistema.
+            Su contraseña es temporal. Debe definir una nueva antes de usar el
+            sistema.
           </div>
 
           <TextField

@@ -23,7 +23,9 @@ describe('ChangePasswordForm', () => {
       await screen.findByText('Ingrese su contraseña actual.'),
     ).toBeInTheDocument();
     expect(
-      screen.getByText('La contraseña nueva debe tener al menos 12 caracteres.'),
+      screen.getByText(
+        'La contraseña nueva debe tener al menos 12 caracteres.',
+      ),
     ).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
   });
