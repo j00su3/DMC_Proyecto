@@ -137,7 +137,10 @@ no router, no network.
 - [x] 4.6 RED→GREEN `apps/web/src/components/ui/FormError.{tsx,module.css}` + `FormError.test.tsx` —
       renders the message text with `role="alert"`
 - [x] 4.7 GREEN `apps/web/src/components/ui/AuthCard.{tsx,module.css}` — centered white card (radius
-      14, modal shadow per 4.2), max-width ~380px, 30×30 brand mark on `linear-gradient(135deg,#3b82f6,#2456c8)`
+      14, modal shadow per 4.2), max-width ~380px, **44×44 radius-12** brand mark on
+      `linear-gradient(135deg,#3b82f6,#2456c8)` — corrected 2026-08-25: this task originally said 30×30
+      radius-8, which is `docs/design.md`'s SIDEBAR logo spec, not the login card. The approved mockups
+      (`docs/design/Main.dc.html`) render the login mark at 44×44 radius-12; the mockups win.
 
 ## Phase 5A: S5a — Router Skeleton + Session Bootstrap + Guards (TDD)
 

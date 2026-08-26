@@ -28,17 +28,22 @@
   gap: 10px;
 }
 
+/*
+ * 44x44 / radius 12, per the approved login mockups (docs/design/Main.dc.html).
+ * The 30x30 / radius 8 mark in docs/design.md describes the SIDEBAR logo, a
+ * different surface — do not "correct" this back to those values.
+ */
 .brandMark {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
   background: var(--gradient-brand);
   color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 800;
-  font-size: 12px;
+  font-size: 16px;
   letter-spacing: -0.01em;
 }
 
