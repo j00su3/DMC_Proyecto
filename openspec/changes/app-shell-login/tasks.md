@@ -248,19 +248,29 @@ Maps to: *Change Password Endpoint* (client side, `password-change` spec);
 
 ## Phase 7: Manual Steps + Bookkeeping
 
-- [ ] 7.1 MANUAL (user, external/local action — not executable by the agent). Apply migration
+- [x] 7.1 MANUAL (user, external/local action — not executable by the agent). Apply migration
       `0001_*.sql` against Neon per ADR-0010 (`pnpm db:migrate` with the Neon connection string) —
       **before** Phase 3 (S3) deploys, since the guard reads the new column live on every request.
-      Tooling never reads or writes `.env*` files; this is a manual, user-owned step
-- [ ] 7.2 MANUAL (user, local verification — not executable by the agent). Run
+      Tooling never reads or writes `.env*` files; this is a manual, user-owned step.
+      **DONE 2026-08-25**, before S3 shipped. Verified in production afterwards: the column reports
+      `boolean / NOT NULL / default false`, `usuarios: { total: 1, flagged: 0 }`, and health returns
+      200 `db:up` both directly against Render and through the Vercel `/api` proxy
+- [x] 7.2 MANUAL (user, local verification — not executable by the agent). Run
       `pnpm --filter @inventienda/api test:integration` locally against Docker Postgres to confirm
-      Phase 2 and Phase 3's integration suites pass before requesting review on their respective PRs
+      Phase 2 and Phase 3's integration suites pass before requesting review on their respective PRs.
+      **DONE**: 13/13 green. Note this task also surfaced a pre-existing ~50% flake — the suites share
+      one database and truncate the same tables under vitest's default file parallelism — fixed in
+      `d588840` (`fileParallelism: false`) and confirmed by five consecutive clean runs
 - [ ] 7.3 Bookkeeping: mark completed checkboxes in this file as each PR lands; the orchestrator
       advances `openspec/changes/app-shell-login/state.yaml` phase statuses (this agent does not edit
       `state.yaml`)
-- [ ] 7.4 Confirm `pnpm contract:check` is green specifically on Phase 3 (S3)'s PR — the only seam
+- [x] 7.4 Confirm `pnpm contract:check` is green specifically on Phase 3 (S3)'s PR — the only seam
       that can move the contract — and confirm `pnpm -r typecheck` stays green on every later PR
-      (5A, 5B, 6) as a regression guard against accidental route/schema drift
+      (5A, 5B, 6) as a regression guard against accidental route/schema drift.
+      **DONE**: `contract:check` verified byte-identical on S3 and on every seam after it, and
+      `git show --name-only 581b29e` confirms `openapi.json` and `schema.d.ts` landed in the same
+      commit as the route change. `typecheck` green on 5A, 5B and 6 — it caught one real defect the
+      test suite could not see, a `readonly` tuple passed where zod wants a mutable `PropertyKey[]`
 
 ## Review Workload Forecast
 

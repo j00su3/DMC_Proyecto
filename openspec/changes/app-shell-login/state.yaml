@@ -302,7 +302,81 @@ phases:
       S5b: done
       S6: done
   verify:
-    status: pending
+    status: completed
+    verdict: PASS WITH FINDINGS
+    notes: >-
+      sdd-verify ran adversarially against the tip of the chain
+      (feat/shell-pr6-change-password) on 2026-08-26. Verdict: PASS WITH
+      FINDINGS — 1 SUGGESTION, 0 WARNING, 0 CRITICAL. It ran all five gates
+      itself: typecheck and lint clean, contract:check byte-identical, api
+      82/82, web 50/50, integration 13/13 deterministic. It confirmed D1-D16
+      against the code rather than against these notes, including D14 via
+      git show --name-only on 581b29e, the exactly-two allowPasswordChangePending
+      routes, the guard's position between the auth-false return and the roles
+      check, the one-UPDATE password write ordering, the absence of
+      routeTree.gen and createContext, and the cambiarPassword-under-authLayout
+      nesting. All five recorded deliberate deviations were confirmed real.
+      ORCHESTRATOR CORRECTED THE VERIFIER: it reported tasks 7.1 and 7.2 as
+      "correctly left unchecked, MANUAL, not attempted". That is wrong. 7.1 (the
+      Neon migration) was applied before S3 shipped and verified in production;
+      7.2 (the local integration run) was executed at 13/13 and is what surfaced
+      the pre-existing parallelism flake. 7.4 was likewise already satisfied.
+      All three are now checked in tasks.md with their evidence.
+  unexplained_one_off:
+    id: F2
+    severity: unknown
+    status: open
+    observed: 2026-08-26
+    what: >-
+      `apps/api/src/routes/auth.test.ts` — "returns 200 with the usuario and a
+      Set-Cookie with the expected attributes on success" failed ONCE, giving
+      api 81/82. It had passed minutes earlier and no file under apps/api had
+      been touched between the two runs.
+    could_not_reproduce: >-
+      6 consecutive runs of that file alone and 3 consecutive full `pnpm -r test`
+      runs afterwards were all green (api 82/82, web 50/50). 12 clean runs total.
+    honest_limit: >-
+      The failure output was NOT captured before the rerun, so there is no
+      diagnosis — only a hypothesis. The failing run happened inside a single
+      chained command that also ran format, typecheck, lint and contract:check,
+      so the machine was under heavy contention, and this test does a real argon2
+      hash, which is deliberately slow and memory-hard. A default vitest timeout
+      under that load would fit, but nothing here proves it.
+    next_step: >-
+      Do NOT "fix" this blind. If it recurs, capture the full failure output
+      first — a timeout and an assertion failure need opposite responses. Note
+      that CI runs the same suite on a smaller runner, so contention is plausible
+      there too.
+  open_finding:
+    id: F1
+    severity: suggestion
+    status: deferred
+    finding: >-
+      The app-shell spec scenario "Login background matches documented token"
+      (#16233c) has no test. The value is implemented correctly — AuthCard's
+      .screen paints var(--color-sidebar) and tokens.css defines it — but no
+      test asserts it, so a token drifting away from docs/design.md would go
+      unnoticed by the suite.
+    attempted: >-
+      A src/styles/tokens.test.ts was written and works: 53/53 green, and proven
+      load-bearing by changing --color-sidebar and observing the failure. It
+      reads the stylesheets from disk, because jsdom never applies a CSS Module's
+      stylesheet (getComputedStyle reports nothing) and vitest resolves CSS
+      `?raw` imports to an empty string.
+    blocked_on: >-
+      It fails pnpm typecheck: apps/web has no @types/node, and the test imports
+      node:fs. Closing this needs @types/node as a web devDependency, imported as
+      node:process rather than the global so tsconfig's types: ["vite/client"]
+      stays narrow and app code still cannot reach Node APIs by accident.
+    decision: >-
+      DEFERRED by the user on 2026-08-26 — not blocking, since the finding is a
+      SUGGESTION. The working file is parked outside the repo at the session
+      scratchpad (tokens.test.ts) so nothing was lost. The repo was left green:
+      the test file is NOT committed, and typecheck passes.
+    honest_caveat: >-
+      This test's real value is modest. It guards against token drift; it does
+      NOT prove the screen looks right. A layout could break completely with the
+      token untouched and it would still pass.
     engram_topic: sdd/app-shell-login/verify-report
   archive:
     status: pending
