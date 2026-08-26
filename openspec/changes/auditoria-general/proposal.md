@@ -99,7 +99,14 @@ commit, no data migration required.
       snapshot.
 - [ ] Changing a password produces one `auditoria` row atomically with the password/session update.
 - [ ] A simulated audit-write failure rolls back the business write (transaction test).
-- [ ] Recording a `movimiento` produces zero `auditoria` rows and vice versa (ADR-0012 rule 5 test).
+- [ ] The audit service's signature admits no quantity parameter — the enforceable half of
+      ADR-0012 rule 5, pinned by a `@ts-expect-error` signature test.
+- [ ] **Tracked obligation, NOT achievable in this change:** ADR-0012 rule 5's two literal boundary
+      tests ("recording a `movimiento` produces zero `auditoria` rows" and "editing a record field
+      produces zero `movimientos` rows") need a `movimientos` table, which arrives with #5/#6.
+      `schema.ts` holds only `usuarios` and `sesiones` today — verified. This criterion was written
+      unconditionally in the first draft and is restated here after `sdd-design` (D15) showed it
+      could not be met; #2.2 does NOT stay open waiting for #5. The obligation moves to #5/#6.
 
 ## Proposal question round
 
