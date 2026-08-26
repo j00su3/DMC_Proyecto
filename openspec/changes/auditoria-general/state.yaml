@@ -1,0 +1,176 @@
+change: auditoria-general
+backlog_item: "2.2"
+title: Sistema de auditoría general
+created: 2026-08-26
+branch: docs/sdd-planning-auditoria
+base: main
+
+session_preflight:
+  collected: 2026-08-26
+  execution_mode: interactive
+  artifact_store: hybrid
+  delivery_strategy: ask-on-risk
+  review_budget_lines: 400
+
+blocks:
+  - "#3 gestion-usuarios"
+  - "#4 gestion-proveedores"
+depends_on:
+  - "#2 auth-sesiones (archived)"
+
+binding_adrs:
+  - id: ADR-0011
+    file: docs/adrs/0011-claves-primarias-uuid.md
+    gives: >-
+      uuid PKs with defaultRandom(); auditoria.entidad_id is uuid with NO foreign
+      key (Postgres has no polymorphic FKs), deliberate so an audit row outlives
+      its subject. sesiones.id staying text is the one documented exception.
+  - id: ADR-0012
+    file: docs/adrs/0012-frontera-auditoria-y-ledger.md
+    gives: >-
+      auditoria and movimientos stay separate; the decision test; no
+      double-writing; a service signature with no quantity parameter; a
+      sensitive-field denylist headed by hash_contrasena; two boundary tests;
+      never name anything historial.
+
+product_decisions:
+  decided_by: user
+  decided: 2026-08-26
+  read_path: >-
+    WRITE-ONLY in v1. No endpoint, no UI, no route file. Verified during
+    exploration that no product document (PRD, design.md, TECH-DESIGNv2) asks for
+    a read path over a record-change trail; every PRD audit requirement is
+    movement-scoped. Recorded as an explicit non-goal, not an omission.
+  auditable_actions: >-
+    Creation, update, logical deletion and reactivation of usuarios/proveedores/
+    productos, PLUS password change. Reads and failed logins are out of scope.
+    The password-change case is not optional — apps/api/src/auth/service.ts:106
+    already carries a comment naming #2.2 as its audit hook, and it is the exact
+    non-repudiation case that puts #2.2 ahead of #3.
+  atomicity: >-
+    The audit write shares the database transaction with the business write. If
+    the audit write fails, the business write rolls back. Rationale: a trail that
+    can silently miss entries cannot distinguish "nobody did it" from "the write
+    failed", which is the whole guarantee.
+  retention: >-
+    None in v1, unbounded. A single-store deployment produces few rows, and
+    purging an audit trail is a decision better made against real volume.
+
+phases:
+  explore:
+    status: completed
+    artifact: exploration.md
+    commit: f1d79f9
+    engram_topic: sdd/auditoria-general/explore
+    orchestrator_note: >-
+      The sdd-explore agent returned status:partial — its agent definition has no
+      write tool, so it could not create exploration.md. The orchestrator wrote
+      the file from the returned content. Three of its load-bearing claims were
+      verified before acceptance: no db.transaction() exists anywhere in
+      apps/api/src, the #2.2 hook comment is really at auth/service.ts:106, and
+      lib/pagination.ts exists.
+  proposal:
+    status: completed
+    artifact: proposal.md
+    commit: 8b9ada6
+    engram_topic: sdd/auditoria-general/proposal
+    orchestrator_addition: >-
+      Added the consequence the proposal had left implicit: only usuarios and
+      sesiones exist in schema.ts today, so although the service is built
+      generically for three entities, the ONLY live call site in this change is
+      changePassword. Everything else is a contract awaiting its consumer.
+  spec:
+    status: completed
+    artifacts:
+      - specs/record-audit-trail/spec.md   # NEW capability, 7 requirements
+      - specs/password-change/spec.md      # DELTA, 1 MODIFIED requirement
+    commit: d08ace1
+    engram_topic: sdd/auditoria-general/spec
+  design:
+    status: completed
+    artifact: design.md
+    commit: 51262dc
+    engram_topic: sdd/auditoria-general/design
+    decisions: D1..D16
+    incident: >-
+      The sdd-design agent (opus) was killed by a session limit at the moment it
+      reported. The artifact itself survived complete — 231 lines, all sections
+      present, verified not truncated. Nothing was re-run.
+  tasks:
+    status: in_progress
+  apply:
+    status: pending
+  verify:
+    status: pending
+  archive:
+    status: pending
+
+reconciliation:
+  performed_by: orchestrator
+  after: spec and design ran in parallel
+  findings:
+    - id: R1
+      topic: session revocation inside the transaction
+      divergence: >-
+        design.md's Data Flow puts repos.sesiones.deleteOthers inside the
+        transaction and rolls it back with everything else. The spec's
+        password-change delta covered only the password write, the flag and the
+        audit row.
+      resolution: >-
+        DESIGN WINS; spec updated. The capability already promises that another
+        session's cookie stops working, and that promise is not kept if the
+        revocation can fail on its own while the password change commits — the
+        user would be told they are protected when they are not. This also closes
+        a PRE-EXISTING gap: service.ts:129-130 performs updatePassword and
+        deleteOthers as two separate awaits today, with no transaction at all.
+    - id: R2
+      topic: ADR-0012 rule 5 boundary tests
+      divergence: >-
+        proposal.md listed both literal boundary tests as success criteria.
+        design.md D15 showed they cannot be written in this change.
+      resolution: >-
+        DESIGN WINS; proposal restated. Verified: schema.ts holds only usuarios
+        and sesiones, so there is no movimientos table for those tests to run
+        against. The enforceable half — the no-quantity signature test — ships
+        now; the two literal tests become a tracked obligation on #5/#6. #2.2
+        does NOT stay open waiting for #5. The spec had already qualified this
+        correctly; only the proposal was unconditional.
+
+delivery_decision:
+  decided_by: user
+  decided: 2026-08-26
+  forecast_lines: 720
+  budget_lines: 400
+  policy: four-chained-prs
+  chain_strategy: stacked-to-main
+  slices:
+    - id: S1
+      name: transaction seam
+      lines: ~155
+      note: pure refactor, no behaviour change, independently valuable
+    - id: S2a
+      name: table + field classification
+      lines: ~145
+      note: schema only, unreachable from any code path until S2b
+    - id: S2b
+      name: repository + service
+      lines: ~270
+      note: adds a service with no call site
+    - id: S3
+      name: changePassword reference implementation
+      lines: ~150
+      note: the only slice that changes observable API behaviour
+  delivery_warning: >-
+    VERIFIED THIS SESSION on the app-shell-login chain: GitHub does NOT
+    auto-retarget a stacked PR when its base PR is merged. After merging PR #16,
+    PR #17's base was still the merged branch, and still was 20 seconds later.
+    Deleting a base branch while a dependent is open CLOSES the dependent.
+    Procedure: `gh pr edit <n> --base main` on every dependent, confirm
+    `base: main / MERGEABLE / CLEAN`, then merge and delete.
+  merged_main_warning: >-
+    ALSO VERIFIED: a clean merge is not a working merge. Every PR in the previous
+    chain was MERGEABLE/CLEAN with green CI, and main still failed typecheck
+    after merging, because two branches widened and consumed an interface without
+    ever compiling each other's code. Run the full gate on the MERGED main before
+    declaring the chain done — tests alone are not enough, since vitest does not
+    typecheck.
