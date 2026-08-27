@@ -1,6 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import fp from 'fastify-plugin';
 import {
+  type AuditoriaRepo,
+  DrizzleAuditoriaRepo,
+} from '../auditoria/repository.js';
+import {
   DrizzleSesionesRepo,
   DrizzleUsuariosRepo,
   type SesionesRepo,
@@ -13,6 +17,7 @@ import { type UnitOfWork, createUnitOfWork } from '../db/uow.js';
 export interface Repos {
   usuarios: UsuariosRepo;
   sesiones: SesionesRepo;
+  auditoria: AuditoriaRepo;
 }
 
 // Binds every repo to the same executor (design.md D1/D2). Called with the
@@ -24,6 +29,7 @@ export function buildRepos(executor: DbExecutor): Repos {
   return {
     usuarios: new DrizzleUsuariosRepo(executor),
     sesiones: new DrizzleSesionesRepo(executor),
+    auditoria: new DrizzleAuditoriaRepo(executor),
   };
 }
 

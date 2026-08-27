@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildApp } from './app.js';
+import type { AuditoriaRepo } from './auditoria/repository.js';
 import type { SesionesRepo, UsuariosRepo } from './auth/repository.js';
 
 /**
@@ -42,6 +43,9 @@ function fakeRepos() {
       purgeExpired: async () => {},
       deleteOthers: async () => {},
     } satisfies SesionesRepo,
+    auditoria: {
+      record: async () => {},
+    } satisfies AuditoriaRepo,
   };
 }
 
