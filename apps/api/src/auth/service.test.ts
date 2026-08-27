@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { AuditoriaRepo } from '../auditoria/repository.js';
 import { hashPassword, verifyPassword } from './password.js';
 import type { SesionesRepo, Usuario, UsuariosRepo } from './repository.js';
 import { changePassword, login, logout, resolveSession } from './service.js';
@@ -177,16 +178,43 @@ describe('resolveSession', () => {
   });
 });
 
+// Wraps fakeRepos with an `auditoria` fake and a `run` that mimics
+// `db.transaction`: work only "commits" (state.committed becomes true) if
+// the callback resolves. If the callback throws, `run` rejects and
+// `committed` stays false — the same observable shape a real Postgres
+// rollback produces (design.md D1, R1).
+function fakeUow(
+  overrides: {
+    usuarios?: Partial<UsuariosRepo>;
+    sesiones?: Partial<SesionesRepo>;
+    auditoria?: Partial<AuditoriaRepo>;
+  } = {},
+) {
+  const repos = {
+    ...fakeRepos(overrides.usuarios, overrides.sesiones),
+    auditoria: {
+      record: async () => {},
+      ...overrides.auditoria,
+    } as AuditoriaRepo,
+  };
+  const state = { committed: false, calls: 0 };
+  async function run<T>(work: (r: typeof repos) => Promise<T>): Promise<T> {
+    state.calls += 1;
+    const result = await work(repos);
+    state.committed = true;
+    return result;
+  }
+  return { run, state };
+}
+
 describe('changePassword', () => {
-  it('rejects a wrong current password with INVALID_CURRENT_PASSWORD and performs no repo writes (D5)', async () => {
+  it('rejects a wrong current password with INVALID_CURRENT_PASSWORD and never opens a transaction (D5)', async () => {
     const hash = await hashPassword('correct-horse-battery-staple');
     const usuario = makeUsuario({ hashContrasena: hash });
-    const updatePassword = vi.fn(async () => {});
-    const deleteOthers = vi.fn(async () => {});
-    const repos = fakeRepos({ updatePassword }, { deleteOthers });
+    const uow = fakeUow();
 
     await expect(
-      changePassword(repos, {
+      changePassword(uow, {
         usuario,
         sessionId: 'session-a',
         currentPassword: 'wrong-current',
@@ -194,36 +222,64 @@ describe('changePassword', () => {
       }),
     ).rejects.toMatchObject({ code: 'INVALID_CURRENT_PASSWORD' });
 
-    expect(updatePassword).not.toHaveBeenCalled();
-    expect(deleteOthers).not.toHaveBeenCalled();
+    expect(uow.state.calls).toBe(0);
   });
 
-  it('on success calls updatePassword then deleteOthers in that exact order (D7), and the new hash verifies while the old one does not', async () => {
+  it('on success runs updatePassword, deleteOthers, and auditoria.record in that order inside one uow.run (R1, D8), and the new hash verifies while the old one does not', async () => {
     const currentPassword = 'correct-horse-battery-staple';
     const newPassword = 'a-brand-new-valid-password';
     const hash = await hashPassword(currentPassword);
-    const usuario = makeUsuario({ hashContrasena: hash });
+    const usuario = makeUsuario({
+      hashContrasena: hash,
+      debeCambiarPassword: true,
+    });
     const callOrder: string[] = [];
     let capturedHash: string | undefined;
-    const updatePassword = vi.fn(async (_id: string, newHash: string) => {
-      callOrder.push('updatePassword');
-      capturedHash = newHash;
+    let capturedEvent: unknown;
+    const uow = fakeUow({
+      usuarios: {
+        updatePassword: async (_id, newHash) => {
+          callOrder.push('updatePassword');
+          capturedHash = newHash;
+        },
+      },
+      sesiones: {
+        deleteOthers: async () => {
+          callOrder.push('deleteOthers');
+        },
+      },
+      auditoria: {
+        record: async (event) => {
+          callOrder.push('auditoria.record');
+          capturedEvent = event;
+        },
+      },
     });
-    const deleteOthers = vi.fn(async () => {
-      callOrder.push('deleteOthers');
-    });
-    const repos = fakeRepos({ updatePassword }, { deleteOthers });
 
-    await changePassword(repos, {
+    await changePassword(uow, {
       usuario,
       sessionId: 'session-a',
       currentPassword,
       newPassword,
     });
 
-    expect(callOrder).toEqual(['updatePassword', 'deleteOthers']);
-    expect(updatePassword).toHaveBeenCalledWith(usuario.id, expect.any(String));
-    expect(deleteOthers).toHaveBeenCalledWith(usuario.id, 'session-a');
+    expect(callOrder).toEqual([
+      'updatePassword',
+      'deleteOthers',
+      'auditoria.record',
+    ]);
+    expect(uow.state.committed).toBe(true);
+    // D7's non-symmetric case: datosPrevios reflects the actual prior value
+    // of the one field that changes as a side effect, datosPosteriores is
+    // always `false` because updatePassword always clears the flag.
+    expect(capturedEvent).toMatchObject({
+      entidad: 'usuarios',
+      entidadId: usuario.id,
+      accion: 'cambiar_password',
+      usuarioId: usuario.id,
+      datosPrevios: { debeCambiarPassword: true },
+      datosPosteriores: { debeCambiarPassword: false },
+    });
 
     if (!capturedHash) {
       throw new Error('expected updatePassword to receive a hash');
@@ -232,5 +288,29 @@ describe('changePassword', () => {
     await expect(verifyPassword(capturedHash, currentPassword)).resolves.toBe(
       false,
     );
+  });
+
+  it('propagates a failed audit write as AUDIT_WRITE_FAILED and never reports the transaction as committed (spec Scenario 4)', async () => {
+    const currentPassword = 'correct-horse-battery-staple';
+    const hash = await hashPassword(currentPassword);
+    const usuario = makeUsuario({ hashContrasena: hash });
+    const uow = fakeUow({
+      auditoria: {
+        record: async () => {
+          throw new Error('boom');
+        },
+      },
+    });
+
+    await expect(
+      changePassword(uow, {
+        usuario,
+        sessionId: 'session-a',
+        currentPassword,
+        newPassword: 'a-brand-new-valid-password',
+      }),
+    ).rejects.toMatchObject({ code: 'AUDIT_WRITE_FAILED' });
+
+    expect(uow.state.committed).toBe(false);
   });
 });

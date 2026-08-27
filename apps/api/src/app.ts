@@ -10,6 +10,7 @@ import {
   serializerCompiler,
   validatorCompiler,
 } from 'fastify-type-provider-zod';
+import type { UnitOfWork } from './db/uow.js';
 import { notFoundEnvelope, toErrorEnvelope } from './lib/errors.js';
 import authPlugin from './plugins/auth.js';
 import cookiePlugin from './plugins/cookie.js';
@@ -30,6 +31,7 @@ declare module 'fastify' {
 export interface BuildAppOptions {
   db?: DbLike;
   repos?: Repos;
+  uow?: UnitOfWork;
   cookieSecret?: string;
   rateLimitMax?: number;
   logger?: FastifyServerOptions['logger'];
@@ -86,7 +88,7 @@ export async function buildApp(
 
   await app.register(cookiePlugin, { secret: opts.cookieSecret });
   await app.register(dbPlugin, { db: opts.db });
-  await app.register(reposPlugin, { repos: opts.repos });
+  await app.register(reposPlugin, { repos: opts.repos, uow: opts.uow });
   // Must be registered before any route plugin below — Fastify hooks only
   // apply to routes registered after the hook (design.md risk register).
   await app.register(authPlugin);

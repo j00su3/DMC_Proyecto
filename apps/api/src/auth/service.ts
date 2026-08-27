@@ -1,3 +1,5 @@
+import { recordAudit } from '../auditoria/service.js';
+import type { UnitOfWork } from '../db/uow.js';
 import {
   accountInactive,
   accountLocked,
@@ -103,16 +105,20 @@ export interface ChangePasswordInput {
 }
 
 // Single funnel every password mutation passes through (design.md D9) — the
-// hook point backlog #2.2's audit change will use once immutable event rows
-// replace this mutable-column approach.
+// hook point backlog #2.2's audit change uses, now that immutable
+// `auditoria` rows exist.
 //
-// Order matters (design.md D5-D7): verify BEFORE any write; on success,
-// update the hash (and clear debe_cambiar_password, one UPDATE) BEFORE
-// revoking other sessions, so a revoke failure leaves stale sessions for at
-// most the TTL instead of locking other devices out with an unchanged
-// password.
+// Order matters. `verifyPassword`/`hashPassword` run OUTSIDE the transaction
+// (design.md D3) — argon2 hashing is deliberately slow and depends on
+// nothing in the database, so holding a pooled connection open across it is
+// pure contention for zero atomicity benefit. Once verified, the hash
+// update, the session revocation and the audit write all run inside one
+// `uow.run` (design.md D1, D4, D8): the capability's promise that another
+// session's cookie stops working is not kept if `deleteOthers` can fail on
+// its own while the password change commits (spec R1), so it is folded into
+// the same transaction as the audit write.
 export async function changePassword(
-  repos: Repos,
+  uow: UnitOfWork,
   input: ChangePasswordInput,
 ): Promise<void> {
   const { usuario, sessionId, currentPassword, newPassword } = input;
@@ -126,6 +132,22 @@ export async function changePassword(
   }
 
   const hash = await hashPassword(newPassword);
-  await repos.usuarios.updatePassword(usuario.id, hash);
-  await repos.sesiones.deleteOthers(usuario.id, sessionId);
+
+  await uow.run(async (repos) => {
+    await repos.usuarios.updatePassword(usuario.id, hash);
+    await repos.sesiones.deleteOthers(usuario.id, sessionId);
+    // D7's non-symmetric case: datosPrevios carries the actual prior value
+    // of the one field that changes as a side effect of updatePassword;
+    // datosPosteriores is always `false` because updatePassword always
+    // clears the flag. hash_contrasena itself never reaches either snapshot
+    // (design.md D6/D11 denylist, enforced in recordAudit).
+    await recordAudit(repos.auditoria, {
+      entidad: 'usuarios',
+      entidadId: usuario.id,
+      accion: 'cambiar_password',
+      usuarioId: usuario.id,
+      datosPrevios: { debeCambiarPassword: usuario.debeCambiarPassword },
+      datosPosteriores: { debeCambiarPassword: false },
+    });
+  });
 }

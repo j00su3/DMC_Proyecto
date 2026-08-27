@@ -143,7 +143,7 @@ const authRoutes: FastifyPluginAsync = async (app) => {
       if (!request.user) {
         throw unauthorized();
       }
-      await changePassword(app.repos, {
+      await changePassword(app.uow, {
         usuario: request.user,
         sessionId: request.sessionId ?? '',
         currentPassword: request.body.currentPassword,
