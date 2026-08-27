@@ -105,8 +105,9 @@ the transaction). The only slice with observable API behavior change; **no schem
       **Done during reconciliation, commit `51262dc`** — `proposal.md`'s Success Criteria now splits
       the enforceable half (no-quantity signature test) from the tracked obligation. Nothing left to
       do here; it stays listed so `sdd-verify` sees the deferral was deliberate, not forgotten
-- [ ] 5.2 Bookkeeping: mark checkboxes complete as each PR (S1/S2a/S2b/S3) merges to `main`; the
-      orchestrator advances `openspec/changes/auditoria-general/state.yaml` phase statuses
-- [ ] 5.3 Before merging each PR except the last, retarget the next PR onto `main` with
+- [x] 5.2 Bookkeeping: mark checkboxes complete as each PR (S1/S2a/S2b/S3) merges to `main`.
+      **DONE: All five PRs merged to `main` at `2ec034e` on 2026-08-26 (#28 planning, #29 S1, #30 S2a, #31 S2b, #32 S3). Every branch deleted, `origin` holds only `main`.**
+- [x] 5.3 Before merging each PR except the last, retarget the next PR onto `main` with
       `gh pr edit <next-pr-number> --base main` — GitHub does not do this automatically, and
-      deleting a merged base branch before retargeting closes the dependent PR
+      deleting a merged base branch before retargeting closes the dependent PR.
+      **DONE: Every dependent was retargeted to `main` with `gh pr edit` before merging, per the documented procedure in tasks.md Delivery note.**
