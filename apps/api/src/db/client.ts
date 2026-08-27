@@ -12,3 +12,9 @@ export function createDb(pool: Pool) {
 }
 
 export type Db = ReturnType<typeof createDb>;
+
+// Anything that can run a query: either the pool-bound `Db` itself, or the
+// transaction handle Drizzle passes into a `db.transaction(tx => …)`
+// callback. Derived from `Db['transaction']` itself so a Drizzle upgrade
+// cannot desynchronise the two arms (design.md D2).
+export type DbExecutor = Db | Parameters<Parameters<Db['transaction']>[0]>[0];
