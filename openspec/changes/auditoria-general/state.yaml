@@ -107,11 +107,63 @@ phases:
       Marked done with that evidence rather than left open, so sdd-verify reads
       the deferral as deliberate instead of forgotten.
   apply:
-    status: pending
+    status: completed
+    slices: S1, S2a, S2b, S3 — all four implemented
+    engram_topic: sdd/auditoria-general/apply-progress
+    ledger: every slice settled "complete"
+    counts_at_completion: api 98/98, web 53/53, integration 22/22 across 5 files
   verify:
-    status: pending
+    status: completed
+    verdict: PASS WITH FINDINGS
+    engram_topic: sdd/auditoria-general/verify-report
+    findings: 0 critical, 1 warning, 2 suggestions
+    no_file_artifact: >-
+      Deliberate. The previous cycle's archive
+      (openspec/changes/archive/2026-08-26-app-shell-login/) contains NO
+      verify-report.md, so no filesystem convention exists for one in this
+      project. Verified before accepting the verifier's choice. Engram-only.
+    confirmed:
+      - "R1: deleteOthers really runs inside the real db.transaction; Scenario 4 rolls back all three writes."
+      - "R2: only the @ts-expect-error no-quantity test exists; no fake approximation of the movimientos boundary tests was written."
+      - "Denylist: hash_contrasena reaches neither snapshot, proven at unit and real-Postgres level."
+      - "D3: verify/hash run before uow.run."
+      - "D7: the CHECK is enforced by the database, tested in both directions."
+      - "D9: AuditableEntidad resolves to the literal 'usuarios', so entidad: 'proveedores' cannot compile."
+      - "D16: contract:check byte-identical."
+      - "Checkbox audit clean in BOTH directions: every [x] backed by evidence, and the only unchecked items (5.2, 5.3) are correctly unchecked."
+      - "No test found that would still pass if the code under it were deleted."
+    warning_W1:
+      what: >-
+        The Engram apply-progress narrative claimed "PR #29 merged". FALSE — at
+        verification time all five PRs (#28-#32) were open. Confirmed by the
+        orchestrator with gh pr list.
+      impact: >-
+        No effect on code correctness: the branches are stacked, so every commit
+        is present in the checked-out tip. A delivery-state bookkeeping error only.
+      lesson: >-
+        apply-progress prose can drift from real PR state even while tasks.md
+        checkboxes stay accurate. Check both independently; never infer merge
+        state from an agent's narrative.
+      resolution: corrected here; tasks.md 5.2/5.3 were already correct.
+    suggestion_S1:
+      what: D9's compile-time gate has no dedicated negative test.
+      note: >-
+        Structurally sound without one, since AuditableEntidad derives from a
+        single-key as-const object. Worth adding when #4 classifies proveedores,
+        because that is when the gate actually starts moving.
+    suggestion_S2:
+      what: 500 is not declared in the route's response schema.
+      note: Cosmetic. D16 forbids contract changes in this cycle, so it belongs to a later slice.
   archive:
-    status: pending
+    status: blocked
+    blocked_on: delivery, not correctness
+    detail: >-
+      Verification found no code-correctness blocker. What remains is delivery:
+      merge the five-PR chain bottom-up (#28 -> #29 -> #30 -> #31 -> #32),
+      retargeting each to main with "gh pr edit <n> --base main" BEFORE merging
+      (GitHub does not do it automatically), then run the full gate on the
+      MERGED main before archiving. See merged_main_warning: a chain whose PRs
+      were all green individually still left main typecheck-broken once.
 
 reconciliation:
   performed_by: orchestrator
