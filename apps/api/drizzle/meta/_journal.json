@@ -15,6 +15,13 @@
       "when": 1787683900291,
       "tag": "0001_friendly_frightful_four",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787792272148,
+      "tag": "0002_fat_whizzer",
+      "breakpoints": true
     }
   ]
 }
