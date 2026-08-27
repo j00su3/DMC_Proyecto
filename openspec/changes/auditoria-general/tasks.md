@@ -40,15 +40,15 @@ Chain strategy: stacked-to-main
 Maps to: *Atomic Write With the Business Operation* (`record-audit-trail` spec, D1). No `Repos`
 member changes observable yet.
 
-- [ ] 1.1 GREEN (config, no test) `apps/api/src/db/client.ts` — add `export type DbExecutor = Db | Parameters<Parameters<Db['transaction']>[0]>[0]` (D2)
-- [ ] 1.2 GREEN `apps/api/src/auth/repository.ts` — change both repo constructors from `Db` to `DbExecutor`; no behavior change
-- [ ] 1.3 RED: extend `apps/api/src/plugins/repos.test.ts` — `buildRepos(executor)` returns every member of `Repos`; injected fakes still win; `app.uow` decorator present and overridable
-- [ ] 1.4 GREEN `apps/api/src/plugins/repos.ts` — `buildRepos(executor)` factory replaces the object literal; `uow` decorator + `ReposPluginOptions.uow` (D1)
-- [ ] 1.5 GREEN `apps/api/src/db/uow.ts` (new) — `UnitOfWork` interface (`run<T>(work: (repos: Repos) => Promise<T>): Promise<T>`) + `createUnitOfWork(db)` wrapping `db.transaction(tx => work(buildRepos(tx)))` (D1)
-- [ ] 1.6 RED `apps/api/src/db/uow.integration.test.ts` (new, Docker Postgres) — a `run` whose second write throws leaves zero rows from the first write; documented negative: a repo built from `getDb()` and used inside `run` is NOT rolled back
-- [ ] 1.7 GREEN — confirm 1.6 passes against the real `db.transaction`; no further production code expected beyond 1.4/1.5
-- [ ] 1.8 MANUAL (user, local verification — not executable by the agent, no `.env*` access). Run `pnpm test:integration` against Docker Postgres to confirm 1.6/1.7
-- [ ] 1.9 Verify on the PR branch: `pnpm lint`, `pnpm typecheck`, `pnpm contract:check` (byte-identical — no route file touched), `pnpm -r test`
+- [x] 1.1 GREEN (config, no test) `apps/api/src/db/client.ts` — add `export type DbExecutor = Db | Parameters<Parameters<Db['transaction']>[0]>[0]` (D2)
+- [x] 1.2 GREEN `apps/api/src/auth/repository.ts` — change both repo constructors from `Db` to `DbExecutor`; no behavior change
+- [x] 1.3 RED: extend `apps/api/src/plugins/repos.test.ts` — `buildRepos(executor)` returns every member of `Repos`; injected fakes still win; `app.uow` decorator present and overridable
+- [x] 1.4 GREEN `apps/api/src/plugins/repos.ts` — `buildRepos(executor)` factory replaces the object literal; `uow` decorator + `ReposPluginOptions.uow` (D1)
+- [x] 1.5 GREEN `apps/api/src/db/uow.ts` (new) — `UnitOfWork` interface (`run<T>(work: (repos: Repos) => Promise<T>): Promise<T>`) + `createUnitOfWork(db)` wrapping `db.transaction(tx => work(buildRepos(tx)))` (D1)
+- [x] 1.6 RED `apps/api/src/db/uow.integration.test.ts` (new, Docker Postgres) — a `run` whose second write throws leaves zero rows from the first write; documented negative: a repo built from `getDb()` and used inside `run` is NOT rolled back. Written and typechecked; execution blocked locally — Docker daemon unreachable in this environment (`docker ps` → named-pipe connect error), so RED/GREEN could not be observed by the agent. See 1.8.
+- [ ] 1.7 GREEN — confirm 1.6 passes against the real `db.transaction`; no further production code expected beyond 1.4/1.5. BLOCKED (same Docker unavailability as 1.6) — production code (1.4/1.5) is already implemented and typechecks against the test's imports; needs the manual run in 1.8 to confirm.
+- [ ] 1.8 MANUAL (user, local verification — not executable by the agent, no `.env*` access). Run `pnpm test:integration` against Docker Postgres to confirm 1.6/1.7. Exact command (from repo root, Docker Postgres running on `localhost:5432` per `apps/api/vitest.integration.config.ts`): `pnpm test:integration`
+- [x] 1.9 Verify on the PR branch: `pnpm lint`, `pnpm typecheck`, `pnpm contract:check` (byte-identical — no route file touched), `pnpm -r test`
 
 ## Phase 2: S2a — Table + Field Classification (TDD, schema-only)
 
