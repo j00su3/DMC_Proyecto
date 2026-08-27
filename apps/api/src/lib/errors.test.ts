@@ -3,6 +3,7 @@ import {
   AppError,
   accountInactive,
   accountLocked,
+  auditWriteFailed,
   forbidden,
   invalidCredentials,
   invalidCurrentPassword,
@@ -118,6 +119,24 @@ describe('auth error factories', () => {
 
     expect(error.status).toBe(400);
     expect(error.code).toBe('INVALID_CURRENT_PASSWORD');
+  });
+
+  it('auditWriteFailed() is a 500 AppError with code AUDIT_WRITE_FAILED, preserving cause', () => {
+    const cause = new Error('insert violates check constraint');
+
+    const error = auditWriteFailed(cause);
+
+    expect(error.status).toBe(500);
+    expect(error.code).toBe('AUDIT_WRITE_FAILED');
+    expect(error.cause).toBe(cause);
+  });
+
+  it('auditWriteFailed() works with no cause supplied', () => {
+    const error = auditWriteFailed();
+
+    expect(error.status).toBe(500);
+    expect(error.code).toBe('AUDIT_WRITE_FAILED');
+    expect(error.cause).toBeUndefined();
   });
 });
 

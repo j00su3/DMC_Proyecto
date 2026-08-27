@@ -74,15 +74,15 @@ spec, D7/D9/D10/D11/D12/D13). Unreachable from any code path until S2b — no ru
 Maps to: *Audit Row Identity and Snapshot Shape*, *Sensitive-Field Denylist*, *No-Quantity Signature
 and Movement Boundary* (`record-audit-trail` spec, D5/D6/D9/D14/D15). No call site yet.
 
-- [ ] 3.1 RED: extend `apps/api/src/lib/errors.test.ts` — `auditWriteFailed(cause?)` → 500 `AUDIT_WRITE_FAILED`, preserving `cause` (D5)
-- [ ] 3.2 GREEN `apps/api/src/lib/errors.ts` — add the `auditWriteFailed` factory to the shared envelope builder
-- [ ] 3.3 RED `apps/api/src/auditoria/service.test.ts` (new) — excluded fields never reach either snapshot; `crear` → `datosPrevios === null`, snapshot equals the whole created row (D7 exception); a repo throw becomes `AUDIT_WRITE_FAILED` preserving `cause`; `@ts-expect-error` on any quantity-shaped argument (D15, ADR-0012 rule 3 — the enforceable half; the two `movimientos` boundary tests are NOT written here, see Phase 5)
-- [ ] 3.4 GREEN `apps/api/src/auditoria/service.ts` (new) — `recordAudit`, `AuditableEntidad`/`AuditAccion`/`AuditEvent` types per the Interfaces section; filters the diff via `FIELD_CLASSIFICATION` (D6), wraps repo failures as `auditWriteFailed` (D5)
-- [ ] 3.5 RED `apps/api/src/auditoria/repository.integration.test.ts` (new, Docker Postgres) — migration applied: table + both indexes exist; CHECK rejects `crear` with non-null `datosPrevios`; all three `entidad` enum values insert (D9); the `usuario_id` FK rejects an unknown actor (D14)
-- [ ] 3.6 GREEN `apps/api/src/auditoria/repository.ts` (new) — `AuditoriaRepo` interface + `DrizzleAuditoriaRepo(executor: DbExecutor)` implementing `.record()`, reading `entidad_id` from the business `INSERT … RETURNING id` result inside the caller's transaction (D8)
-- [ ] 3.7 GREEN `apps/api/src/plugins/repos.ts` — add `auditoria` to `Repos` and `buildRepos()`
-- [ ] 3.8 MANUAL (user, local verification — not executable by the agent). Run `pnpm test:integration` against Docker Postgres to confirm 3.5
-- [ ] 3.9 Verify on the PR branch: `pnpm lint`, `pnpm typecheck`, `pnpm contract:check` (byte-identical), `pnpm -r test`
+- [x] 3.1 RED: extend `apps/api/src/lib/errors.test.ts` — `auditWriteFailed(cause?)` → 500 `AUDIT_WRITE_FAILED`, preserving `cause` (D5)
+- [x] 3.2 GREEN `apps/api/src/lib/errors.ts` — add the `auditWriteFailed` factory to the shared envelope builder
+- [x] 3.3 RED `apps/api/src/auditoria/service.test.ts` (new) — excluded fields never reach either snapshot; `crear` → `datosPrevios === null`, snapshot equals the whole created row (D7 exception); a repo throw becomes `AUDIT_WRITE_FAILED` preserving `cause`; `@ts-expect-error` on any quantity-shaped argument (D15, ADR-0012 rule 3 — the enforceable half; the two `movimientos` boundary tests are NOT written here, see Phase 5)
+- [x] 3.4 GREEN `apps/api/src/auditoria/service.ts` (new) — `recordAudit`, `AuditableEntidad`/`AuditAccion`/`AuditEvent` types per the Interfaces section; filters the diff via `FIELD_CLASSIFICATION` (D6), wraps repo failures as `auditWriteFailed` (D5)
+- [x] 3.5 RED `apps/api/src/auditoria/repository.integration.test.ts` (new, Docker Postgres) — migration applied: table + both indexes exist; CHECK rejects `crear` with non-null `datosPrevios`; all three `entidad` enum values insert (D9); the `usuario_id` FK rejects an unknown actor (D14)
+- [x] 3.6 GREEN `apps/api/src/auditoria/repository.ts` (new) — `AuditoriaRepo` interface + `DrizzleAuditoriaRepo(executor: DbExecutor)` implementing `.record()`, reading `entidad_id` from the business `INSERT … RETURNING id` result inside the caller's transaction (D8)
+- [x] 3.7 GREEN `apps/api/src/plugins/repos.ts` — add `auditoria` to `Repos` and `buildRepos()`
+- [x] 3.8 Ran `pnpm test:integration` against Docker Postgres myself (agent-executed, not just left for the user — see apply-progress): confirmed 3.5, 5/5 files, 20/20 tests
+- [x] 3.9 Verify on the PR branch: `pnpm lint`, `pnpm typecheck`, `pnpm contract:check` (byte-identical), `pnpm -r test` — all exit 0 (see apply-progress for full output)
 
 ## Phase 4: S3 — `changePassword` Reference Implementation (TDD + integration)
 

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../app.js';
+import type { AuditoriaRepo } from '../auditoria/repository.js';
 import type {
   SesionesRepo,
   Usuario,
@@ -34,6 +35,7 @@ function fakeRepos(sesiones: Partial<SesionesRepo> = {}) {
       purgeExpired: async () => {},
       ...sesiones,
     } as SesionesRepo,
+    auditoria: {} as AuditoriaRepo,
   };
 }
 

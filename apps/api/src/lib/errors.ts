@@ -31,8 +31,12 @@ export class AppError extends Error {
     message: string,
     status: number,
     details?: unknown,
+    options?: { cause?: unknown },
   ) {
-    super(message);
+    super(
+      message,
+      options?.cause !== undefined ? { cause: options.cause } : undefined,
+    );
     this.name = 'AppError';
     this.code = code;
     this.status = status;
@@ -110,6 +114,20 @@ export function invalidCurrentPassword(): AppError {
     'INVALID_CURRENT_PASSWORD',
     'Current password is incorrect',
     400,
+  );
+}
+
+// D5: a failed audit write must not be swallowed or mapped to the generic
+// INTERNAL_ERROR — a distinct code separates "the feature is broken" from
+// "the trail is broken" for logs and support. `cause` is preserved so the
+// underlying repo/database error is not lost.
+export function auditWriteFailed(cause?: unknown): AppError {
+  return new AppError(
+    'AUDIT_WRITE_FAILED',
+    'Failed to record the audit trail for this operation',
+    500,
+    undefined,
+    { cause },
   );
 }
 
