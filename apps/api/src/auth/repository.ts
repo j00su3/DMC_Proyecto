@@ -1,5 +1,5 @@
 import { and, eq, gt, lte, ne, sql } from 'drizzle-orm';
-import type { Db } from '../db/client.js';
+import type { DbExecutor } from '../db/client.js';
 import { sesiones, usuarios } from '../db/schema.js';
 
 export interface Usuario {
@@ -47,7 +47,7 @@ interface LockoutRow {
 }
 
 export class DrizzleUsuariosRepo implements UsuariosRepo {
-  constructor(private readonly db: Db) {}
+  constructor(private readonly db: DbExecutor) {}
 
   async findByEmail(email: string): Promise<Usuario | undefined> {
     const rows = await this.db
@@ -105,7 +105,7 @@ export class DrizzleUsuariosRepo implements UsuariosRepo {
 }
 
 export class DrizzleSesionesRepo implements SesionesRepo {
-  constructor(private readonly db: Db) {}
+  constructor(private readonly db: DbExecutor) {}
 
   async create(sesion: NuevaSesion): Promise<void> {
     await this.db.insert(sesiones).values({
