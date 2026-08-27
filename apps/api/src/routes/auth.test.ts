@@ -39,6 +39,7 @@ function fakeRepos(
         bloqueadoHasta: null,
       }),
       resetAttempts: async () => {},
+      updatePassword: async () => {},
       ...usuarios,
     } as UsuariosRepo,
     sesiones: {
@@ -46,9 +47,21 @@ function fakeRepos(
       findValid: async () => undefined,
       delete: async () => {},
       purgeExpired: async () => {},
+      deleteOthers: async () => {},
       ...sesiones,
     } as SesionesRepo,
-    auditoria: {} as AuditoriaRepo,
+    auditoria: { record: async () => {} } as AuditoriaRepo,
+  };
+}
+
+// `POST /api/auth/password` runs through `app.uow` (design.md D1/D4), not
+// `app.repos` directly. This fake mimics `db.transaction`: the callback's
+// repos are the same fakes returned by `fakeRepos`.
+function fakeUow(repos: ReturnType<typeof fakeRepos>) {
+  return {
+    async run<T>(work: (r: typeof repos) => Promise<T>): Promise<T> {
+      return work(repos);
+    },
   };
 }
 
@@ -313,11 +326,13 @@ describe('POST /api/auth/password', () => {
   it('returns 200 on a successful password change', async () => {
     const hash = await hashPassword(PASSWORD);
     const usuario = makeUsuario({ hashContrasena: hash });
+    const repos = fakeRepos(
+      { updatePassword: async () => {} },
+      { findValid: async () => usuario, deleteOthers: async () => {} },
+    );
     app = await buildApp({
-      repos: fakeRepos(
-        { updatePassword: async () => {} },
-        { findValid: async () => usuario, deleteOthers: async () => {} },
-      ),
+      repos,
+      uow: fakeUow(repos),
       cookieSecret: COOKIE_SECRET,
     });
     await app.ready();
@@ -408,11 +423,13 @@ describe('POST /api/auth/password', () => {
       hashContrasena: hash,
       debeCambiarPassword: true,
     });
+    const repos = fakeRepos(
+      { updatePassword: async () => {} },
+      { findValid: async () => usuario, deleteOthers: async () => {} },
+    );
     app = await buildApp({
-      repos: fakeRepos(
-        { updatePassword: async () => {} },
-        { findValid: async () => usuario, deleteOthers: async () => {} },
-      ),
+      repos,
+      uow: fakeUow(repos),
       cookieSecret: COOKIE_SECRET,
     });
     await app.ready();
