@@ -353,14 +353,14 @@ refs: D9, D10, D12, D15. Depends on S4 (list rows), S5a/S5b (detail actions), S6
 
 ## Phase 11: Bookkeeping
 
-- [ ] 11.1 Before merging each PR except the last in a stacked chain, `gh pr edit
+- [x] 11.1 Before merging each PR except the last in a stacked chain, `gh pr edit
       <next-pr-number> --base main` — GitHub does not auto-retarget a stacked PR when its base
       merges (precedent: `gestion-usuarios` #36→#37→#38, and `auditoria-general` before it);
       delete a merged branch only after confirming the retarget landed
-- [ ] 11.2 Confirm no `.env*` file is touched and no new environment variable is introduced by
+- [x] 11.2 Confirm no `.env*` file is touched and no new environment variable is introduced by
       any slice (this change is frontend-only against already-provisioned inputs) — no manual
       user step is needed before any PR in this change merges
-- [ ] 11.3 After the last slice merges, confirm `pnpm contract:check` is still byte-identical —
+- [x] 11.3 After the last slice merges, confirm `pnpm contract:check` is still byte-identical —
       this change touches no `apps/api/**` file and regenerates nothing
 
 ## Review Workload Forecast

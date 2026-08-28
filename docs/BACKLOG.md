@@ -12,10 +12,15 @@ Actualizado el 2026-08-27: se agregaron los ítems **3.1** (pantalla de usuarios
 #3) y **3.5** (recuperación de contraseña por email), ambos surgidos de la ronda de decisiones de
 producto previa al ciclo SDD del #3.
 
-Actualizado el 2026-08-28: el ítem **#3** queda archivado. Las siete rutas de gestión de usuarios
+Actualizado el 2026-08-28 (A): el ítem **#3** queda archivado. Las siete rutas de gestión de usuarios
 están en `main` y en el contrato. Quedan pendientes sus dos derivados: **3.1** (la pantalla, que es
 lo que vuelve usable esta API) y **3.5** (recuperación por email, todavía bloqueado por no tener
 dominio propio).
+
+Actualizado el 2026-08-28 (B): el ítem **3.1** (Pantalla de usuarios) queda archivado. La UI de
+listado/detalle/CRUD para gestión de usuarios está en `main` con cobertura completa de test
+(172 api + 157 web tests, 59 integration). Las dos nuevas specs (`app-layout` y `usuarios-ui`)
+están promovidas a `openspec/specs/`.
 
 | # | Item | Alcance | Depende de | Estado |
 |---|---|---|---|---|
@@ -24,7 +29,7 @@ dominio propio).
 | 2.1 | App shell + login | Primer ciclo con UI: instalación del router (TanStack Router) con rutas tipadas y guardas público/protegido; pantalla de login según los tokens de `design.md`; parseo del sobre de error en `apps/web/src/api/client.ts` (hoy descarta el body y pierde el `code`); contexto de sesión + logout; formularios con `react-hook-form` + resolver de `zod`; cambio de contraseña que revoca **las demás** sesiones; flag `debe_cambiar_password` con cambio obligatorio **impuesto del lado del servidor** (allowlist acotada a cambiar-contraseña, logout y `/me`) — una guarda solo en el router del SPA es evitable con la cookie en mano | #2 | ✅ Archivado |
 | 2.2 | Sistema de auditoría general | Tabla y servicio de auditoría **genéricos**, diseñados una sola vez para usuarios, proveedores y productos: quién, qué, cuándo y estado previo/posterior. No duplica ni reemplaza el ledger de movimientos de stock de #5/#6, que es contabilidad de existencias, no rastro de cambios. Da el no-repudio que exige el flujo de contraseña temporal de #3: sin rastro, un encargado que conoce la contraseña de un empleado hace que el registro no pruebe nada | #2 | ✅ Archivado |
 | 3 | Gestión de usuarios | CRUD de usuarios y roles por el encargado; 403 a depósito; baja lógica de usuario; alta con contraseña temporal + cambio obligatorio en el primer ingreso; guarda que impide desactivar o degradar al último encargado activo | #2, #2.1, #2.2 | ✅ Archivado |
-| 3.1 | Pantalla de usuarios | Fast-follow de UI para el #3: pantalla de listado/detalle de usuarios sobre el shell que ya dejó el #2.1 (router, formularios, contexto de sesión). Sale aparte porque el #3 es CRUD de backend según la letra del backlog, porque no hay wireframe aprobado (`Wireframes.dc.html`, citado por `design.md`, no está en el repo) y porque juntar API + UI arriesga el presupuesto de revisión en un cambio que ya toca la guarda de último encargado | #3 | ⬜ Pendiente |
+| 3.1 | Pantalla de usuarios | Fast-follow de UI para el #3: pantalla de listado/detalle de usuarios sobre el shell que ya dejó el #2.1 (router, formularios, contexto de sesión). Sale aparte porque el #3 es CRUD de backend según la letra del backlog, porque no hay wireframe aprobado (`Wireframes.dc.html`, citado por `design.md`, no está en el repo) y porque juntar API + UI arriesga el presupuesto de revisión en un cambio que ya toca la guarda de último encargado | #3 | ✅ Archivado |
 | 3.5 | Recuperación de contraseña por email | Flujo propio de reset por correo: tabla de tokens con hash, expiración y un solo uso; endpoint de pedido con rate-limit y respuesta idéntica exista o no el mail (para no filtrar qué cuentas existen); endpoint de confirmación; puerto de mailer con fake para tests; dos pantallas. **Bloqueado por infraestructura, no por esfuerzo**: enviar a una dirección arbitraria exige un dominio cuyo DNS pueda llevar SPF/DKIM, y hoy no hay uno (el `*.web.app` de Firebase Hosting tiene el DNS de Google). Descartado adoptar Firebase Authentication: reemplaza el modelo cookie + `sesiones` que fija el ADR-0007 y deja huérfana la FK `auditoria.usuario_id` | #3, dominio propio | ⬜ Pendiente — bloqueado |
 | 4 | Gestión de proveedores | CRUD por el encargado, solo-lectura para depósito; baja lógica que preserva referencias e historial; vista maestro-detalle | #2, #2.1, #2.2 | ⬜ Pendiente |
 | 5 | Productos + ledger base | Tablas Producto y Movimiento con CHECKs (signo↔tipo, `es_discrepancia` solo en ajustes); CRUD con SKU único; stock inicial vía movimiento `ajuste` en la misma transacción (C2); edición sin `stock_actual` en el schema; permiso por campo `stock_minimo` — 403 `campo_reservado_encargado` (A7); baja lógica reservada al encargado; chips quiebre/bajo derivados | #2, #2.2, #4 | ⬜ Pendiente |
