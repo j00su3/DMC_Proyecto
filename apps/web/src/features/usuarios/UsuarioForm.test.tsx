@@ -95,4 +95,43 @@ describe('UsuarioForm', () => {
       screen.getByRole('button', { name: 'Guardar cambios' }),
     ).toBeDisabled();
   });
+
+  it('create mode: labels the submit button "Crear usuario" and it is not gated on dirty state', () => {
+    render(
+      <UsuarioForm
+        usuario={{ nombre: '', email: '', rol: 'deposito' }}
+        isOwnAccount={false}
+        mode="create"
+        onSubmit={vi.fn()}
+        isPending={false}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Crear usuario' })).toBeEnabled();
+  });
+
+  it('create mode: submits the full triple, not just the dirty subset', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+
+    render(
+      <UsuarioForm
+        usuario={{ nombre: '', email: '', rol: 'deposito' }}
+        isOwnAccount={false}
+        mode="create"
+        onSubmit={onSubmit}
+        isPending={false}
+      />,
+    );
+
+    await user.type(screen.getByLabelText('Nombre'), 'Carla');
+    await user.type(screen.getByLabelText('Correo'), 'carla@test.com');
+    await user.click(screen.getByRole('button', { name: 'Crear usuario' }));
+
+    expect(onSubmit).toHaveBeenCalledWith({
+      nombre: 'Carla',
+      email: 'carla@test.com',
+      rol: 'deposito',
+    });
+  });
 });

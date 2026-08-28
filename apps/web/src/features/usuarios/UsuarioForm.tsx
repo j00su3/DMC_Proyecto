@@ -14,9 +14,14 @@ type UsuarioFormProps = {
    * stay editable.
    */
   isOwnAccount: boolean;
-  /** Receives only the dirty subset of the three fields (D18). */
+  /**
+   * `'edit'` (default): receives only the dirty subset of the three fields
+   * (D18). `'create'`: no existing record to diff against, so the full
+   * triple is always submitted and the button is not gated on dirty state.
+   */
   onSubmit: (patch: Partial<UsuarioFormInput>) => void;
   isPending?: boolean;
+  mode?: 'create' | 'edit';
 };
 
 const ROL_OPTIONS: { value: UsuarioFormInput['rol']; label: string }[] = [
@@ -41,6 +46,7 @@ export function UsuarioForm({
   isOwnAccount,
   onSubmit,
   isPending,
+  mode = 'edit',
 }: UsuarioFormProps) {
   const {
     register,
@@ -52,6 +58,10 @@ export function UsuarioForm({
   });
 
   const submit = handleSubmit((values) => {
+    if (mode === 'create') {
+      onSubmit(values);
+      return;
+    }
     const patch: Partial<UsuarioFormInput> = {};
     if (dirtyFields.nombre) patch.nombre = values.nombre;
     if (dirtyFields.email) patch.email = values.email;
@@ -98,10 +108,10 @@ export function UsuarioForm({
         <Button
           type="submit"
           variant="primary"
-          disabled={!isDirty}
+          disabled={mode === 'edit' && !isDirty}
           isPending={isPending}
         >
-          Guardar cambios
+          {mode === 'create' ? 'Crear usuario' : 'Guardar cambios'}
         </Button>
       </div>
     </form>
