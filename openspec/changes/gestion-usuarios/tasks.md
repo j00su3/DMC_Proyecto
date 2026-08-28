@@ -41,24 +41,43 @@ boundary is touched anywhere in this change) — no dedicated RED task is requir
 Satisfies spec: *Email Uniqueness and Normalization*, *List Users*, *Get User by Id*, *Update User
 Profile*. Design refs: D9, D15, D16 (naming), D17.
 
-- [ ] 2.1 GREEN `apps/api/src/usuarios/repository.ts` — add `UsuarioResumen`, `NuevoUsuario`,
+- [x] 2.1 GREEN `apps/api/src/usuarios/repository.ts` — add `UsuarioResumen`, `NuevoUsuario`,
       `CambiosUsuario` (D15's no-hash projection, D8's no-plaintext-field shape)
-- [ ] 2.2 GREEN extend `UsuariosRepo` interface: `list`, `findById`, `findByIdForUpdate`, `create`,
+- [x] 2.2 GREEN extend `UsuariosRepo` interface: `list`, `findById`, `findByIdForUpdate`, `create`,
       `update`, `setActivo`, `resetPassword`
-- [ ] 2.3 RED `apps/api/src/usuarios/repository.integration.test.ts` (new, Docker PG) — `list`
+- [x] 2.3 RED `apps/api/src/usuarios/repository.integration.test.ts` (new, Docker PG) — `list`
       paginates/totals correctly and stays stable across `creado_en` ties (D17); `list`/`findById`/
       `findByIdForUpdate` rows have no `hashContrasena` key (D15); duplicate email on `create`/
       `update` surfaces `EMAIL_ALREADY_IN_USE`, not a raw pg error (D9); `resetPassword` sets the
       flag and clears `intentos_fallidos`/`bloqueado_hasta` in one statement (D11); `setActivo`
       leaves both counters untouched on reactivate (D11)
-- [ ] 2.4 GREEN `apps/api/src/usuarios/repository.ts` — implement `list`/`findById`/
+- [x] 2.4 GREEN `apps/api/src/usuarios/repository.ts` — implement `list`/`findById`/
       `findByIdForUpdate`/`create`/`update`/`setActivo`/`resetPassword`; 23505 → `emailAlreadyInUse`
       mapping on `create`/`update` (D9); emails normalized `trim().toLowerCase()` on every write
-- [ ] 2.5 GREEN widen every `UsuariosRepo` fake by one line per new method (D1 correction — real
+- [x] 2.5 GREEN widen every `UsuariosRepo` fake by one line per new method (D1 correction — real
       cost, must ship in this slice): `app.test.ts`, `auth/service.test.ts`, `routes/auth.test.ts`,
       `plugins/auth.test.ts`, `plugins/repos.test.ts`
-- [ ] 2.6 Verify: `pnpm -r test`, `pnpm test:integration`, `pnpm typecheck`, `pnpm lint`,
+- [x] 2.6 Verify: `pnpm -r test`, `pnpm test:integration`, `pnpm typecheck`, `pnpm lint`,
       `pnpm contract:check` (byte-identical)
+
+**S2a outcome notes (2026-08-28):**
+
+- **2.5 landed in one file, not five.** Only `app.test.ts` needed widening. The other four fakes
+  (`auth/service.test.ts`, `routes/auth.test.ts`, `plugins/auth.test.ts`, `plugins/repos.test.ts`)
+  use `as UsuariosRepo`, and a cast absorbs a widened interface silently — `pnpm typecheck` is
+  green without touching them. Adding seven throwing stubs to each would have been 28 lines no
+  type checker asked for. `satisfies` in `app.test.ts` is what caught the widening, which is the
+  point D1's correction was making; the four `as` fakes are the latent problem, and converting
+  them is its own decision, not S2a's.
+- **Drizzle wraps driver errors.** `DrizzleQueryError` carries the `pg` error on `.cause`, so a
+  top-level `.code` read finds no SQLSTATE. The first GREEN run had `isUniqueViolation` reading
+  only the top level, which would have turned every duplicate email into a 500 instead of a 409.
+  The D9 integration tests caught it; `isUniqueViolation` now walks a bounded `cause` chain.
+- **The D17 tie test was decoration and was rewritten.** As first written it asserted only
+  "no overlap, no gap, same set", which passes with no tiebreaker at all — a five-row seq scan is
+  incidentally stable across three OFFSET queries, so the set is identical either way and only the
+  ORDER differs. It now fixes five ascending ids and asserts the exact descending sequence.
+  Verified: dropping `desc(usuarios.id)` fails it. Five mutations run against S2a, five caught.
 
 ## Phase 3: S2b — Last-Encargado Guard + Session Revocation (TDD + integration, real concurrency)
 
