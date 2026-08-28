@@ -53,7 +53,13 @@ export async function apiFetch<T>(
     ...init,
     credentials: 'include',
     headers: {
-      'Content-Type': 'application/json',
+      // Only announce a JSON body when one is actually sent. Fastify's JSON
+      // parser rejects an empty body that declares `application/json`, and the
+      // API maps that rejection to a 500 — so declaring it unconditionally
+      // broke every bodyless POST, `/auth/logout` included.
+      ...(init?.body === undefined
+        ? {}
+        : { 'Content-Type': 'application/json' }),
       ...init?.headers,
     },
   });

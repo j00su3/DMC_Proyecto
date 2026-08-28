@@ -102,6 +102,51 @@ describe('apiFetch', () => {
     expect(error).toMatchObject({ status: 401, code: 'UNAUTHORIZED' });
     expect((error as ApiError).details).toBeUndefined();
   });
+
+  // Fastify's JSON parser rejects an empty body when the request declares
+  // `Content-Type: application/json`, and app.ts maps that rejection to a 500.
+  // Sending the header unconditionally therefore broke every bodyless POST:
+  // `POST /api/auth/logout` answered 500 in this exact shape. The API's own
+  // tests missed it because `app.inject` only sends the headers a test passes.
+  it('omits Content-Type when the request carries no body', async () => {
+    const fetchMock = stubFetch({ ok: true, status: 200, body: { ok: true } });
+
+    await apiFetch('/auth/logout', { method: 'POST' });
+
+    const headers = fetchMock.mock.calls[0]?.[1]?.headers as
+      | Record<string, string>
+      | undefined;
+    expect(headers).not.toHaveProperty('Content-Type');
+  });
+
+  it('sends Content-Type: application/json when the request carries a body', async () => {
+    const fetchMock = stubFetch({ ok: true, status: 200, body: { ok: true } });
+
+    await apiFetch('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email: 'a@b.c' }),
+    });
+
+    const headers = fetchMock.mock.calls[0]?.[1]?.headers as
+      | Record<string, string>
+      | undefined;
+    expect(headers?.['Content-Type']).toBe('application/json');
+  });
+
+  it('lets an explicit Content-Type from the caller win', async () => {
+    const fetchMock = stubFetch({ ok: true, status: 200, body: { ok: true } });
+
+    await apiFetch('/upload', {
+      method: 'POST',
+      body: 'raw',
+      headers: { 'Content-Type': 'text/plain' },
+    });
+
+    const headers = fetchMock.mock.calls[0]?.[1]?.headers as
+      | Record<string, string>
+      | undefined;
+    expect(headers?.['Content-Type']).toBe('text/plain');
+  });
 });
 
 describe('isApiError', () => {
