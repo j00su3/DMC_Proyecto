@@ -18,6 +18,7 @@ import dbPlugin, { type DbLike } from './plugins/db.js';
 import reposPlugin, { type Repos } from './plugins/repos.js';
 import authRoutes from './routes/auth.js';
 import healthRoutes from './routes/health.js';
+import usuariosRoutes from './routes/usuarios.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -99,6 +100,10 @@ export async function buildApp(
 
   app.register(healthRoutes, { prefix: '/api' });
   app.register(authRoutes, { prefix: '/api' });
+  // After authPlugin, like every other route plugin — Fastify hooks apply
+  // only to routes registered after the hook, so registering above it would
+  // silently drop the default-deny guarantee for these routes.
+  app.register(usuariosRoutes, { prefix: '/api' });
 
   app.setErrorHandler((error, _request, reply) => {
     const { status, body } = toErrorEnvelope(error);

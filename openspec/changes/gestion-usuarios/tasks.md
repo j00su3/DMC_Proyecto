@@ -195,23 +195,41 @@ Design refs: D3–D6, D8, D11, D12.
 Satisfies spec: *Role Gate on Every User-Management Route* (partial), *List Users (Paginated)*,
 *Get User by Id*. Design refs: D15–D17.
 
-- [ ] 6.1 RED `apps/api/src/routes/usuarios.test.ts` (new, `buildApp({ repos, uow, cookieSecret })`
+- [x] 6.1 RED `apps/api/src/routes/usuarios.test.ts` (new, `buildApp({ repos, uow, cookieSecret })`
       + `inject`) — `deposito` → 403 and unauthenticated → 401 on `GET /api/usuarios` and
       `GET /api/usuarios/:id`; default pagination shape; explicit `?page&pageSize` echoed; unknown
       `:id` → 404 `USER_NOT_FOUND`
-- [ ] 6.2 GREEN `apps/api/src/routes/usuarios.ts` (new) — `usuarioResumenDto` (own DTO, not
+- [x] 6.2 GREEN `apps/api/src/routes/usuarios.ts` (new) — `usuarioResumenDto` (own DTO, not
       `auth.ts`'s, per D16); `GET /api/usuarios` (`pageQuerySchema` + `paginated()` verbatim, D17)
       and `GET /api/usuarios/:id`; both `config: { roles: ['encargado'] }`, reads via `app.repos`
       not `uow` (D17)
-- [ ] 6.3 GREEN `apps/api/src/app.ts` — `app.register(usuariosRoutes, { prefix: '/api' })` after
+- [x] 6.3 GREEN `apps/api/src/app.ts` — `app.register(usuariosRoutes, { prefix: '/api' })` after
       `authPlugin`
-- [ ] 6.4 RED `apps/api/src/routes/usuarios.integration.test.ts` (new, real app + Docker PG) — list
+- [x] 6.4 RED `apps/api/src/routes/usuarios.integration.test.ts` (new, real app + Docker PG) — list
       and get against seeded users, no `hash_contrasena` field in any response
-- [ ] 6.5 GREEN — confirm 6.4 passes against 6.2/6.3
-- [ ] 6.6 Run `pnpm contract` to regenerate `openapi.json`/`schema.d.ts` for these two paths
+- [x] 6.5 GREEN — confirm 6.4 passes against 6.2/6.3
+- [x] 6.6 Run `pnpm contract` to regenerate `openapi.json`/`schema.d.ts` for these two paths
       (generated, exempt from TDD and from the authored-line count)
-- [ ] 6.7 Verify: `pnpm -r test`, `pnpm test:integration`, `pnpm typecheck`, `pnpm lint`,
+- [x] 6.7 Verify: `pnpm -r test`, `pnpm test:integration`, `pnpm typecheck`, `pnpm lint`,
       `pnpm contract:check`
+
+**S4a outcome notes (2026-08-28):**
+
+- **The contract diff alone is 525 raw lines** (348 in `openapi.json`, 177 in `schema.d.ts`) for two
+  paths. The ledger attempt was acquired at 2500 against the RAW expectation rather than the
+  authored one, per the note further down this file — a 400-line cap would have blocked on
+  generated files nobody wrote.
+- **`contract:check` fails on regenerated-but-unstaged files.** It runs `pnpm contract && git diff
+  --exit-code`, which compares the working tree to the INDEX. Regenerating and not staging reads
+  as drift. Stage the two generated files before running it; this is not a real contract failure.
+- **Mutation R4 survived and was proven behaviour-neutral, not a coverage gap.** Replacing
+  `toDto`'s explicit field list with a spread changed no output. Three probes established why: the
+  Zod response schema strips unknown keys, AND `toDto` builds an explicit object; with either one
+  alone the hash still never leaves, and only disabling BOTH lets it through — which the leak test
+  does catch. The test asserts the property that matters (no hash in the response bytes), not
+  which layer produced it, so no test was added. The code comment claiming `toDto` was "the last
+  line of defence" was wrong and has been corrected to say what was measured.
+- Five mutations run against S4a: four caught, one proven neutral by construction.
 
 ## Phase 7: S4b1 — Create + Password-Reset Routes (TDD + contract, integration)
 
