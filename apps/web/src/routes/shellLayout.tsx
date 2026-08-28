@@ -1,4 +1,6 @@
 import { Outlet, createRoute, redirect } from '@tanstack/react-router';
+import { AppShell } from '../components/ui/AppShell.js';
+import { useLogout } from '../features/auth/useLogout.js';
 import { authLayout } from './authLayout.js';
 
 /**
@@ -11,6 +13,11 @@ import { authLayout } from './authLayout.js';
  * this layout, so it stays reachable while `debeCambiarPassword` is `true`
  * — otherwise this guard would redirect the user away from the very screen
  * that clears the flag.
+ *
+ * `component` mounts `AppShell` once around `<Outlet/>` (app-layout spec,
+ * D1), so every child route — the home route and, from this PR on, the
+ * usuarios routes — shares one persistent sidebar instance instead of each
+ * re-rendering its own copy of it.
  */
 export const shellLayout = createRoute({
   getParentRoute: () => authLayout,
@@ -20,5 +27,20 @@ export const shellLayout = createRoute({
       throw redirect({ to: '/cambiar-password' });
     }
   },
-  component: Outlet,
+  component: ShellLayoutContainer,
 });
+
+function ShellLayoutContainer() {
+  const usuario = shellLayout.useRouteContext().usuario;
+  const logout = useLogout();
+
+  return (
+    <AppShell
+      usuario={usuario}
+      onLogout={() => logout.mutate()}
+      isLoggingOut={logout.isPending}
+    >
+      <Outlet />
+    </AppShell>
+  );
+}
