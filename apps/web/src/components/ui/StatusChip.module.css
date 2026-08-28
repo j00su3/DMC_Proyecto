@@ -1,0 +1,23 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.success {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.neutral {
+  background: #f1f4f8;
+  color: #69788c;
+}
+
+.warning {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-notice-text);
+}

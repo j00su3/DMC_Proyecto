@@ -1,6 +1,13 @@
-import { QueryClient } from '@tanstack/react-query';
-import { createMemoryHistory, createRouter } from '@tanstack/react-router';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  RouterProvider,
+  createMemoryHistory,
+  createRouter,
+} from '@tanstack/react-router';
+import { render, screen, waitFor } from '@testing-library/react';
+import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { PAGE_SIZE } from '../features/usuarios/queries.js';
 import { routeTree } from './routeTree.js';
 
 const encargadoUsuario = {
@@ -12,12 +19,16 @@ const encargadoUsuario = {
 };
 
 function buildAuthenticatedRouter(initialPath: string) {
+  return buildAuthenticatedRouterWithQueryClient(initialPath).router;
+}
+
+function buildAuthenticatedRouterWithQueryClient(initialPath: string) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   const history = createMemoryHistory({ initialEntries: [initialPath] });
   const router = createRouter({ routeTree, context: { queryClient }, history });
-  return router;
+  return { router, queryClient };
 }
 
 function stubFetchAsEncargado() {
@@ -27,6 +38,47 @@ function stubFetchAsEncargado() {
       ok: true,
       status: 200,
       json: async () => ({ usuario: encargadoUsuario }),
+    }),
+  );
+}
+
+function usuarioRow(id: string) {
+  return {
+    id,
+    nombre: `Usuario ${id}`,
+    email: `u${id}@test.com`,
+    rol: 'deposito' as const,
+    activo: true,
+    debeCambiarPassword: false,
+    creadoEn: '2026-01-01T12:00:00.000Z',
+  };
+}
+
+function stubFetchAsEncargadoWithList(listResponse: {
+  data: ReturnType<typeof usuarioRow>[];
+  page: number;
+  pageSize: number;
+  total: number;
+}) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/api/auth/me')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ usuario: encargadoUsuario }),
+        });
+      }
+      if (url.includes('/api/usuarios')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => listResponse,
+        });
+      }
+      throw new Error(`unexpected fetch: ${url}`);
     }),
   );
 }
@@ -94,5 +146,57 @@ describe('usuarios routes', () => {
     expect(matchedIds).toContain(
       '/authLayout/shellLayout/encargadoLayout/usuarios/$id',
     );
+  });
+
+  it('corrects an out-of-range page: settled data.length===0 && total>0 && page>1 navigates to the last real page, replacing history (D11)', async () => {
+    stubFetchAsEncargadoWithList({
+      data: [],
+      page: 9,
+      pageSize: PAGE_SIZE,
+      total: 3,
+    });
+    const router = buildAuthenticatedRouter('/usuarios?page=9');
+    await router.load();
+
+    await waitFor(() =>
+      expect(router.state.location.search).toEqual({ page: 1 }),
+    );
+    expect(router.state.location.pathname).toBe('/usuarios');
+  });
+
+  it('does not navigate when total===0 (no non-empty page to recover to)', async () => {
+    stubFetchAsEncargadoWithList({
+      data: [],
+      page: 1,
+      pageSize: PAGE_SIZE,
+      total: 0,
+    });
+    const router = buildAuthenticatedRouter('/usuarios?page=1');
+    await router.load();
+
+    expect(router.state.location.search).toEqual({ page: 1 });
+  });
+
+  it('renders the empty state when total===0, not a blank/errored table', async () => {
+    stubFetchAsEncargadoWithList({
+      data: [],
+      page: 1,
+      pageSize: PAGE_SIZE,
+      total: 0,
+    });
+    const { router, queryClient } =
+      buildAuthenticatedRouterWithQueryClient('/usuarios');
+
+    render(
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(RouterProvider, { router }),
+      ),
+    );
+
+    expect(
+      await screen.findByText('No hay usuarios registrados.'),
+    ).toBeInTheDocument();
   });
 });
