@@ -43,4 +43,33 @@ describe('design tokens', () => {
       /--shadow-modal:\s*0 18px 50px rgba\(22,\s*35,\s*60,\s*0?\.4\);/,
     );
   });
+
+  // S6a (usuarios-ui / Design-Tokens-Only Build, modal half; D13): pins the
+  // two modal tokens the credential dialog must render from. Both already
+  // exist in tokens.css — this test pins the values rather than adding them.
+  it('pins the documented modal radius', () => {
+    expect(tokens).toMatch(/--radius-modal:\s*18px;/);
+  });
+
+  it('pins the documented modal overlay colour', () => {
+    expect(tokens).toMatch(
+      /--overlay-modal:\s*rgba\(22,\s*35,\s*60,\s*0?\.55\);/,
+    );
+  });
+});
+
+describe('Modal.module.css references the modal tokens', () => {
+  const modalStyles = readStyles('src/components/ui/Modal.module.css');
+
+  it('references --radius-modal', () => {
+    expect(modalStyles).toMatch(/var\(--radius-modal\)/);
+  });
+
+  it('references --overlay-modal', () => {
+    expect(modalStyles).toMatch(/var\(--overlay-modal\)/);
+  });
+
+  it('references --shadow-modal', () => {
+    expect(modalStyles).toMatch(/var\(--shadow-modal\)/);
+  });
 });

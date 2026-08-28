@@ -5,6 +5,7 @@ import {
   createRouter,
 } from '@tanstack/react-router';
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PAGE_SIZE } from '../features/usuarios/queries.js';
@@ -198,5 +199,150 @@ describe('usuarios routes', () => {
     expect(
       await screen.findByText('No hay usuarios registrados.'),
     ).toBeInTheDocument();
+  });
+
+  /**
+   * usuarios-ui / Last-Active-Encargado Guard Is Server-Authoritative — the
+   * control was enabled beforehand (no client-side prediction anywhere in
+   * this change) and the error surfaces only after the 409 response.
+   */
+  it('surfaces LAST_ACTIVE_ENCARGADO copy after a refused deactivate; the control was enabled beforehand', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string | URL | Request, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes('/api/auth/me')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({ usuario: encargadoUsuario }),
+          });
+        }
+        if (init?.method === 'POST' && url.includes('/deactivate')) {
+          return Promise.resolve({
+            ok: false,
+            status: 409,
+            json: async () => ({
+              error: {
+                code: 'LAST_ACTIVE_ENCARGADO',
+                message:
+                  'No se puede desactivar: es el último encargado activo.',
+              },
+            }),
+          });
+        }
+        if (url.includes('/api/usuarios')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              data: [usuarioRow('7')],
+              page: 1,
+              pageSize: PAGE_SIZE,
+              total: 1,
+            }),
+          });
+        }
+        throw new Error(`unexpected fetch: ${url}`);
+      }),
+    );
+    const { router, queryClient } =
+      buildAuthenticatedRouterWithQueryClient('/usuarios');
+    await router.load();
+
+    render(
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(RouterProvider, { router }),
+      ),
+    );
+
+    const desactivar = await screen.findByRole('button', {
+      name: 'Desactivar',
+    });
+    expect(desactivar).toBeEnabled();
+
+    await user.click(desactivar);
+
+    expect(
+      await screen.findByText(/último encargado activo/i),
+    ).toBeInTheDocument();
+  });
+
+  /**
+   * usuarios-ui / Admin Password-Reset Flow + Temporary Password Handling —
+   * reuses `CredentialDialog` (D12/D13/D14) for the reset flow, exactly as
+   * for create: the plaintext hands off to the modal, and acknowledging it
+   * dismisses the dialog.
+   */
+  it('shows the CredentialDialog with the one-time plaintext after a password-reset, dismissed by acknowledging', async () => {
+    const user = userEvent.setup();
+    const PLAINTEXT = 'QK4R-8MB2-VC9H-TN7X';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string | URL | Request, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes('/api/auth/me')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({ usuario: encargadoUsuario }),
+          });
+        }
+        if (init?.method === 'POST' && url.includes('/password-reset')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              usuario: { ...usuarioRow('7'), debeCambiarPassword: true },
+              passwordTemporal: PLAINTEXT.replace(/-/g, ''),
+            }),
+          });
+        }
+        if (url.includes('/api/usuarios')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              data: [usuarioRow('7')],
+              page: 1,
+              pageSize: PAGE_SIZE,
+              total: 1,
+            }),
+          });
+        }
+        throw new Error(`unexpected fetch: ${url}`);
+      }),
+    );
+    const { router, queryClient } =
+      buildAuthenticatedRouterWithQueryClient('/usuarios');
+    await router.load();
+
+    render(
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(RouterProvider, { router }),
+      ),
+    );
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Restablecer contraseña' }),
+    );
+
+    expect(
+      await screen.findByRole('dialog', {
+        name: 'Contraseña temporal generada',
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(PLAINTEXT)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Entendido' }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    );
   });
 });

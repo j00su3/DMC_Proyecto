@@ -3,12 +3,15 @@ import { z } from 'zod';
 import { isApiError } from '../api/errors.js';
 import { FormError } from '../components/ui/FormError.js';
 import { Pagination } from '../components/ui/Pagination.js';
+import { CredentialDialog } from '../features/usuarios/CredentialDialog.js';
 import { UsuariosTable } from '../features/usuarios/UsuariosTable.js';
 import { usuariosErrorMessage } from '../features/usuarios/errorMessages.js';
 import {
   PAGE_SIZE,
   usuariosListQueryOptions,
 } from '../features/usuarios/queries.js';
+import { useEstadoUsuario } from '../features/usuarios/useEstadoUsuario.js';
+import { useRestablecerPassword } from '../features/usuarios/useRestablecerPassword.js';
 import { useUsuarios } from '../features/usuarios/useUsuarios.js';
 import { encargadoLayout } from './encargadoLayout.js';
 
@@ -69,7 +72,10 @@ export const usuariosListRoute = createRoute({
 function UsuariosListScreen() {
   const { page } = usuariosListRoute.useSearch();
   const navigate = usuariosListRoute.useNavigate();
+  const sesion = usuariosListRoute.useRouteContext().usuario;
   const query = useUsuarios(page);
+  const estado = useEstadoUsuario();
+  const restablecer = useRestablecerPassword();
 
   if (query.isError) {
     const message = isApiError(query.error)
@@ -96,12 +102,30 @@ function UsuariosListScreen() {
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
 
+  // Neither mutation is pre-disabled from any client-side prediction
+  // (usuarios-ui / Last-Active-Encargado Guard Is Server-Authoritative): the
+  // controls stay enabled until the server's 409 arrives.
+  const mutationError = estado.deactivate.error ?? estado.reactivate.error;
+
   return (
     <div>
       <h1>Usuarios</h1>
+      {mutationError ? (
+        <FormError
+          message={
+            isApiError(mutationError)
+              ? usuariosErrorMessage(mutationError)
+              : 'Ocurrió un error inesperado. Intente de nuevo.'
+          }
+        />
+      ) : null}
       <UsuariosTable
         usuarios={data?.data ?? []}
         aria-busy={query.isPlaceholderData}
+        currentUserId={sesion.id}
+        onDeactivate={(id) => estado.deactivate.mutate(id)}
+        onReactivate={(id) => estado.reactivate.mutate(id)}
+        onPasswordReset={(id) => restablecer.mutate(id)}
       />
       <Pagination
         page={page}
@@ -109,6 +133,12 @@ function UsuariosListScreen() {
         isBusy={query.isPlaceholderData}
         onPageChange={(nextPage) => navigate({ search: { page: nextPage } })}
       />
+      {restablecer.credential ? (
+        <CredentialDialog
+          credential={restablecer.credential}
+          onAcknowledge={restablecer.acknowledge}
+        />
+      ) : null}
     </div>
   );
 }

@@ -1,13 +1,20 @@
 import { createRoute } from '@tanstack/react-router';
 import { isApiError } from '../api/errors.js';
+import { Button } from '../components/ui/Button.js';
 import { FormError } from '../components/ui/FormError.js';
 import { StatusChip } from '../components/ui/StatusChip.js';
+import { CredentialDialog } from '../features/usuarios/CredentialDialog.js';
 import { UsuarioForm } from '../features/usuarios/UsuarioForm.js';
 import { usuariosErrorMessage } from '../features/usuarios/errorMessages.js';
 import { formatFecha } from '../features/usuarios/format.js';
 import { useActualizarUsuario } from '../features/usuarios/useActualizarUsuario.js';
+import { useEstadoUsuario } from '../features/usuarios/useEstadoUsuario.js';
+import { useRestablecerPassword } from '../features/usuarios/useRestablecerPassword.js';
 import { useUsuario } from '../features/usuarios/useUsuario.js';
 import { encargadoLayout } from './encargadoLayout.js';
+
+const SELF_ACTION_REASON =
+  'No puede realizar esta acción sobre su propia cuenta: cerraría todas sus sesiones de inmediato.';
 
 /**
  * Detail route (usuarios-ui / Detail Screen and Edit User Flow): the
@@ -26,6 +33,9 @@ function UsuariosDetalleScreen() {
   const sesion = usuariosDetalleRoute.useRouteContext().usuario;
   const query = useUsuario(id);
   const actualizar = useActualizarUsuario(id);
+  const estado = useEstadoUsuario();
+  const restablecer = useRestablecerPassword();
+  const isOwnAccount = sesion.id === id;
 
   if (query.isError) {
     const message = isApiError(query.error)
@@ -44,6 +54,7 @@ function UsuariosDetalleScreen() {
   }
 
   const { usuario } = query.data;
+  const estadoError = estado.deactivate.error ?? estado.reactivate.error;
 
   return (
     <div>
@@ -63,13 +74,57 @@ function UsuariosDetalleScreen() {
           }
         />
       ) : null}
+      {estadoError ? (
+        <FormError
+          message={
+            isApiError(estadoError)
+              ? usuariosErrorMessage(estadoError)
+              : 'Ocurrió un error inesperado. Intente de nuevo.'
+          }
+        />
+      ) : null}
 
       <UsuarioForm
         usuario={usuario}
-        isOwnAccount={sesion.id === id}
+        isOwnAccount={isOwnAccount}
         isPending={actualizar.isPending}
         onSubmit={(patch) => actualizar.mutate(patch)}
       />
+
+      <div>
+        {usuario.activo ? (
+          <Button
+            variant="secondary"
+            disabled={isOwnAccount}
+            onClick={() => estado.deactivate.mutate(id)}
+          >
+            Desactivar
+          </Button>
+        ) : (
+          <Button
+            variant="secondary"
+            disabled={isOwnAccount}
+            onClick={() => estado.reactivate.mutate(id)}
+          >
+            Reactivar
+          </Button>
+        )}
+        <Button
+          variant="secondary"
+          disabled={isOwnAccount}
+          onClick={() => restablecer.mutate(id)}
+        >
+          Restablecer contraseña
+        </Button>
+        {isOwnAccount ? <p>{SELF_ACTION_REASON}</p> : null}
+      </div>
+
+      {restablecer.credential ? (
+        <CredentialDialog
+          credential={restablecer.credential}
+          onAcknowledge={restablecer.acknowledge}
+        />
+      ) : null}
     </div>
   );
 }

@@ -35,3 +35,16 @@ export const usuarioFormSchema = z.object({
 });
 
 export type UsuarioFormInput = z.infer<typeof usuarioFormSchema>;
+
+/**
+ * Client mirror of the server's `POST /api/usuarios` body (`crearUsuarioBody`
+ * in `apps/api/src/routes/usuarios.ts:60-64`) — same three required fields,
+ * verified against `useCrearUsuario.test.ts`'s request-body assertion.
+ */
+export const crearUsuarioSchema = z.object({
+  nombre: z.string().min(1),
+  email: z.string().email(),
+  rol: z.enum(['encargado', 'deposito']),
+});
+
+export type CrearUsuarioInput = z.infer<typeof crearUsuarioSchema>;

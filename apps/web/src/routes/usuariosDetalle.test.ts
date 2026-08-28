@@ -193,4 +193,117 @@ describe('usuariosDetalleRoute', () => {
       expect(patchBody).toBe(JSON.stringify({ nombre: 'Nuevo nombre' })),
     );
   });
+
+  /**
+   * usuarios-ui / Self-Action Block Is A UI Affordance, Not An Authorization
+   * Control (D17, extended): the logged-in user's own detail renders
+   * deactivate/reactivate and password-reset disabled with a visible reason.
+   * Another user's detail keeps both enabled.
+   */
+  it('renders deactivate and restablecer disabled with a reason on own detail, enabled on another user', async () => {
+    stubFetchAsEncargadoWithDetail(otherUsuario);
+    const { router, queryClient } =
+      buildAuthenticatedRouterWithQueryClient('/usuarios/7');
+    await router.load();
+
+    const otherRender = render(
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(RouterProvider, { router }),
+      ),
+    );
+
+    expect(
+      await screen.findByRole('button', { name: 'Desactivar' }),
+    ).toBeEnabled();
+    otherRender.unmount();
+
+    stubFetchAsEncargadoWithDetail({
+      ...encargadoUsuario,
+      activo: true,
+      creadoEn: '2026-01-01T12:00:00.000Z',
+    });
+    const { router: ownRouter, queryClient: ownQueryClient } =
+      buildAuthenticatedRouterWithQueryClient('/usuarios/1');
+    await ownRouter.load();
+
+    render(
+      createElement(
+        QueryClientProvider,
+        { client: ownQueryClient },
+        createElement(RouterProvider, { router: ownRouter }),
+      ),
+    );
+
+    expect(
+      await screen.findByRole('button', { name: 'Desactivar' }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Restablecer contraseña' }),
+    ).toBeDisabled();
+    expect(
+      screen.getByText(/no puede realizar esta acción sobre su propia cuenta/i),
+    ).toBeInTheDocument();
+  });
+
+  it('surfaces LAST_ACTIVE_ENCARGADO copy after a refused deactivate on the detail screen', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string | URL | Request, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes('/api/auth/me')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({ usuario: encargadoUsuario }),
+          });
+        }
+        if (init?.method === 'POST' && url.includes('/deactivate')) {
+          return Promise.resolve({
+            ok: false,
+            status: 409,
+            json: async () => ({
+              error: {
+                code: 'LAST_ACTIVE_ENCARGADO',
+                message:
+                  'No se puede desactivar: es el último encargado activo.',
+              },
+            }),
+          });
+        }
+        if (url.includes('/api/usuarios/')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({ usuario: otherUsuario }),
+          });
+        }
+        throw new Error(`unexpected fetch: ${url}`);
+      }),
+    );
+    const { router, queryClient } =
+      buildAuthenticatedRouterWithQueryClient('/usuarios/7');
+    await router.load();
+
+    render(
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(RouterProvider, { router }),
+      ),
+    );
+
+    const desactivar = await screen.findByRole('button', {
+      name: 'Desactivar',
+    });
+    expect(desactivar).toBeEnabled();
+
+    await user.click(desactivar);
+
+    expect(
+      await screen.findByText(/último encargado activo/i),
+    ).toBeInTheDocument();
+  });
 });
