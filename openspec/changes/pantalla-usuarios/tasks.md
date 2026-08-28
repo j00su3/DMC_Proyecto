@@ -255,22 +255,22 @@ Satisfies spec: **usuarios-ui / Design-Tokens-Only Build, No Approved Mockup** (
 half); prerequisite for **Temporary Password Handling**'s modal mechanics (wired in S6b/S7).
 Design refs: D13, D14.
 
-- [ ] 8.1 RED `apps/web/src/styles/tokens.test.ts` (extend) — two assertions pinning
+- [x] 8.1 RED `apps/web/src/styles/tokens.test.ts` (extend) — two assertions pinning
       `--radius-modal` (18px) and `--overlay-modal` (`rgba(22,35,60,.55)`) — both already exist
       in `tokens.css` (verified), so this pins rather than adds
-- [ ] 8.2 RED `apps/web/src/components/ui/Modal.module.css` reference test (P5, same file as
+- [x] 8.2 RED `apps/web/src/components/ui/Modal.module.css` reference test (P5, same file as
       8.1 or a sibling) — `Modal.module.css` references `var(--radius-modal)`,
       `var(--overlay-modal)`, `var(--shadow-modal)`
-- [ ] 8.3 RED `apps/web/src/components/ui/Modal.test.tsx` (new, P4) — with
+- [x] 8.3 RED `apps/web/src/components/ui/Modal.test.tsx` (new, P4) — with
       `closePolicy="explicit-only"`: `Escape` does not call `onClose`; an overlay click does not
       call `onClose`; the acknowledge button does. With `closePolicy="casual"`: both do. Focus
       lands on the heading (not the acknowledge button) on open. Tab from the last focusable
       wraps to the first; Shift+Tab from the first wraps to the last. On unmount, focus returns
       to the trigger
-- [ ] 8.4 GREEN `apps/web/src/components/ui/Modal.tsx` + `.module.css` (new) — `<div role="dialog"
+- [x] 8.4 GREEN `apps/web/src/components/ui/Modal.tsx` + `.module.css` (new) — `<div role="dialog"
       aria-modal="true" aria-labelledby>` over an overlay div; required, non-defaulted
       `closePolicy: 'explicit-only' | 'casual'` prop (D13); hand-rolled focus trap and restore
-- [ ] 8.5 Verify: `pnpm --filter @inventienda/web test`, `pnpm typecheck`, `pnpm lint`
+- [x] 8.5 Verify: `pnpm --filter @inventienda/web test`, `pnpm typecheck`, `pnpm lint`
 
 ## Phase 9: S6b — Create Flow + Credential Containment
 
@@ -279,35 +279,35 @@ Handling** (create half — password-reset's half ships in S7 reusing this same 
 refs: D7, D9, D12. Depends on S3a/S3b (form fields reuse none, but the route needs
 `UsuarioForm` from S5b), S6a (Modal), S5b (`UsuarioForm`, `schemas.ts`).
 
-- [ ] 9.1 RED `apps/web/src/features/usuarios/schemas.ts` (extend) — a client mirror of
+- [x] 9.1 RED `apps/web/src/features/usuarios/schemas.ts` (extend) — a client mirror of
       `crearUsuarioBody`, covered by 9.3's assertions
-- [ ] 9.2 GREEN `apps/web/src/features/usuarios/schemas.ts` (extend) — Zod schema for
+- [x] 9.2 GREEN `apps/web/src/features/usuarios/schemas.ts` (extend) — Zod schema for
       `{ nombre, email, rol }` (create)
-- [ ] 9.3 RED `apps/web/src/features/usuarios/useCrearUsuario.test.ts` (new, P3 — **the
+- [x] 9.3 RED `apps/web/src/features/usuarios/useCrearUsuario.test.ts` (new, P3 — **the
       highest-value test in this change**) — after a successful create through a stubbed
       `POST /api/usuarios` returning a known plaintext, assert **all** of:
       `JSON.stringify(queryClient.getQueryCache().getAll())` does not contain it;
       `JSON.stringify(queryClient.getMutationCache().getAll())` does not contain it;
       `router.state.location.href` does not contain it; `localStorage`/`sessionStorage` do not
       contain it; and the returned `credential` state **does** carry it (D12)
-- [ ] 9.4 GREEN `apps/web/src/features/usuarios/useCrearUsuario.ts` (new) — `mutationFn` narrows
+- [x] 9.4 GREEN `apps/web/src/features/usuarios/useCrearUsuario.ts` (new) — `mutationFn` narrows
       inside itself: awaits `apiFetch`, calls `setCredential({ nombre, passwordTemporal })` via
       local `useState`, **returns only `body.usuario`** (typed `UsuarioResumen`, no
       `passwordTemporal` member); `onSuccess` does **not** `await` the `invalidateQueries` call
       and does **not** `navigate()` (D12's data-flow diagram)
-- [ ] 9.5 RED `apps/web/src/features/usuarios/CredentialDialog.test.tsx` (new, P4) — password
+- [x] 9.5 RED `apps/web/src/features/usuarios/CredentialDialog.test.tsx` (new, P4) — password
       renders in a monospace block grouped 4×4 with `user-select: all`; copy states it cannot be
       shown again; no copy-to-clipboard button exists anywhere in the component (D14)
-- [ ] 9.6 GREEN `apps/web/src/features/usuarios/CredentialDialog.tsx` + `.module.css` (new) —
+- [x] 9.6 GREEN `apps/web/src/features/usuarios/CredentialDialog.tsx` + `.module.css` (new) —
       wraps `Modal` with `closePolicy="explicit-only"`, the grouped password display, the
       "Anote esta contraseña…" copy
-- [ ] 9.7 RED `apps/web/src/routes/usuariosNuevo.test.ts` (extend, P3) — the create form submits
+- [x] 9.7 RED `apps/web/src/routes/usuariosNuevo.test.ts` (extend, P3) — the create form submits
       valid unique data, `POST /api/usuarios` returns `201`, and the temporary password is handed
       to `CredentialDialog`, never rendered inline in the form
-- [ ] 9.8 GREEN wire `usuariosNuevoRoute`'s component: `UsuarioForm` in create mode,
+- [x] 9.8 GREEN wire `usuariosNuevoRoute`'s component: `UsuarioForm` in create mode,
       `useCrearUsuario`, `CredentialDialog` gated on `credential !== null`, `acknowledge()` →
       `navigate({ to: '/usuarios' })`
-- [ ] 9.9 Verify: `pnpm --filter @inventienda/web test`, `pnpm typecheck`, `pnpm lint`
+- [x] 9.9 Verify: `pnpm --filter @inventienda/web test`, `pnpm typecheck`, `pnpm lint`
 
 ## Phase 10: S7 — Deactivate / Reactivate / Password-Reset
 
@@ -319,37 +319,37 @@ and **Error Surfacing By Code** (the `LAST_ACTIVE_ENCARGADO` case, live end to e
 refs: D9, D10, D12, D15. Depends on S4 (list rows), S5a/S5b (detail actions), S6a (Modal), S6b
 (`CredentialDialog`, reused for the reset credential per `design.md`'s data flow note).
 
-- [ ] 10.1 RED `apps/web/src/features/usuarios/useEstadoUsuario.test.ts` (new, P3) — deactivate
+- [x] 10.1 RED `apps/web/src/features/usuarios/useEstadoUsuario.test.ts` (new, P3) — deactivate
       and reactivate each send a `POST` with **no `body` key** (`init.body === undefined`,
       reflecting the merged `apiFetch` fix — see "Two corrections" above, NOT
       `JSON.stringify({})}`); each invalidates `lists()` + `detail(id)` on success (D10); a 409
       `LAST_ACTIVE_ENCARGADO` also invalidates `lists()`; `setQueryData` is never called (D9 spy)
-- [ ] 10.2 GREEN `apps/web/src/features/usuarios/useEstadoUsuario.ts` (new) — `deactivate`/
+- [x] 10.2 GREEN `apps/web/src/features/usuarios/useEstadoUsuario.ts` (new) — `deactivate`/
       `reactivate` mutations, bodyless `apiFetch` calls, invalidation per 10.1
-- [ ] 10.3 RED `apps/web/src/features/usuarios/useRestablecerPassword.test.ts` (new, P3) — sends
+- [x] 10.3 RED `apps/web/src/features/usuarios/useRestablecerPassword.test.ts` (new, P3) — sends
       a bodyless `POST /usuarios/:id/password-reset`; narrows the result the same way as
       `useCrearUsuario` (D12) — the containment sweep from 9.3 repeated for this mutation:
       neither cache, the URL, nor storage ever contains the plaintext, and `credential` does;
       invalidates `lists()` + `detail(id)`
-- [ ] 10.4 GREEN `apps/web/src/features/usuarios/useRestablecerPassword.ts` (new) — same D12
+- [x] 10.4 GREEN `apps/web/src/features/usuarios/useRestablecerPassword.ts` (new) — same D12
       narrowing pattern as S6b's `useCrearUsuario`, instantiated once at the list/detail screen
       level (not inside a row component — `design.md`'s data-flow note on why: a row is free to
       unmount under a refetch, and it must not be the only holder of the credential)
-- [ ] 10.5 RED `apps/web/src/features/usuarios/UsuariosTable.test.tsx` (extend) — on the
+- [x] 10.5 RED `apps/web/src/features/usuarios/UsuariosTable.test.tsx` (extend) — on the
       logged-in user's own row, Desactivar/Reactivar and Restablecer render `disabled` with a
       visible adjacent reason; on any other row both render enabled (D17)
-- [ ] 10.6 GREEN wire deactivate/reactivate/password-reset action buttons into
+- [x] 10.6 GREEN wire deactivate/reactivate/password-reset action buttons into
       `UsuariosTable`'s row rendering and into the detail screen's actions, both gated by the
       self-row check from 10.5
-- [ ] 10.7 RED `apps/web/src/routes/usuarios.test.ts` / `usuariosDetalle.test.ts` (extend, P3) —
+- [x] 10.7 RED `apps/web/src/routes/usuarios.test.ts` / `usuariosDetalle.test.ts` (extend, P3) —
       a deactivate targeting the last active encargado renders the `LAST_ACTIVE_ENCARGADO` copy
       from `errorMessages.ts` beside the action (persistent `FormError`, D16), and the control
       was enabled beforehand — no client-side pre-disable exists anywhere in this slice or any
       prior one
-- [ ] 10.8 GREEN wire the password-reset action's `CredentialDialog` reuse into the list and
+- [x] 10.8 GREEN wire the password-reset action's `CredentialDialog` reuse into the list and
       detail screens
-- [ ] 10.9 Verify: `pnpm --filter @inventienda/web test`, `pnpm typecheck`, `pnpm lint`
-- [ ] 10.10 Verify the full chain end to end: `pnpm --filter @inventienda/web build`
+- [x] 10.9 Verify: `pnpm --filter @inventienda/web test`, `pnpm typecheck`, `pnpm lint`
+- [x] 10.10 Verify the full chain end to end: `pnpm --filter @inventienda/web build`
 
 ## Phase 11: Bookkeeping
 

@@ -1,0 +1,16 @@
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.actionRow {
+  display: flex;
+  gap: 8px;
+}
+
+.reason {
+  font-size: 12px;
+  color: var(--color-text-muted-soft);
+}
