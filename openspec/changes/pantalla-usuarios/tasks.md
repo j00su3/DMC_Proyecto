@@ -123,33 +123,33 @@ Satisfies spec: **usuarios-ui / Design-Tokens-Only Build, No Approved Mockup** (
 half). Prerequisite for S4 (List Screen); no feature requirement is independently satisfied by a
 primitive alone.
 
-- [ ] 3.1 RED `apps/web/src/components/ui/DataTable.test.tsx` (new, P4) — column headers render
+- [x] 3.1 RED `apps/web/src/components/ui/DataTable.test.tsx` (new, P4) — column headers render
       as `<th scope="col">`; rows render from a `columns`/`rows` prop; `aria-busy` prop passes
       through when set
-- [ ] 3.2 GREEN `apps/web/src/components/ui/DataTable.tsx` + `.module.css` (new) — white card,
+- [x] 3.2 GREEN `apps/web/src/components/ui/DataTable.tsx` + `.module.css` (new) — white card,
       11px uppercase header, `#eef1f5` row dividers, `11px 18px` row padding
       (`docs/design.md:73-74`); code comment noting Usuarios has no approved mockup (Req 12)
-- [ ] 3.3 RED `apps/web/src/components/ui/StatusChip.test.tsx` (new, P4) — an inactive user's
+- [x] 3.3 RED `apps/web/src/components/ui/StatusChip.test.tsx` (new, P4) — an inactive user's
       row shows the `Inactivo` chip variant; active shows `Activo`; `debeCambiarPassword` shows
       the warning variant
-- [ ] 3.4 GREEN `apps/web/src/components/ui/StatusChip.tsx` + `.module.css` (new) — 11px/700
+- [x] 3.4 GREEN `apps/web/src/components/ui/StatusChip.tsx` + `.module.css` (new) — 11px/700
       pill (`docs/design.md:76-77`); `Activo` success, `Inactivo` neutral, `Debe cambiar
       contraseña` warning
-- [ ] 3.5 RED `apps/web/src/components/ui/DataTable.test.tsx` (extend) — table container carries
+- [x] 3.5 RED `apps/web/src/components/ui/DataTable.test.tsx` (extend) — table container carries
       the documented white-card/divider/padding token classes (P4/P5 — class presence, not
       computed style, per the jsdom limitation `styles/tokens.test.ts:6-20` already documents)
-- [ ] 3.6 Verify: `pnpm --filter @inventienda/web test`, `pnpm typecheck`, `pnpm lint`
+- [x] 3.6 Verify: `pnpm --filter @inventienda/web test`, `pnpm typecheck`, `pnpm lint`
 
 ## Phase 4: S3b — Pagination Primitive
 
 Prerequisite for S4; no feature requirement is independently satisfied by a primitive alone.
 
-- [ ] 4.1 RED `apps/web/src/components/ui/Pagination.test.tsx` (new, P4) — `onPageChange` fires
+- [x] 4.1 RED `apps/web/src/components/ui/Pagination.test.tsx` (new, P4) — `onPageChange` fires
       with the right page on next/prev/direct-page click; controls are `disabled` when `isBusy`;
       current page renders with the active-page treatment
-- [ ] 4.2 GREEN `apps/web/src/components/ui/Pagination.tsx` + `.module.css` (new) — compact
+- [x] 4.2 GREEN `apps/web/src/components/ui/Pagination.tsx` + `.module.css` (new) — compact
       footer buttons, blue active page (`docs/design.md:73-74`)
-- [ ] 4.3 Verify: `pnpm --filter @inventienda/web test`, `pnpm typecheck`, `pnpm lint`
+- [x] 4.3 Verify: `pnpm --filter @inventienda/web test`, `pnpm typecheck`, `pnpm lint`
 
 ## Phase 5: S4 — List Screen
 
@@ -159,54 +159,63 @@ control" half — the 409-reaction half ships with S7's mutations); establishes
 **usuarios-ui / Error Surfacing By Code**'s module. Design refs: D6–D8, D11, D19. Depends on S2,
 S3a, S3b.
 
-- [ ] 5.1 RED `apps/web/src/features/usuarios/queries.ts` has no test of its own (pure key
+- [x] 5.1 RED `apps/web/src/features/usuarios/queries.ts` has no test of its own (pure key
       factory) — covered indirectly by 5.3/5.4's spies. Author `usuariosKeys` (D7) and
       `PAGE_SIZE = 20` (D6) as GREEN-only scaffolding with a docblock stating the D9 rule
       ("no mutation in this feature calls `setQueryData`; all invalidate") up front for later
-      slices to follow
-- [ ] 5.2 RED `apps/web/src/features/usuarios/errorMessages.test.ts` (new) — each of
+      slices to follow. Extended (still GREEN-only, no test of its own) with
+      `usuariosListQueryOptions(page)` so the loader (5.7) and `useUsuarios` (5.5) share one
+      query definition and cache entry
+- [x] 5.2 RED `apps/web/src/features/usuarios/errorMessages.test.ts` (new) — each of
       `USER_NOT_FOUND`, `EMAIL_ALREADY_IN_USE`, `LAST_ACTIVE_ENCARGADO`, `VALIDATION_ERROR`,
       `FORBIDDEN` maps to a distinct message, switching on `error.code` never `error.status`
       (D15)
-- [ ] 5.3 GREEN `apps/web/src/features/usuarios/errorMessages.ts` (new) — the five-code switch,
+- [x] 5.3 GREEN `apps/web/src/features/usuarios/errorMessages.ts` (new) — the five-code switch,
       following `features/auth/errorMessages.ts`'s shape
-- [ ] 5.4 RED `apps/web/src/features/usuarios/useUsuarios.test.ts` (new, P3) — while a page-2
-      request is in flight, page-1 rows are still present, `aria-busy="true"`, pagination
-      controls disabled (D8, `keepPreviousData`)
-- [ ] 5.5 GREEN `apps/web/src/features/usuarios/useUsuarios.ts` (new) — list query keyed by
+- [x] 5.4 RED `apps/web/src/features/usuarios/useUsuarios.test.ts` (new, P3) — while a page-2
+      request is in flight, page-1 rows are still present, `isPlaceholderData` true (the route
+      component maps this to `aria-busy` + disabled pagination controls, asserted in 5.6/5.12)
+      (D8, `keepPreviousData`)
+- [x] 5.5 GREEN `apps/web/src/features/usuarios/useUsuarios.ts` (new) — list query keyed by
       `usuariosKeys.list({ page })`, `placeholderData: keepPreviousData`
-- [ ] 5.6 RED `apps/web/src/routes/usuarios.test.ts` (extend) — a settled, non-placeholder
+- [x] 5.6 RED `apps/web/src/routes/usuarios.test.ts` (extend) — a settled, non-placeholder
       response with `data.length === 0 && total > 0 && page > 1` navigates to
       `Math.ceil(total / PAGE_SIZE)` with `replace: true` (D11); `total === 0` renders the empty
-      state and does **not** navigate
-- [ ] 5.7 GREEN wire the out-of-range recovery into `usuariosListRoute`'s component (D11)
-- [ ] 5.8 RED `apps/web/src/features/usuarios/format.test.ts` (new, P4) — an ISO string in, a
+      state and does **not** navigate. Implemented as a route `loader` (via
+      `context.queryClient.ensureQueryData(usuariosListQueryOptions(...))`), not a component
+      `useEffect` — this keeps the correction pre-render and testable with `router.load()` (P2/P3)
+      like every other route test in this file, with no RTL render needed for the redirect case
+- [x] 5.7 GREEN wire the out-of-range recovery into `usuariosListRoute`'s `loader` (D11)
+- [x] 5.8 RED `apps/web/src/features/usuarios/format.test.ts` (new, P4) — an ISO string in, a
       stable `es` date out (D19); a malformed string yields a placeholder, not `Invalid Date`
-- [ ] 5.9 GREEN `apps/web/src/features/usuarios/format.ts` (new) — `formatFecha` on
+- [x] 5.9 GREEN `apps/web/src/features/usuarios/format.ts` (new) — `formatFecha` on
       `Intl.DateTimeFormat('es')`
-- [ ] 5.10 RED `apps/web/src/features/usuarios/UsuariosTable.test.tsx` (new, P4) — presentational;
+- [x] 5.10 RED `apps/web/src/features/usuarios/UsuariosTable.test.tsx` (new, P4) — presentational;
       renders rows via `DataTable`, a `StatusChip` per row, `creadoEn` through `formatFecha`; no
       router or react-query import (asserted by the presentational-component precedent, not a
       literal test — verified by inspection per `LoginForm.tsx:17`'s stated boundary)
-- [ ] 5.11 GREEN `apps/web/src/features/usuarios/UsuariosTable.tsx` + `.module.css` (new)
-- [ ] 5.12 GREEN wire `usuariosListRoute`'s component: `useUsuarios`, `UsuariosTable`,
+- [x] 5.11 GREEN `apps/web/src/features/usuarios/UsuariosTable.tsx` (new). Deviation: no
+      `.module.css` — the component composes `DataTable`/`StatusChip` with zero layout of its
+      own; an empty stylesheet would be dead weight. Row action styling (S5b/S7) will add one
+      when there is real content for it
+- [x] 5.12 GREEN wire `usuariosListRoute`'s component: `useUsuarios`, `UsuariosTable`,
       `Pagination`, error rendering via `errorMessages.ts`
-- [ ] 5.13 Verify: `pnpm --filter @inventienda/web test`, `pnpm typecheck`, `pnpm lint`
+- [x] 5.13 Verify: `pnpm --filter @inventienda/web test`, `pnpm typecheck`, `pnpm lint`
 
 ## Phase 6: S5a — Detail Screen (read-only)
 
 Satisfies spec: **usuarios-ui / Detail Screen**. Design refs: D7 (detail key). Depends on S2,
 S4 (`errorMessages.ts`, `formatFecha`).
 
-- [ ] 6.1 RED `apps/web/src/features/usuarios/useUsuario.test.ts` (new, P3) — queries
+- [x] 6.1 RED `apps/web/src/features/usuarios/useUsuario.test.ts` (new, P3) — queries
       `usuariosKeys.detail(id)`; on `USER_NOT_FOUND` surfaces that mapped message
-- [ ] 6.2 GREEN `apps/web/src/features/usuarios/useUsuario.ts` (new) — detail query
-- [ ] 6.3 RED `apps/web/src/routes/usuariosDetalle.test.ts` (extend, P3) — navigating to
+- [x] 6.2 GREEN `apps/web/src/features/usuarios/useUsuario.ts` (new) — detail query
+- [x] 6.3 RED `apps/web/src/routes/usuariosDetalle.test.ts` (extend, P3) — navigating to
       `/usuarios/:id` for an existing id renders that user's profile fields with no password or
       hash field present anywhere in the rendered output
-- [ ] 6.4 GREEN wire `usuariosDetalleRoute`'s component: `useUsuario`, a read-only profile render
+- [x] 6.4 GREEN wire `usuariosDetalleRoute`'s component: `useUsuario`, a read-only profile render
       (`nombre`, `email`, `rol`, status chip, `creadoEn` via `formatFecha`)
-- [ ] 6.5 Verify: `pnpm --filter @inventienda/web test`, `pnpm typecheck`, `pnpm lint`
+- [x] 6.5 Verify: `pnpm --filter @inventienda/web test`, `pnpm typecheck`, `pnpm lint`
 
 ## Phase 7: S5b — Edit Flow + Rol Self-Lock
 
@@ -215,30 +224,30 @@ Self-Action Block Is A UI Affordance, Not An Authorization Control** (deactivate
 password-reset are S7's). Design refs: D9, D10, D18. Depends on S6a (Modal is not used here —
 listed for completeness: none). Depends on S5a.
 
-- [ ] 7.1 RED `apps/web/src/features/usuarios/schemas.ts` has no test of its own — a client
+- [x] 7.1 RED `apps/web/src/features/usuarios/schemas.ts` has no test of its own — a client
       mirror of `actualizarUsuarioBody`, verified against `apps/api/src/routes/usuarios.ts:78-87`
       by 7.4's request-body assertion
-- [ ] 7.2 GREEN `apps/web/src/features/usuarios/schemas.ts` (extend or create) — Zod mirror for
+- [x] 7.2 GREEN `apps/web/src/features/usuarios/schemas.ts` (extend or create) — Zod mirror for
       `{ nombre?, email?, rol? }`
-- [ ] 7.3 RED `apps/web/src/features/usuarios/useActualizarUsuario.test.ts` (new, P3) — changing
+- [x] 7.3 RED `apps/web/src/features/usuarios/useActualizarUsuario.test.ts` (new, P3) — changing
       only `nombre` sends a captured body of exactly `{"nombre":"…"}` (D18, from
       `formState.dirtyFields`); submitting with nothing changed makes no request and the button
       stays disabled; PATCH on the logged-in user's own id also invalidates `['session']`, PATCH
       on another user does not (D10); after any usuarios mutation, `queryClient.setQueryData` was
       never called (D9 spy)
-- [ ] 7.4 GREEN `apps/web/src/features/usuarios/useActualizarUsuario.ts` (new) — PATCH from
+- [x] 7.4 GREEN `apps/web/src/features/usuarios/useActualizarUsuario.ts` (new) — PATCH from
       `dirtyFields`, invalidates `lists()` + `detail(id)` (+ `['session']` conditionally, D10)
-- [ ] 7.5 RED `apps/web/src/features/usuarios/UsuarioForm.test.tsx` (new, P4) — on the logged-in
+- [x] 7.5 RED `apps/web/src/features/usuarios/UsuarioForm.test.tsx` (new, P4) — on the logged-in
       user's own account, `rol` renders `disabled` with an adjacent visible reason while `nombre`
       and `email` stay editable and enabled; on any other user's form `rol` is enabled (D17,
       extended by the corrected spec to cover `rol`)
-- [ ] 7.6 GREEN `apps/web/src/features/usuarios/UsuarioForm.tsx` + `.module.css` (new) —
+- [x] 7.6 GREEN `apps/web/src/features/usuarios/UsuarioForm.tsx` + `.module.css` (new) —
       presentational form for `{ nombre, email, rol }`; the self-lock reason text must not claim
       server authority — mirror D17's wording constraint ("the server still permits this; the
       screen declines to offer it")
-- [ ] 7.7 GREEN wire `usuariosDetalleRoute`'s component: `UsuarioForm` in edit mode,
+- [x] 7.7 GREEN wire `usuariosDetalleRoute`'s component: `UsuarioForm` in edit mode,
       `useActualizarUsuario`, "Guardar cambios" disabled while `!formState.isDirty`
-- [ ] 7.8 Verify: `pnpm --filter @inventienda/web test`, `pnpm typecheck`, `pnpm lint`
+- [x] 7.8 Verify: `pnpm --filter @inventienda/web test`, `pnpm typecheck`, `pnpm lint`
 
 ## Phase 8: S6a — Modal Primitive
 
