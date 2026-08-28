@@ -85,3 +85,90 @@ Option 1 (backend-only CRUD) most faithfully matches the backlog item's literal 
 ## Ready for Proposal
 
 Yes, with the five open questions above flagged for explicit resolution before or during the proposal phase — particularly the login-screen scope question (#1) and the self-protection/last-encargado guard (#2), since both materially change the shape of the design and tasks phases.
+
+---
+
+## Reconciliation (2026-08-27) — supersedes the stale parts above
+
+The body of this exploration was written on 2026-08-26, **before** backlog #2.1
+(`app-shell-login`) and #2.2 (`auditoria-general`) shipped. Both are now merged and archived
+(`main` at `293ae75`). Nothing above is deleted — this section records what changed and which
+open questions are now closed, in the same supersede-don't-rewrite style `TECH-DESIGNv2.md`
+uses against v1.
+
+### Open questions: closed
+
+**Q1 — "Does this change include the login screen?" → MOOT.** Backlog #2.1 shipped the whole
+app shell: TanStack Router with typed public/protected routes, the login screen, session
+context and logout, `react-hook-form` + zod resolver, and server-side enforcement of
+`debe_cambiar_password`. The scope debate in "Approaches" above (options 1/2/3) no longer
+exists: option 1 (backend-first) is now the only coherent reading, because the shell it was
+deferring already exists. Any UI this change needs is a screen on an existing rail, not new
+cross-cutting infrastructure.
+
+**Q2 — self-protection and last-encargado guard → DECIDED (product, user, 2026-08-27).**
+The system MUST refuse to deactivate or demote the last active `encargado`. This is the
+decision that actually closes the lockout risk: `sesiones.findValid`
+(`apps/api/src/auth/repository.ts:118`) joins `usuarios` live on every request and requires
+`activo = true`, and it returns the live row, so `rol` is re-read per request. That means
+self-deactivation locks the actor out on the very next request, and self-demotion strips
+admin instantly while leaving the session valid — and no password-recovery flow of any kind
+would undo either, because the credential was never the thing that was lost.
+
+**Q3 — password handling on create → DECIDED (product, user, 2026-08-27).** The API generates
+the temporary password, returns it **exactly once** in the creation response for the encargado
+to hand over in person, and sets `debe_cambiar_password = true`. No email. Rationale: the
+plaintext never reaches the database (only the argon2id hash is stored) and Fastify's default
+logger records the request line, status and timing but not bodies, so it does not reach the
+logs either. The encargado resetting any user's password reuses the same path, which is what
+makes every non-encargado account rescuable without email.
+
+**Email-based recovery → OUT OF SCOPE, tracked as backlog #3.5.** Not deferred on effort — the
+code is roughly 60% of a #2.2-sized cycle and reuses the `UnitOfWork` seam pattern, the already
+installed `@fastify/rate-limit`, and #2.1's forms and router. It is deferred because the
+blocking constraint is not code: sending to an arbitrary address requires a domain whose DNS
+can carry SPF/DKIM records. The user has no domain (Firebase Hosting yields a `*.web.app`
+subdomain whose DNS belongs to Google and cannot carry those records), so the feature could not
+reach an employee's inbox at all. Adopting Firebase Authentication instead was rejected: it
+replaces the cookie+`sesiones` session model that ADR-0007 fixes, and `auditoria.usuario_id`
+carries a real FK to `usuarios` (design.md D14) that would have nothing to point at.
+
+**Q4 (logical deletion) and Q5 (role change propagation) → unchanged and still favorable.**
+Re-verified against `findValid` at `apps/api/src/auth/repository.ts:118`.
+
+### Risks: closed
+
+- **"No `actualizado_en`/audit column on `usuarios`" → RESOLVED, and NOT by adding a column.**
+  Backlog #2.2 shipped a generic `auditoria` table. Per ADR-0012 the trail lives there, not as
+  columns on the audited row. `usuarios` needs no schema change for auditability.
+- **"`apps/web/src/api/client.ts` does not parse the error envelope" → RESOLVED** by #2.1.
+- **"No approved wireframe for a Usuarios screen"** — still true. `Wireframes.dc.html` is still
+  absent. Mitigated, not resolved: #2.1 established real component conventions in code to build
+  against, which the exploration could not assume when it flagged this.
+
+### New constraints this change inherits from #2.2
+
+These did not exist when the body above was written and are binding:
+
+1. **Every mutation runs inside `app.uow.run`** (`apps/api/src/db/uow.ts`), with the record
+   change and its audit row committing or rolling back together. The callback receives repos,
+   never the raw executor, so a service cannot reach around the boundary.
+2. **Every mutation calls `recordAudit`** (`apps/api/src/auditoria/service.ts`). `AuditAccion`
+   already defines exactly the four verbs this change needs — `crear`, `actualizar`,
+   `baja_logica`, `reactivar` — plus `cambiar_password`.
+3. **The last-encargado guard must live inside that same transaction.** The atomic-single-
+   statement precedent from the lockout UPDATE is still the right shape against TOCTOU, but it
+   is no longer sufficient on its own: the guard, the write and the audit row must share one
+   transaction, or a rolled-back write can leave an audit row claiming it happened.
+4. **`FIELD_CLASSIFICATION.usuarios`** (`apps/api/src/auditoria/fields.ts`) already classifies
+   every column this change touches, `debeCambiarPassword` included, with `hashContrasena` on
+   the denylist. Expected to need no edit — if this change adds a column, `fields.test.ts`
+   fails by name, which is the intended build-time gate (design.md D11).
+5. **`changePassword` in `apps/api/src/auth/service.ts` is the reference implementation** of
+   the whole pattern, including the rule that argon2 hashing happens *outside* the transaction.
+
+### Still open, unchanged
+
+`apps/api/src/lib/errors.ts` still has no factory for a per-resource 404, an email conflict, or
+the last-encargado guard. Those remain net-new, along with their status codes and matching Zod
+response-schema entries, or the OpenAPI contract will under-document the new error surface.
