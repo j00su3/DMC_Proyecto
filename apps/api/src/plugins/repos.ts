@@ -4,15 +4,14 @@ import {
   type AuditoriaRepo,
   DrizzleAuditoriaRepo,
 } from '../auditoria/repository.js';
-import {
-  DrizzleSesionesRepo,
-  DrizzleUsuariosRepo,
-  type SesionesRepo,
-  type UsuariosRepo,
-} from '../auth/repository.js';
+import { DrizzleSesionesRepo, type SesionesRepo } from '../auth/repository.js';
 import type { DbExecutor } from '../db/client.js';
 import { getDb } from '../db/pool.js';
 import { type UnitOfWork, createUnitOfWork } from '../db/uow.js';
+import {
+  DrizzleUsuariosRepo,
+  type UsuariosRepo,
+} from '../usuarios/repository.js';
 
 export interface Repos {
   usuarios: UsuariosRepo;

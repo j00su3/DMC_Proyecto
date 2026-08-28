@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { AuditoriaRepo } from '../auditoria/repository.js';
+import type { Usuario, UsuariosRepo } from '../usuarios/repository.js';
 import { hashPassword, verifyPassword } from './password.js';
-import type { SesionesRepo, Usuario, UsuariosRepo } from './repository.js';
+import type { SesionesRepo } from './repository.js';
 import { changePassword, login, logout, resolveSession } from './service.js';
 
 function makeUsuario(overrides: Partial<Usuario> = {}): Usuario {

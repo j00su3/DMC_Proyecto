@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildApp } from './app.js';
 import type { AuditoriaRepo } from './auditoria/repository.js';
-import type { SesionesRepo, UsuariosRepo } from './auth/repository.js';
+import type { SesionesRepo } from './auth/repository.js';
+import type { UsuariosRepo } from './usuarios/repository.js';
 
 /**
  * `app.log.level` is the observable difference: Fastify swaps in a no-op

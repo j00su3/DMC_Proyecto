@@ -6,8 +6,9 @@ import {
   invalidCredentials,
   invalidCurrentPassword,
 } from '../lib/errors.js';
+import type { Usuario, UsuariosRepo } from '../usuarios/repository.js';
 import { DUMMY_HASH, hashPassword, verifyPassword } from './password.js';
-import type { SesionesRepo, Usuario, UsuariosRepo } from './repository.js';
+import type { SesionesRepo } from './repository.js';
 import { SESSION_TTL_SECONDS, createToken } from './session.js';
 
 // Local repo-pair shape so this module has no dependency on the Fastify

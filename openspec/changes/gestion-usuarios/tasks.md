@@ -19,19 +19,21 @@ boundary is touched anywhere in this change) — no dedicated RED task is requir
 
 ## Phase 1: S1 — Repository Relocation (import-only, zero behaviour change)
 
-- [ ] 1.1 GREEN (mechanical move, no new test — D1) Create `apps/api/src/usuarios/repository.ts`:
+- [x] 1.1 GREEN (mechanical move, no new test — D1) Create `apps/api/src/usuarios/repository.ts`:
       move `Usuario`, `LockoutResult`, `UsuariosRepo`, `DrizzleUsuariosRepo` verbatim from
       `apps/api/src/auth/repository.ts`
-- [ ] 1.2 GREEN `apps/api/src/auth/repository.ts` — keep `NuevaSesion`/`SesionesRepo`/
+- [x] 1.2 GREEN `apps/api/src/auth/repository.ts` — keep `NuevaSesion`/`SesionesRepo`/
       `DrizzleSesionesRepo` only; import `Usuario` from `../usuarios/repository.js`
-- [ ] 1.3 GREEN `apps/api/src/auth/service.ts`, `apps/api/src/plugins/auth.ts`,
+- [x] 1.3 GREEN `apps/api/src/auth/service.ts`, `apps/api/src/plugins/auth.ts`,
       `apps/api/src/plugins/repos.ts` — update import paths only; `Repos`/`buildRepos` shapes
       unchanged
-- [ ] 1.4 GREEN update import paths only (no assertion changes) in `auth/service.test.ts`,
+- [x] 1.4 GREEN update import paths only (no assertion changes) in `auth/service.test.ts`,
       `auth/repository.test.ts`, `plugins/repos.test.ts`, `plugins/auth.test.ts`,
       `routes/auth.test.ts`, `app.test.ts` — green with zero assertion diff is the proof the move
-      is behaviour-neutral
-- [ ] 1.5 Verify: `pnpm -r test`, `pnpm typecheck`, `pnpm lint`, `pnpm contract:check`
+      is behaviour-neutral. Also updated `auth/repository.integration.test.ts` (not listed above
+      but required: it imports `DrizzleUsuariosRepo` from `./repository.js`, and `tsconfig.json`'s
+      `include: ["src"]` means `pnpm typecheck` compiles it too)
+- [x] 1.5 Verify: `pnpm -r test`, `pnpm typecheck`, `pnpm lint`, `pnpm contract:check`
       (byte-identical — no route touched)
 
 ## Phase 2: S2a — CRUD Repository Methods (TDD + integration)
