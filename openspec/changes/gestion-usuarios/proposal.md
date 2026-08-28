@@ -25,7 +25,7 @@ with a stolen cookie.
   `debe_cambiar_password = true`, last-active-encargado guard (blocks self- and admin-initiated
   deactivate/demote of the last active encargado), email uniqueness, admin-initiated password
   reset reusing the same temp-password path as create.
-- New `routes/usuarios.ts`: list, create, get, update, deactivate, reactivate, reset-password —
+- New `routes/usuarios.ts`: list, create, get, update, deactivate, reactivate, password-reset —
   all `config: { roles: ['encargado'] }`.
 - Every write wrapped in `app.uow.run`, paired with `recordAudit` (`crear`, `actualizar`,
   `baja_logica`, `reactivar`) in the same transaction as the guard check and the row write.
@@ -82,7 +82,7 @@ active encargados and committing the demote/deactivate.
 |------|--------|-------------|
 | `apps/api/src/auth/repository.ts` | Modified | Extend `UsuariosRepo`: create/list/findById/update/guard query |
 | `apps/api/src/usuarios/service.ts` | New | Business rules: temp password, last-encargado guard, uniqueness |
-| `apps/api/src/routes/usuarios.ts` | New | CRUD + reset-password endpoints, `roles: ['encargado']` |
+| `apps/api/src/routes/usuarios.ts` | New | CRUD + password-reset endpoints, `roles: ['encargado']` |
 | `apps/api/src/lib/errors.ts` | Modified | 404 (resource), 409 (email conflict), 409/422 (last-encargado guard) |
 | `apps/api/src/plugins/repos.ts` | Modified | Wire extended `usuarios` repo |
 | `openspec/specs/user-management/spec.md` | New | Delta/full spec for this capability |
