@@ -131,6 +131,34 @@ export function auditWriteFailed(cause?: unknown): AppError {
   );
 }
 
+// D14: distinct from notFoundEnvelope() (reserved for unmatched routes) so
+// "no such path" and "no such user" stay distinguishable in logs and clients.
+export function userNotFound(): AppError {
+  return new AppError('USER_NOT_FOUND', 'User not found', 404);
+}
+
+// D14: 409 not 422 — the request itself is valid, it is the current state of
+// the users collection (another active row already owns this email) that
+// conflicts, and the conflict is resolvable by changing that state.
+export function emailAlreadyInUse(): AppError {
+  return new AppError(
+    'EMAIL_ALREADY_IN_USE',
+    'Email is already in use by another user',
+    409,
+  );
+}
+
+// D14: 409 not 422 — same reasoning as emailAlreadyInUse(): the request is
+// valid, but honoring it would leave the encargado role with zero active
+// members, which conflicts with the current state of the users collection.
+export function lastActiveEncargado(): AppError {
+  return new AppError(
+    'LAST_ACTIVE_ENCARGADO',
+    'Cannot deactivate or demote the last active encargado',
+    409,
+  );
+}
+
 export function toErrorEnvelope(error: unknown): MappedError {
   if (hasValidationErrors(error)) {
     return {

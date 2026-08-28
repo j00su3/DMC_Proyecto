@@ -91,16 +91,16 @@ The guard's race-safety is only provable against real Postgres — no unit test 
 
 Satisfies spec: *User Creation With Temporary Password* (generation half). Design refs: D7, D14.
 
-- [ ] 4.1 RED `apps/api/src/usuarios/temp-password.test.ts` (new) — exactly 16 symbols; every symbol
+- [x] 4.1 RED `apps/api/src/usuarios/temp-password.test.ts` (new) — exactly 16 symbols; every symbol
       is in the 32-char Crockford alphabet and none is `I`/`L`/`O`/`U`; 1000 draws are distinct;
       `randomBytes` is called with 10 and `Math.random` is never called (spy)
-- [ ] 4.2 GREEN `apps/api/src/usuarios/temp-password.ts` (new) — `TEMP_PASSWORD_ALPHABET`,
+- [x] 4.2 GREEN `apps/api/src/usuarios/temp-password.ts` (new) — `TEMP_PASSWORD_ALPHABET`,
       `TEMP_PASSWORD_LENGTH`, `generateTempPassword()`; 80 bits → 16 × 5-bit symbols (D7)
-- [ ] 4.3 RED extend `apps/api/src/lib/errors.test.ts` — `userNotFound()` → 404
+- [x] 4.3 RED extend `apps/api/src/lib/errors.test.ts` — `userNotFound()` → 404
       `USER_NOT_FOUND`; `emailAlreadyInUse()` → 409 `EMAIL_ALREADY_IN_USE`; `lastActiveEncargado()`
       → 409 `LAST_ACTIVE_ENCARGADO` (D14)
-- [ ] 4.4 GREEN `apps/api/src/lib/errors.ts` — add the three factories
-- [ ] 4.5 Verify: `pnpm -r test`, `pnpm typecheck`, `pnpm lint`, `pnpm contract:check`
+- [x] 4.4 GREEN `apps/api/src/lib/errors.ts` — add the three factories
+- [x] 4.5 Verify: `pnpm -r test`, `pnpm typecheck`, `pnpm lint`, `pnpm contract:check`
       (byte-identical)
 
 ## Phase 5: S3b — Usuarios Service (TDD, needs S2a + S2b + S3a)
