@@ -287,31 +287,57 @@ Satisfies spec: *Update User Profile and Role*, *Logical Deactivation*, *Reactiv
 Active-Encargado Guard* (route-level), *No State Change Writes Nothing*, *PATCH Rejects an
 `activo` Key*. Design refs: D4, D5, D13.
 
-- [ ] 8.1 RED extend `apps/api/src/routes/usuarios.test.ts` — `deposito` → 403, unauthenticated →
+- [x] 8.1 RED extend `apps/api/src/routes/usuarios.test.ts` — `deposito` → 403, unauthenticated →
       401 on `PATCH /api/usuarios/:id`, `POST .../deactivate`, `POST .../reactivate`; `PATCH` with
       an `activo` key → 400 `VALIDATION_ERROR` before any handler runs; `PATCH` with `{}` → 400
       (D13)
-- [ ] 8.2 GREEN `apps/api/src/routes/usuarios.ts` — `PATCH /api/usuarios/:id` (Zod body rejects
+- [x] 8.2 GREEN `apps/api/src/routes/usuarios.ts` — `PATCH /api/usuarios/:id` (Zod body rejects
       `activo`, requires ≥1 of `nombre`/`email`/`rol`), `POST .../deactivate`,
       `POST .../reactivate`
-- [ ] 8.3 RED extend `apps/api/src/routes/usuarios.integration.test.ts` — successful update/
+- [x] 8.3 RED extend `apps/api/src/routes/usuarios.integration.test.ts` — successful update/
       deactivate/reactivate each produce one correctly-verbed `auditoria` row; deactivate makes the
       target's next request with its old session cookie 401; deactivating/demoting the last
       encargado → 409 `LAST_ACTIVE_ENCARGADO`, row unchanged, no audit row; already-inactive
       deactivate and unchanged `PATCH` → 200, no write, no audit row (D5)
-- [ ] 8.4 GREEN — confirm 8.3 passes against 8.2
-- [ ] 8.5 Run `pnpm contract` to regenerate for the remaining three paths — all seven routes now
+- [x] 8.4 GREEN — confirm 8.3 passes against 8.2
+- [x] 8.5 Run `pnpm contract` to regenerate for the remaining three paths — all seven routes now
       present, `openapi.json`/`schema.d.ts` complete for `user-management`
-- [ ] 8.6 Verify: `pnpm -r test`, `pnpm test:integration`, `pnpm typecheck`, `pnpm lint`,
+- [x] 8.6 Verify: `pnpm -r test`, `pnpm test:integration`, `pnpm typecheck`, `pnpm lint`,
       `pnpm contract:check`
+
+**S4b2 outcome notes (2026-08-28):**
+
+- **All seven user-management routes are now in the contract**, with their full response-code sets.
+  `openapi.json`/`schema.d.ts` are complete for this change.
+- **`.strict()` is the load-bearing half of the PATCH body, not `.partial()`.** Dropping it lets an
+  `activo` key through, which is the exact ambiguity D13 exists to make unreachable. The unit test
+  proves the rejection happens BEFORE the handler by asserting a `handlerReached` flag stays false,
+  not merely that the status is 400 — a handler-side check would also return 400.
+- **The refine is what stops an empty body.** `{}` satisfies every optional field, produces an
+  empty diff and would answer 200 having done nothing, i.e. a success code for a request that
+  expressed no intent.
+- **T4 was caught, unlike S4b1's Q4.** The same mutation — filing the target as the audit actor —
+  died here because the update integration test asserts `usuario_id === encargado.id`. The gap
+  found in S4b1 was closed before it could recur.
+- Six mutations run against S4b2; six caught, none survived.
+
+**Bookkeeping (Phase 9):**
+
+- **9.1 verified in practice, not just from precedent.** After merging #35, PR #36 was still based
+  on `docs/sdd-planning-gestion-usuarios` — GitHub did not auto-retarget. `gh pr edit 36 --base
+  main` was required. `deleteBranchOnMerge` is `false` on this repo, so a merge cannot close a
+  stacked dependent, but the retarget is still mandatory for the diff to be reviewable.
+- **9.3 confirmed: no environment change.** No `.env*` file is touched by this change and no new
+  source file reads `process.env`. `DATABASE_URL` and `COOKIE_SECRET` remain the only inputs, both
+  already provisioned. No manual user step is needed before any PR in this change merges.
 
 ## Phase 9: Bookkeeping
 
-- [ ] 9.1 Before merging each PR except the last, `gh pr edit <next-pr-number> --base main` — GitHub
+- [x] 9.1 Before merging each PR except the last, `gh pr edit <next-pr-number> --base main` — GitHub
       does not auto-retarget a stacked PR when its base merges (verified precedent:
       `auditoria-general`); delete a merged branch only after confirming the retarget landed
 - [ ] 9.2 Mark checkboxes complete as each of the eight PRs merges to `main`
-- [ ] 9.3 No `.env*` change and no new environment variable for this change (`DATABASE_URL`/
+- [x] 9.3 No `.env*` change and no new environment variable for this change (`DATABASE_URL`/
       `COOKIE_SECRET` are the only inputs) — confirm no manual user step is needed before S4a merges
 
 ## Review Workload Forecast

@@ -549,3 +549,248 @@ describe('the temporary password never appears on a read route', () => {
     expect(get.body).not.toContain('passwordTemporal');
   });
 });
+
+describe('PATCH /api/usuarios/:id', () => {
+  let app: Awaited<ReturnType<typeof buildApp>> | undefined;
+
+  afterEach(async () => {
+    await app?.close();
+    app = undefined;
+  });
+
+  const url = `/api/usuarios/${TARGET_ID}`;
+
+  it('returns 401 UNAUTHORIZED without a session', async () => {
+    app = await buildWithSession(undefined);
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url,
+      payload: { nombre: 'Nuevo Nombre' },
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json().error.code).toBe('UNAUTHORIZED');
+  });
+
+  it('returns 403 FORBIDDEN for a deposito session', async () => {
+    app = await buildWithSession(makeUsuario({ rol: 'deposito' }));
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url,
+      payload: { nombre: 'Nuevo Nombre' },
+      cookies: { sid: app.signCookie('valid-token') },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json().error.code).toBe('FORBIDDEN');
+  });
+
+  it('rejects an activo key with VALIDATION_ERROR before any handler runs', async () => {
+    let handlerReached = false;
+    app = await buildWithSession(makeUsuario(), {
+      findByIdForUpdate: async () => {
+        handlerReached = true;
+        return makeResumen();
+      },
+    });
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url,
+      payload: { nombre: 'Nuevo Nombre', activo: false },
+      cookies: { sid: app.signCookie('valid-token') },
+    });
+
+    // D13: deactivation is its own route so the audit verb is never derived
+    // from a patch shape. Rejecting the key at the Zod layer makes the
+    // ambiguous request unreachable by construction — and `handlerReached`
+    // is what proves it is rejected BEFORE the handler, not inside it.
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('VALIDATION_ERROR');
+    expect(handlerReached).toBe(false);
+  });
+
+  it('rejects an empty body with VALIDATION_ERROR', async () => {
+    app = await buildWithSession(makeUsuario());
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url,
+      payload: {},
+      cookies: { sid: app.signCookie('valid-token') },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('rejects an unknown key with VALIDATION_ERROR', async () => {
+    app = await buildWithSession(makeUsuario());
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url,
+      payload: { nombre: 'Nuevo Nombre', rolSecreto: 'admin' },
+      cookies: { sid: app.signCookie('valid-token') },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('returns 200 with the updated usuario', async () => {
+    app = await buildWithSession(makeUsuario(), {
+      update: async () => makeResumen({ nombre: 'Nuevo Nombre' }),
+    });
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url,
+      payload: { nombre: 'Nuevo Nombre' },
+      cookies: { sid: app.signCookie('valid-token') },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().usuario.nombre).toBe('Nuevo Nombre');
+  });
+
+  it('maps the guard to 409 LAST_ACTIVE_ENCARGADO', async () => {
+    app = await buildWithSession(makeUsuario(), {
+      lockActiveEncargados: async () => [TARGET_ID],
+    });
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url,
+      payload: { rol: 'deposito' },
+      cookies: { sid: app.signCookie('valid-token') },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('LAST_ACTIVE_ENCARGADO');
+  });
+
+  it('returns 404 USER_NOT_FOUND for an id that matches no row', async () => {
+    app = await buildWithSession(makeUsuario(), {
+      findByIdForUpdate: async () => undefined,
+    });
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url,
+      payload: { nombre: 'Nadie' },
+      cookies: { sid: app.signCookie('valid-token') },
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json().error.code).toBe('USER_NOT_FOUND');
+  });
+});
+
+describe('POST /api/usuarios/:id/deactivate and /reactivate', () => {
+  let app: Awaited<ReturnType<typeof buildApp>> | undefined;
+
+  afterEach(async () => {
+    await app?.close();
+    app = undefined;
+  });
+
+  const deactivateUrl = `/api/usuarios/${TARGET_ID}/deactivate`;
+  const reactivateUrl = `/api/usuarios/${TARGET_ID}/reactivate`;
+
+  it('returns 401 UNAUTHORIZED without a session on both routes', async () => {
+    app = await buildWithSession(undefined);
+
+    for (const url of [deactivateUrl, reactivateUrl]) {
+      const response = await app.inject({ method: 'POST', url });
+      expect(response.statusCode).toBe(401);
+      expect(response.json().error.code).toBe('UNAUTHORIZED');
+    }
+  });
+
+  it('returns 403 FORBIDDEN for a deposito session on both routes', async () => {
+    app = await buildWithSession(makeUsuario({ rol: 'deposito' }));
+    const cookies = { sid: app.signCookie('valid-token') };
+
+    for (const url of [deactivateUrl, reactivateUrl]) {
+      const response = await app.inject({ method: 'POST', url, cookies });
+      expect(response.statusCode).toBe(403);
+      expect(response.json().error.code).toBe('FORBIDDEN');
+    }
+  });
+
+  it('deactivates and returns the updated usuario', async () => {
+    app = await buildWithSession(makeUsuario(), {
+      lockActiveEncargados: async () => [TARGET_ID, 'another-encargado-id'],
+      setActivo: async () => makeResumen({ activo: false }),
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: deactivateUrl,
+      cookies: { sid: app.signCookie('valid-token') },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().usuario.activo).toBe(false);
+  });
+
+  it('reactivates and returns the updated usuario', async () => {
+    app = await buildWithSession(makeUsuario(), {
+      findByIdForUpdate: async () => makeResumen({ activo: false }),
+      setActivo: async () => makeResumen({ activo: true }),
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: reactivateUrl,
+      cookies: { sid: app.signCookie('valid-token') },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().usuario.activo).toBe(true);
+  });
+
+  it('refuses to deactivate the last active encargado with 409', async () => {
+    app = await buildWithSession(makeUsuario(), {
+      lockActiveEncargados: async () => [TARGET_ID],
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: deactivateUrl,
+      cookies: { sid: app.signCookie('valid-token') },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('LAST_ACTIVE_ENCARGADO');
+  });
+
+  it('returns 404 USER_NOT_FOUND on both routes for an unknown id', async () => {
+    app = await buildWithSession(makeUsuario(), {
+      findByIdForUpdate: async () => undefined,
+      lockActiveEncargados: async () => ['someone-else'],
+    });
+    const cookies = { sid: app.signCookie('valid-token') };
+
+    for (const url of [deactivateUrl, reactivateUrl]) {
+      const response = await app.inject({ method: 'POST', url, cookies });
+      expect(response.statusCode).toBe(404);
+      expect(response.json().error.code).toBe('USER_NOT_FOUND');
+    }
+  });
+
+  it('never returns a temporary password from either route', async () => {
+    app = await buildWithSession(makeUsuario(), {
+      lockActiveEncargados: async () => [TARGET_ID, 'another-encargado-id'],
+    });
+    const cookies = { sid: app.signCookie('valid-token') };
+
+    for (const url of [deactivateUrl, reactivateUrl]) {
+      const response = await app.inject({ method: 'POST', url, cookies });
+      expect(response.body).not.toContain('passwordTemporal');
+    }
+  });
+});

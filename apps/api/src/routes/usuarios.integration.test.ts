@@ -493,3 +493,239 @@ describe('usuarios write routes (integration, real app + real Postgres)', () => 
     expect((result as unknown as { rows: { n: number }[] }).rows[0]?.n).toBe(0);
   });
 });
+
+describe('usuarios activo and update routes (integration, real app + real Postgres)', () => {
+  let app: Awaited<ReturnType<typeof buildApp>> | undefined;
+
+  beforeEach(async () => {
+    await db.execute(sql`truncate table auditoria, sesiones, usuarios cascade`);
+  });
+
+  afterEach(async () => {
+    await app?.close();
+    app = undefined;
+  });
+
+  async function auditRowsFor(entidadId: string) {
+    const result = await db.execute(
+      sql`select accion, usuario_id, datos_previos, datos_posteriores
+            from auditoria where entidad_id = ${entidadId} order by creado_en`,
+    );
+    return (
+      result as unknown as {
+        rows: {
+          accion: string;
+          usuario_id: string;
+          datos_previos: Record<string, unknown> | null;
+          datos_posteriores: Record<string, unknown>;
+        }[];
+      }
+    ).rows;
+  }
+
+  it('updates a profile and files exactly one actualizar row with only the changed field', async () => {
+    const encargado = await seedUsuario('encargado');
+    const objetivo = await seedUsuario('deposito', 'Nombre Viejo');
+    app = await buildApp({ cookieSecret: COOKIE_SECRET });
+    await app.ready();
+    const sid = await loginAs(app, encargado.email);
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: `/api/usuarios/${objetivo.id}`,
+      payload: { nombre: 'Nombre Nuevo' },
+      cookies: { sid },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().usuario.nombre).toBe('Nombre Nuevo');
+
+    const rows = await auditRowsFor(objetivo.id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.accion).toBe('actualizar');
+    expect(rows[0]?.usuario_id).toBe(encargado.id);
+    // Changed fields only: email and rol did not move, so they are in
+    // neither snapshot.
+    expect(rows[0]?.datos_previos).toEqual({ nombre: 'Nombre Viejo' });
+    expect(rows[0]?.datos_posteriores).toEqual({ nombre: 'Nombre Nuevo' });
+  });
+
+  it('deactivates a user, kills the session it was holding, and files baja_logica', async () => {
+    const encargado = await seedUsuario('encargado');
+    const objetivo = await seedUsuario('deposito', 'Objetivo');
+    app = await buildApp({ cookieSecret: COOKIE_SECRET });
+    await app.ready();
+    const sid = await loginAs(app, encargado.email);
+    const objetivoSid = await loginAs(app, objetivo.email);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/usuarios/${objetivo.id}/deactivate`,
+      cookies: { sid },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().usuario.activo).toBe(false);
+
+    // The session dies as a fact in the table, not merely as a property of
+    // findValid's join (D10).
+    const me = await app.inject({
+      method: 'GET',
+      url: '/api/auth/me',
+      cookies: { sid: objetivoSid },
+    });
+    expect(me.statusCode).toBe(401);
+
+    const rows = await auditRowsFor(objetivo.id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.accion).toBe('baja_logica');
+    expect(rows[0]?.datos_previos).toEqual({ activo: true });
+    expect(rows[0]?.datos_posteriores).toEqual({ activo: false });
+  });
+
+  it('reactivates a user and files reactivar', async () => {
+    const encargado = await seedUsuario('encargado');
+    const objetivo = await seedUsuario('deposito', 'Objetivo');
+    await db
+      .update(usuarios)
+      .set({ activo: false })
+      .where(eq(usuarios.id, objetivo.id));
+    app = await buildApp({ cookieSecret: COOKIE_SECRET });
+    await app.ready();
+    const sid = await loginAs(app, encargado.email);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/usuarios/${objetivo.id}/reactivate`,
+      cookies: { sid },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().usuario.activo).toBe(true);
+
+    const rows = await auditRowsFor(objetivo.id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.accion).toBe('reactivar');
+  });
+
+  it('refuses to deactivate the last active encargado over HTTP and changes nothing', async () => {
+    const encargado = await seedUsuario('encargado');
+    await seedUsuario('deposito', 'Un Deposito');
+    app = await buildApp({ cookieSecret: COOKIE_SECRET });
+    await app.ready();
+    const sid = await loginAs(app, encargado.email);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/usuarios/${encargado.id}/deactivate`,
+      cookies: { sid },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('LAST_ACTIVE_ENCARGADO');
+
+    // Active deposito users do not count as cover — the guard's predicate is
+    // rol AND activo, and this is the shape that proves it over HTTP.
+    const [row] = await db
+      .select()
+      .from(usuarios)
+      .where(eq(usuarios.id, encargado.id));
+    expect(row?.activo).toBe(true);
+    expect(await auditRowsFor(encargado.id)).toHaveLength(0);
+  });
+
+  it('refuses to demote the last active encargado over HTTP and changes nothing', async () => {
+    const encargado = await seedUsuario('encargado');
+    app = await buildApp({ cookieSecret: COOKIE_SECRET });
+    await app.ready();
+    const sid = await loginAs(app, encargado.email);
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: `/api/usuarios/${encargado.id}`,
+      payload: { rol: 'deposito' },
+      cookies: { sid },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('LAST_ACTIVE_ENCARGADO');
+
+    const [row] = await db
+      .select()
+      .from(usuarios)
+      .where(eq(usuarios.id, encargado.id));
+    expect(row?.rol).toBe('encargado');
+    expect(await auditRowsFor(encargado.id)).toHaveLength(0);
+  });
+
+  it('writes nothing when a PATCH changes nothing (D5)', async () => {
+    const encargado = await seedUsuario('encargado');
+    const objetivo = await seedUsuario('deposito', 'Sin Cambios');
+    app = await buildApp({ cookieSecret: COOKIE_SECRET });
+    await app.ready();
+    const sid = await loginAs(app, encargado.email);
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: `/api/usuarios/${objetivo.id}`,
+      // Same name it already has, and the email differing only in case —
+      // both normalise to the stored values.
+      payload: { nombre: 'Sin Cambios', email: objetivo.email.toUpperCase() },
+      cookies: { sid },
+    });
+
+    expect(response.statusCode).toBe(200);
+    // `actualizar` names a transition. A row here would answer "who renamed
+    // this user" with whoever re-submitted an unchanged form.
+    expect(await auditRowsFor(objetivo.id)).toHaveLength(0);
+  });
+
+  it('writes nothing when deactivating an already-inactive user (D5)', async () => {
+    const encargado = await seedUsuario('encargado');
+    const objetivo = await seedUsuario('deposito', 'Ya Inactivo');
+    await db
+      .update(usuarios)
+      .set({ activo: false })
+      .where(eq(usuarios.id, objetivo.id));
+    app = await buildApp({ cookieSecret: COOKIE_SECRET });
+    await app.ready();
+    const sid = await loginAs(app, encargado.email);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/usuarios/${objetivo.id}/deactivate`,
+      cookies: { sid },
+    });
+
+    // 200, not 409: the requested end state already holds, so nothing
+    // conflicts, and a retry after a dropped response must not look like a
+    // failure.
+    expect(response.statusCode).toBe(200);
+    expect(response.json().usuario.activo).toBe(false);
+    expect(await auditRowsFor(objetivo.id)).toHaveLength(0);
+  });
+
+  it('rejects an activo key in a PATCH over HTTP', async () => {
+    const encargado = await seedUsuario('encargado');
+    const objetivo = await seedUsuario('deposito', 'Objetivo');
+    app = await buildApp({ cookieSecret: COOKIE_SECRET });
+    await app.ready();
+    const sid = await loginAs(app, encargado.email);
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: `/api/usuarios/${objetivo.id}`,
+      payload: { nombre: 'Otro', activo: false },
+      cookies: { sid },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('VALIDATION_ERROR');
+    const [row] = await db
+      .select()
+      .from(usuarios)
+      .where(eq(usuarios.id, objetivo.id));
+    expect(row?.nombre).toBe('Objetivo');
+    expect(row?.activo).toBe(true);
+  });
+});

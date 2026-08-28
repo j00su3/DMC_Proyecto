@@ -9,6 +9,8 @@ import {
   getUsuario,
   listUsuarios,
   resetUsuarioPassword,
+  setUsuarioActivo,
+  updateUsuario,
 } from '../usuarios/service.js';
 
 // Its own DTO, deliberately NOT auth.ts's `usuarioDto` (D16). The two
@@ -61,6 +63,28 @@ const usuarioConPasswordDto = z.object({
   usuario: usuarioResumenDto,
   passwordTemporal: z.string(),
 });
+
+// `.strict()` is the load-bearing part, not `.partial()` (D13). Deactivation
+// is its own route precisely so the audit verb is never derived from a patch
+// shape — a body carrying both `nombre` and `activo` would force either two
+// audit rows for one transaction or a lossy choice of verb, and the lossy
+// choice destroys the indexed equality filter the verbs exist for. Rejecting
+// the key makes that request unreachable rather than merely discouraged, and
+// it fails at the Zod layer before any handler runs.
+//
+// The refine is what stops an empty body: `{}` satisfies every optional
+// field, would produce an empty diff, and would answer 200 having done
+// nothing — a success code for a request that expressed no intent.
+const actualizarUsuarioBody = z
+  .object({
+    nombre: z.string().min(1).optional(),
+    email: z.string().email().optional(),
+    rol: z.enum(['encargado', 'deposito']).optional(),
+  })
+  .strict()
+  .refine((value) => Object.keys(value).length > 0, {
+    message: 'at least one of nombre, email or rol is required',
+  });
 
 function toDto(usuario: UsuarioResumen) {
   return {
@@ -191,6 +215,68 @@ const usuariosRoutes: FastifyPluginAsync = async (app) => {
       return { usuario: toDto(usuario), passwordTemporal };
     },
   );
+
+  typed.patch(
+    '/usuarios/:id',
+    {
+      config: { roles: ['encargado'] },
+      schema: {
+        params: idParams,
+        body: actualizarUsuarioBody,
+        response: {
+          200: okUsuario,
+          400: errorEnvelopeSchema,
+          401: errorEnvelopeSchema,
+          403: errorEnvelopeSchema,
+          404: errorEnvelopeSchema,
+          409: errorEnvelopeSchema,
+        },
+      },
+    },
+    async (request) => {
+      const actorId = requireActorId(request.user);
+      const usuario = await updateUsuario(app.uow, {
+        id: request.params.id,
+        cambios: request.body,
+        actorId,
+      });
+      return { usuario: toDto(usuario) };
+    },
+  );
+
+  // Two explicit routes rather than one PATCH carrying `activo` (D13). The
+  // path names the transition, so the audit verb is decided by which URL was
+  // called, not inferred from a diff.
+  for (const [segment, activo] of [
+    ['deactivate', false],
+    ['reactivate', true],
+  ] as const) {
+    typed.post(
+      `/usuarios/:id/${segment}`,
+      {
+        config: { roles: ['encargado'] },
+        schema: {
+          params: idParams,
+          response: {
+            200: okUsuario,
+            401: errorEnvelopeSchema,
+            403: errorEnvelopeSchema,
+            404: errorEnvelopeSchema,
+            409: errorEnvelopeSchema,
+          },
+        },
+      },
+      async (request) => {
+        const actorId = requireActorId(request.user);
+        const usuario = await setUsuarioActivo(app.uow, {
+          id: request.params.id,
+          activo,
+          actorId,
+        });
+        return { usuario: toDto(usuario) };
+      },
+    );
+  }
 };
 
 export default usuariosRoutes;
