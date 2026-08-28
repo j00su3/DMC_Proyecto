@@ -1,8 +1,9 @@
 import Fastify from 'fastify';
 import { describe, expect, it } from 'vitest';
 import type { AuditoriaRepo } from '../auditoria/repository.js';
-import type { SesionesRepo, UsuariosRepo } from '../auth/repository.js';
+import type { SesionesRepo } from '../auth/repository.js';
 import type { DbExecutor } from '../db/client.js';
+import type { UsuariosRepo } from '../usuarios/repository.js';
 import { type Repos, buildRepos } from './repos.js';
 import reposPlugin from './repos.js';
 

@@ -1,12 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import fp from 'fastify-plugin';
-import type { Usuario } from '../auth/repository.js';
 import { SESSION_COOKIE } from '../auth/session.js';
 import {
   forbidden,
   passwordChangeRequired,
   unauthorized,
 } from '../lib/errors.js';
+import type { Usuario } from '../usuarios/repository.js';
 
 declare module 'fastify' {
   interface FastifyContextConfig {

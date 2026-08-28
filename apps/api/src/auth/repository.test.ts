@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Db } from '../db/client.js';
-import { DrizzleSesionesRepo, DrizzleUsuariosRepo } from './repository.js';
+import { DrizzleUsuariosRepo } from '../usuarios/repository.js';
+import { DrizzleSesionesRepo } from './repository.js';
 
 // Interface-shape tests only: assert the repos expose the contracted
 // methods and delegate to the injected Db's query-builder entry points.

@@ -3,7 +3,8 @@ import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { getDb, getPool } from '../db/pool.js';
 import { sesiones, usuarios } from '../db/schema.js';
-import { DrizzleSesionesRepo, DrizzleUsuariosRepo } from './repository.js';
+import { DrizzleUsuariosRepo } from '../usuarios/repository.js';
+import { DrizzleSesionesRepo } from './repository.js';
 
 // Real Docker Postgres suite (see vitest.integration.config.ts). Verifies
 // the migrated schema (tables, FK, rol_usuario enum) and the atomic lockout
