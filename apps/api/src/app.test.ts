@@ -26,6 +26,10 @@ import type { UsuariosRepo } from './usuarios/repository.js';
  * sides because neither ever compiled the other's code. No annotation
  * prevents that — only typechecking the merged result does.
  */
+function unusedRepoMethod(): never {
+  throw new Error('app.test.ts fake: this repo method is outside this suite');
+}
+
 function fakeRepos() {
   return {
     usuarios: {
@@ -36,6 +40,19 @@ function fakeRepos() {
       }),
       resetAttempts: async () => {},
       updatePassword: async () => {},
+      // These tests exercise logging and wiring, never user management, so
+      // the CRUD half of the port throws instead of returning a plausible
+      // row: a stub that answers is a stub a future test can pass against
+      // by accident. `satisfies` is what forced them to be added at all —
+      // it is deliberately not `as` (see the auth suites, which use `as`
+      // and would have silently accepted the narrower fake).
+      list: unusedRepoMethod,
+      findById: unusedRepoMethod,
+      findByIdForUpdate: unusedRepoMethod,
+      create: unusedRepoMethod,
+      update: unusedRepoMethod,
+      setActivo: unusedRepoMethod,
+      resetPassword: unusedRepoMethod,
     } satisfies UsuariosRepo,
     sesiones: {
       create: async () => {},
