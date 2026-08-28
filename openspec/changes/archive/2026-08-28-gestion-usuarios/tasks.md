@@ -336,7 +336,9 @@ Active-Encargado Guard* (route-level), *No State Change Writes Nothing*, *PATCH 
 - [x] 9.1 Before merging each PR except the last, `gh pr edit <next-pr-number> --base main` — GitHub
       does not auto-retarget a stacked PR when its base merges (verified precedent:
       `auditoria-general`); delete a merged branch only after confirming the retarget landed
-- [ ] 9.2 Mark checkboxes complete as each of the eight PRs merges to `main`
+- [x] 9.2 All three PRs merged to `main`: #36 (PR1, S1) at `29fb735`, #37 (PR2, S2a/S2b/S3a/S3b)
+      at `532258b`, #38 (PR3, S4a/S4b1/S4b2) at `d2e057b`. The forecast said eight PRs; the change
+      shipped in three, cut by where risk sits rather than by line count (see PR Grouping above)
 - [x] 9.3 No `.env*` change and no new environment variable for this change (`DATABASE_URL`/
       `COOKIE_SECRET` are the only inputs) — confirm no manual user step is needed before S4a merges
 
