@@ -4,7 +4,7 @@ import {
   createMemoryHistory,
   createRouter,
 } from '@tanstack/react-router';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -344,5 +344,121 @@ describe('usuarios routes', () => {
     await waitFor(() =>
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
     );
+  });
+  /**
+   * usuarios-ui / Deactivate And Reactivate Actions — the success path.
+   *
+   * `useEstadoUsuario.test.ts` proves the request shape and that
+   * `invalidateQueries` is called, but a called invalidation is not a
+   * visible update: nothing there renders the table. This test stubs a real
+   * 200, lets the list refetch, and asserts the chip the encargado is
+   * actually looking at changes — the same "proven at the wrong layer" gap
+   * that let `POST /api/auth/logout` ship broken behind three green tests.
+   */
+  it('flips the row chip to Inactivo after a successful deactivate', async () => {
+    const user = userEvent.setup();
+    let activo = true;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string | URL | Request, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes('/api/auth/me')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({ usuario: encargadoUsuario }),
+          });
+        }
+        if (init?.method === 'POST' && url.includes('/deactivate')) {
+          activo = false;
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              usuario: { ...usuarioRow('7'), activo: false },
+            }),
+          });
+        }
+        if (url.includes('/api/usuarios')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              data: [{ ...usuarioRow('7'), activo }],
+              page: 1,
+              pageSize: PAGE_SIZE,
+              total: 1,
+            }),
+          });
+        }
+        throw new Error(`unexpected fetch: ${url}`);
+      }),
+    );
+    const { router, queryClient } =
+      buildAuthenticatedRouterWithQueryClient('/usuarios');
+    await router.load();
+
+    render(
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(RouterProvider, { router }),
+      ),
+    );
+
+    expect(await screen.findByText('Activo')).toBeInTheDocument();
+
+    await user.click(await screen.findByRole('button', { name: 'Desactivar' }));
+
+    expect(await screen.findByText('Inactivo')).toBeInTheDocument();
+    expect(screen.queryByText('Activo')).not.toBeInTheDocument();
+  });
+
+  /**
+   * usuarios-ui / List Screen With Pagination — the footer must be derived
+   * from the server's envelope, not from hand-fed props.
+   * `Pagination.test.tsx` covers the component in isolation; only a route
+   * test proves the screen turns `total` and `pageSize` into the right page
+   * count. A wrong derivation (using `data.length`, or dropping the ceiling)
+   * would pass every existing test.
+   */
+  it('derives the pagination footer from the envelope total, not from the rows on screen', async () => {
+    stubFetchAsEncargadoWithList({
+      data: [usuarioRow('7')],
+      page: 1,
+      pageSize: PAGE_SIZE,
+      // 41 rows over a page size of 20 is three pages, and the last one is
+      // partial — a floor instead of a ceiling would lose it.
+      total: PAGE_SIZE * 2 + 1,
+    });
+    const { router, queryClient } =
+      buildAuthenticatedRouterWithQueryClient('/usuarios');
+    await router.load();
+
+    render(
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(RouterProvider, { router }),
+      ),
+    );
+
+    const footer = await screen.findByRole('navigation', {
+      name: 'Paginación',
+    });
+    expect(within(footer).getByRole('button', { name: '1' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(
+      within(footer).getByRole('button', { name: '3' }),
+    ).toBeInTheDocument();
+    expect(within(footer).queryByRole('button', { name: '4' })).toBeNull();
+    expect(
+      within(footer).getByRole('button', { name: 'Anterior' }),
+    ).toBeDisabled();
+    expect(
+      within(footer).getByRole('button', { name: 'Siguiente' }),
+    ).toBeEnabled();
   });
 });
