@@ -85,6 +85,7 @@ describe('usuariosDetalleRoute', () => {
     stubFetchAsEncargadoWithDetail(otherUsuario);
     const { router, queryClient } =
       buildAuthenticatedRouterWithQueryClient('/usuarios/7');
+    await router.load();
 
     render(
       createElement(
@@ -104,6 +105,7 @@ describe('usuariosDetalleRoute', () => {
     stubFetchAsEncargadoWithDetail(otherUsuario);
     const { router, queryClient } =
       buildAuthenticatedRouterWithQueryClient('/usuarios/7');
+    await router.load();
 
     const otherRender = render(
       createElement(
@@ -123,6 +125,7 @@ describe('usuariosDetalleRoute', () => {
     });
     const { router: ownRouter, queryClient: ownQueryClient } =
       buildAuthenticatedRouterWithQueryClient('/usuarios/1');
+    await ownRouter.load();
 
     render(
       createElement(
@@ -171,6 +174,7 @@ describe('usuariosDetalleRoute', () => {
     );
     const { router, queryClient } =
       buildAuthenticatedRouterWithQueryClient('/usuarios/7');
+    await router.load();
 
     render(
       createElement(
