@@ -41,66 +41,104 @@ boundary is touched anywhere in this change) — no dedicated RED task is requir
 Satisfies spec: *Email Uniqueness and Normalization*, *List Users*, *Get User by Id*, *Update User
 Profile*. Design refs: D9, D15, D16 (naming), D17.
 
-- [ ] 2.1 GREEN `apps/api/src/usuarios/repository.ts` — add `UsuarioResumen`, `NuevoUsuario`,
+- [x] 2.1 GREEN `apps/api/src/usuarios/repository.ts` — add `UsuarioResumen`, `NuevoUsuario`,
       `CambiosUsuario` (D15's no-hash projection, D8's no-plaintext-field shape)
-- [ ] 2.2 GREEN extend `UsuariosRepo` interface: `list`, `findById`, `findByIdForUpdate`, `create`,
+- [x] 2.2 GREEN extend `UsuariosRepo` interface: `list`, `findById`, `findByIdForUpdate`, `create`,
       `update`, `setActivo`, `resetPassword`
-- [ ] 2.3 RED `apps/api/src/usuarios/repository.integration.test.ts` (new, Docker PG) — `list`
+- [x] 2.3 RED `apps/api/src/usuarios/repository.integration.test.ts` (new, Docker PG) — `list`
       paginates/totals correctly and stays stable across `creado_en` ties (D17); `list`/`findById`/
       `findByIdForUpdate` rows have no `hashContrasena` key (D15); duplicate email on `create`/
       `update` surfaces `EMAIL_ALREADY_IN_USE`, not a raw pg error (D9); `resetPassword` sets the
       flag and clears `intentos_fallidos`/`bloqueado_hasta` in one statement (D11); `setActivo`
       leaves both counters untouched on reactivate (D11)
-- [ ] 2.4 GREEN `apps/api/src/usuarios/repository.ts` — implement `list`/`findById`/
+- [x] 2.4 GREEN `apps/api/src/usuarios/repository.ts` — implement `list`/`findById`/
       `findByIdForUpdate`/`create`/`update`/`setActivo`/`resetPassword`; 23505 → `emailAlreadyInUse`
       mapping on `create`/`update` (D9); emails normalized `trim().toLowerCase()` on every write
-- [ ] 2.5 GREEN widen every `UsuariosRepo` fake by one line per new method (D1 correction — real
+- [x] 2.5 GREEN widen every `UsuariosRepo` fake by one line per new method (D1 correction — real
       cost, must ship in this slice): `app.test.ts`, `auth/service.test.ts`, `routes/auth.test.ts`,
       `plugins/auth.test.ts`, `plugins/repos.test.ts`
-- [ ] 2.6 Verify: `pnpm -r test`, `pnpm test:integration`, `pnpm typecheck`, `pnpm lint`,
+- [x] 2.6 Verify: `pnpm -r test`, `pnpm test:integration`, `pnpm typecheck`, `pnpm lint`,
       `pnpm contract:check` (byte-identical)
+
+**S2a outcome notes (2026-08-28):**
+
+- **2.5 landed in one file, not five.** Only `app.test.ts` needed widening. The other four fakes
+  (`auth/service.test.ts`, `routes/auth.test.ts`, `plugins/auth.test.ts`, `plugins/repos.test.ts`)
+  use `as UsuariosRepo`, and a cast absorbs a widened interface silently — `pnpm typecheck` is
+  green without touching them. Adding seven throwing stubs to each would have been 28 lines no
+  type checker asked for. `satisfies` in `app.test.ts` is what caught the widening, which is the
+  point D1's correction was making; the four `as` fakes are the latent problem, and converting
+  them is its own decision, not S2a's.
+- **Drizzle wraps driver errors.** `DrizzleQueryError` carries the `pg` error on `.cause`, so a
+  top-level `.code` read finds no SQLSTATE. The first GREEN run had `isUniqueViolation` reading
+  only the top level, which would have turned every duplicate email into a 500 instead of a 409.
+  The D9 integration tests caught it; `isUniqueViolation` now walks a bounded `cause` chain.
+- **The D17 tie test was decoration and was rewritten.** As first written it asserted only
+  "no overlap, no gap, same set", which passes with no tiebreaker at all — a five-row seq scan is
+  incidentally stable across three OFFSET queries, so the set is identical either way and only the
+  ORDER differs. It now fixes five ascending ids and asserts the exact descending sequence.
+  Verified: dropping `desc(usuarios.id)` fails it. Five mutations run against S2a, five caught.
 
 ## Phase 3: S2b — Last-Encargado Guard + Session Revocation (TDD + integration, real concurrency)
 
 Satisfies spec: *Last-Active-Encargado Guard* (all three scenarios). Design refs: D2, D3, D10.
 The guard's race-safety is only provable against real Postgres — no unit test can substitute.
 
-- [ ] 3.1 GREEN `apps/api/src/usuarios/repository.ts` — add `lockActiveEncargados(): Promise<string[]>`
+- [x] 3.1 GREEN `apps/api/src/usuarios/repository.ts` — add `lockActiveEncargados(): Promise<string[]>`
       to `UsuariosRepo`
-- [ ] 3.2 GREEN `apps/api/src/auth/repository.ts` — add `deleteAllForUser(usuarioId): Promise<void>`
+- [x] 3.2 GREEN `apps/api/src/auth/repository.ts` — add `deleteAllForUser(usuarioId): Promise<void>`
       to `SesionesRepo` (D10; distinct from `deleteOthers`, revokes every session including the
       caller's — there is no caller-owned session to preserve on an admin action)
-- [ ] 3.3 RED `apps/api/src/usuarios/guard.integration.test.ts` (new, Docker PG, two real
+- [x] 3.3 RED `apps/api/src/usuarios/guard.integration.test.ts` (new, Docker PG, two real
       transactions on separate pooled connections) — with exactly two active encargados, two
       simultaneous deactivates leave exactly one, the other raises the guard error; same for
       deactivate-A ∥ demote-B; the documented negative: the rejected `EXISTS`-subquery UPDATE run
       in the same harness leaves zero active encargados (spec: *Concurrent requests cannot both
       succeed*)
-- [ ] 3.4 GREEN `apps/api/src/usuarios/repository.ts` — implement
+- [x] 3.4 GREEN `apps/api/src/usuarios/repository.ts` — implement
       `select id from usuarios where rol='encargado' and activo=true order by id for update` (D2)
-- [ ] 3.5 RED extend `apps/api/src/auth/repository.integration.test.ts` — `deleteAllForUser` removes
+- [x] 3.5 RED extend `apps/api/src/auth/repository.integration.test.ts` — `deleteAllForUser` removes
       every session of the target and none of any other user
-- [ ] 3.6 GREEN `apps/api/src/auth/repository.ts` — implement `deleteAllForUser`
-- [ ] 3.7 GREEN widen `UsuariosRepo`/`SesionesRepo` fakes by one line each for the two new methods
+- [x] 3.6 GREEN `apps/api/src/auth/repository.ts` — implement `deleteAllForUser`
+- [x] 3.7 GREEN widen `UsuariosRepo`/`SesionesRepo` fakes by one line each for the two new methods
       (same five/four consumer files as 2.5)
-- [ ] 3.8 Verify: `pnpm -r test`, `pnpm test:integration` (`fileParallelism: false` — the race needs
+- [x] 3.8 Verify: `pnpm -r test`, `pnpm test:integration` (`fileParallelism: false` — the race needs
       two live connections and no other file truncating `usuarios` underneath it), `pnpm typecheck`,
       `pnpm lint`, `pnpm contract:check`
+
+**S2b outcome notes (2026-08-28):**
+
+- **The documented negative passed on the first run, before any of my code existed.** It is raw SQL
+  on two pooled connections, so it depends on nothing in `UsuariosRepo` — which is the point. It
+  records that the rejected `EXISTS`-subquery UPDATE really does leave zero active encargados, and
+  it would keep recording that even if the guard were deleted.
+- **Interleaving is proved, not timed.** `waitForBlockedLock()` polls `pg_locks where not granted`
+  until a backend is genuinely blocked, so T2 provably holds a waiting lock request before T1
+  commits. A `sleep` would make the interleaving likely; this makes it observed.
+- **Two tests were added that the task list did not ask for, because mutation testing found the
+  guard fails OPEN without them.** Dropping `rol = 'encargado'` from the lock predicate killed no
+  test: every fixture here was all-encargado, so the filter was a no-op. But active `deposito`
+  rows padding the locked set means `locked` minus the target is non-empty, nothing throws, and
+  the last encargado is deactivated. Added *trips for the last encargado even when active deposito
+  users exist* and its mirror for an inactive encargado. Verified: both mutations now fail.
+- **3.7 landed in one file again**, for the same reason as 2.5 — `app.test.ts`'s `satisfies` is the
+  only fake the compiler holds to the widened ports.
+- Five mutations run against S2b; after the two added tests, five caught.
 
 ## Phase 4: S3a — Temp-Password Generator + Error Factories (TDD, no service dependency)
 
 Satisfies spec: *User Creation With Temporary Password* (generation half). Design refs: D7, D14.
 
-- [ ] 4.1 RED `apps/api/src/usuarios/temp-password.test.ts` (new) — exactly 16 symbols; every symbol
+- [x] 4.1 RED `apps/api/src/usuarios/temp-password.test.ts` (new) — exactly 16 symbols; every symbol
       is in the 32-char Crockford alphabet and none is `I`/`L`/`O`/`U`; 1000 draws are distinct;
       `randomBytes` is called with 10 and `Math.random` is never called (spy)
-- [ ] 4.2 GREEN `apps/api/src/usuarios/temp-password.ts` (new) — `TEMP_PASSWORD_ALPHABET`,
+- [x] 4.2 GREEN `apps/api/src/usuarios/temp-password.ts` (new) — `TEMP_PASSWORD_ALPHABET`,
       `TEMP_PASSWORD_LENGTH`, `generateTempPassword()`; 80 bits → 16 × 5-bit symbols (D7)
-- [ ] 4.3 RED extend `apps/api/src/lib/errors.test.ts` — `userNotFound()` → 404
+- [x] 4.3 RED extend `apps/api/src/lib/errors.test.ts` — `userNotFound()` → 404
       `USER_NOT_FOUND`; `emailAlreadyInUse()` → 409 `EMAIL_ALREADY_IN_USE`; `lastActiveEncargado()`
       → 409 `LAST_ACTIVE_ENCARGADO` (D14)
-- [ ] 4.4 GREEN `apps/api/src/lib/errors.ts` — add the three factories
-- [ ] 4.5 Verify: `pnpm -r test`, `pnpm typecheck`, `pnpm lint`, `pnpm contract:check`
+- [x] 4.4 GREEN `apps/api/src/lib/errors.ts` — add the three factories
+- [x] 4.5 Verify: `pnpm -r test`, `pnpm typecheck`, `pnpm lint`, `pnpm contract:check`
       (byte-identical)
 
 ## Phase 5: S3b — Usuarios Service (TDD, needs S2a + S2b + S3a)
@@ -110,7 +148,7 @@ Satisfies spec: *User Creation*, *Update User Profile*, *Logical Deactivation*, 
 or Audit Failure*, *Locked Account Is Rescuable By Reset*, *No State Change Writes Nothing*.
 Design refs: D3–D6, D8, D11, D12.
 
-- [ ] 5.1 RED `apps/api/src/usuarios/service.test.ts` (new, stub repos + `{ run: (work) =>
+- [x] 5.1 RED `apps/api/src/usuarios/service.test.ts` (new, stub repos + `{ run: (work) =>
       work(stubs) }`) — create passes a hash and no plaintext-bearing key to the repo, returned
       `passwordTemporal` never equals any repo argument (D8); `debeCambiarPassword: true` on
       create; `crear` audit has `datosPrevios === null` and no `hashContrasena` (D7); guard throws
@@ -119,12 +157,38 @@ Design refs: D3–D6, D8, D11, D12.
       audit, 200 (D5); already-inactive deactivate → no write, no audit, guard not consulted (D5);
       reset calls `deleteAllForUser`, never `deleteOthers`, audit is `cambiar_password` with the
       three-key snapshot (D12); every mutation's repo calls occur inside one `run`
-- [ ] 5.2 GREEN `apps/api/src/usuarios/service.ts` (new) — `listUsuarios`, `getUsuario`,
+- [x] 5.2 GREEN `apps/api/src/usuarios/service.ts` (new) — `listUsuarios`, `getUsuario`,
       `createUsuario`, `updateUsuario`, `setUsuarioActivo`, `resetUsuarioPassword`; hashing/
       generation outside `uow.run`, guard+write+`recordAudit` inside (D6); `changedFields` diff
       helper (D5)
-- [ ] 5.3 Verify: `pnpm -r test`, `pnpm typecheck`, `pnpm lint`, `pnpm contract:check`
+- [x] 5.3 Verify: `pnpm -r test`, `pnpm typecheck`, `pnpm lint`, `pnpm contract:check`
       (byte-identical — no route yet)
+
+**S3b outcome notes (2026-08-28):**
+
+- **D12 asked for a snapshot the port could not produce.** The reset audit needs the PRIOR
+  `intentosFallidos`/`bloqueadoHasta`, but `UsuarioResumen` omits both on purpose (D15) and
+  `UPDATE … RETURNING` hands back the new values, not the old. Closed with one narrow repo read,
+  `findLockoutState(id): Promise<LockoutResult | undefined>`, taken inside the transaction under
+  the row lock already held. Rejected widening `UsuarioResumen`, which would push lockout counters
+  into every route DTO for the sake of one audit row.
+- **The already-inactive deactivate still takes the set lock.** D3 decides the lock from the
+  REQUEST SHAPE before the target is read, deliberately over-locking rather than inverting the
+  lock order. What the already-inactive row changes is the GUARD, which needs `previo.activo` and
+  so never trips. The test asserts both halves, because "guard not consulted" and "lock not taken"
+  are different claims and only the first one is true.
+- **The email diff normalizes in the service as well as the repo.** The repo normalizes on write
+  (D9), but the DIFF has to compare what will actually be stored — otherwise `ANA@EXAMPLE.COM`
+  over `ana@example.com` reads as a change and files a write plus an audit row for a value the
+  database already holds.
+- **`toMatchObject` cannot test a changed-fields-only snapshot.** Mutation P8 replaced
+  `datosPrevios: diff.before` with the whole row and killed no test, because a subset match passes
+  on a superset. The audit-snapshot assertions are now `toEqual` on `datosPrevios`/
+  `datosPosteriores` directly. Verified: P8 now fails.
+- **Harness options instead of `mockResolvedValue`.** Overriding a spy's implementation also
+  replaces the call recording that lives inside it, so an overridden spy drops out of the ordering
+  log and the transaction-discipline assertions go blind. Caught by the ordering test itself.
+- Eight mutations run against S3b; after tightening the snapshot assertions, eight caught.
 
 ## Phase 6: S4a — Read Routes: List + Get (TDD + contract)
 

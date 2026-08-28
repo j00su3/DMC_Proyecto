@@ -170,4 +170,53 @@ describe('auth repository (integration, real Postgres)', () => {
       'valid-own',
     ]);
   });
+
+  // D10. Unlike deleteOthers, this keeps nothing: on an admin action the
+  // actor is a different principal, so there is no caller-owned session on
+  // the target worth preserving. Unlike purgeExpired, it does not care
+  // whether a session has expired — a live one is exactly what must go.
+  it('deleteAllForUser removes every session of the target, expired or not, and none of any other user', async () => {
+    const usuario = await insertUsuario();
+    const otro = await insertUsuario();
+    await sesionesRepo.create({
+      id: 'valid-target',
+      usuarioId: usuario.id,
+      expiraEn: new Date(Date.now() + 100_000),
+    });
+    await sesionesRepo.create({
+      id: 'expired-target',
+      usuarioId: usuario.id,
+      expiraEn: new Date(Date.now() - 1000),
+    });
+    await sesionesRepo.create({
+      id: 'valid-other',
+      usuarioId: otro.id,
+      expiraEn: new Date(Date.now() + 100_000),
+    });
+
+    await sesionesRepo.deleteAllForUser(usuario.id);
+
+    const remaining = await db.select({ id: sesiones.id }).from(sesiones);
+    expect(remaining.map((row) => row.id)).toEqual(['valid-other']);
+  });
+
+  // D12's reset audit needs the PRIOR lockout values, and UsuarioResumen
+  // omits them on purpose (D15) so they never reach a route DTO. This is
+  // the narrow read that closes that gap.
+  it('findLockoutState returns the live counters and undefined for an unknown id', async () => {
+    const usuario = await insertUsuario();
+    const bloqueadoHasta = new Date(Date.now() + 100_000);
+    await db
+      .update(usuarios)
+      .set({ intentosFallidos: 4, bloqueadoHasta })
+      .where(eq(usuarios.id, usuario.id));
+
+    const estado = await usuariosRepo.findLockoutState(usuario.id);
+
+    expect(estado?.intentosFallidos).toBe(4);
+    expect(estado?.bloqueadoHasta?.getTime()).toBe(bloqueadoHasta.getTime());
+    await expect(
+      usuariosRepo.findLockoutState('00000000-0000-4000-8000-000000000000'),
+    ).resolves.toBeUndefined();
+  });
 });

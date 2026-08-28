@@ -15,6 +15,8 @@ export interface SesionesRepo {
   delete(id: string): Promise<void>;
   purgeExpired(usuarioId: string): Promise<void>;
   deleteOthers(usuarioId: string, exceptId: string): Promise<void>;
+  // S2b — revokes EVERY session of a user, the caller's included (D10).
+  deleteAllForUser(usuarioId: string): Promise<void>;
 }
 
 export class DrizzleSesionesRepo implements SesionesRepo {
@@ -65,5 +67,21 @@ export class DrizzleSesionesRepo implements SesionesRepo {
     await this.db
       .delete(sesiones)
       .where(and(eq(sesiones.usuarioId, usuarioId), ne(sesiones.id, exceptId)));
+  }
+
+  // Revokes EVERY session, the caller's included (design.md D10). The
+  // asymmetry with deleteOthers is the point: there the actor IS the
+  // subject and owns a session worth keeping; on an admin reset or
+  // deactivate the actor is a different principal, and the trigger is
+  // normally a lost or suspected-compromised credential, so a surviving
+  // session leaves the attacker in.
+  //
+  // Deactivate calls it too, even though findValid already joins
+  // `activo = true`: that makes revocation a fact in the table rather than
+  // a property of a join a refactor could drop, and without it a
+  // deactivated user's rows are immortal — purgeExpired runs only on
+  // login, which that user can never perform again.
+  async deleteAllForUser(usuarioId: string): Promise<void> {
+    await this.db.delete(sesiones).where(eq(sesiones.usuarioId, usuarioId));
   }
 }

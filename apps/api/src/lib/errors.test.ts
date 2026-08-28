@@ -4,13 +4,16 @@ import {
   accountInactive,
   accountLocked,
   auditWriteFailed,
+  emailAlreadyInUse,
   forbidden,
   invalidCredentials,
   invalidCurrentPassword,
+  lastActiveEncargado,
   notFoundEnvelope,
   passwordChangeRequired,
   toErrorEnvelope,
   unauthorized,
+  userNotFound,
 } from './errors.js';
 
 describe('toErrorEnvelope', () => {
@@ -137,6 +140,58 @@ describe('auth error factories', () => {
     expect(error.status).toBe(500);
     expect(error.code).toBe('AUDIT_WRITE_FAILED');
     expect(error.cause).toBeUndefined();
+  });
+});
+
+describe('user-management error factories (design.md D14)', () => {
+  it('userNotFound() is a 404 AppError with code USER_NOT_FOUND, distinct from notFoundEnvelope()', () => {
+    const error = userNotFound();
+
+    expect(error).toBeInstanceOf(AppError);
+    expect(error.status).toBe(404);
+    expect(error.code).toBe('USER_NOT_FOUND');
+    expect(error.code).not.toBe('NOT_FOUND');
+  });
+
+  it('emailAlreadyInUse() is a 409 AppError with code EMAIL_ALREADY_IN_USE (not 422 — the request is valid, the collection state conflicts)', () => {
+    const error = emailAlreadyInUse();
+
+    expect(error.status).toBe(409);
+    expect(error.code).toBe('EMAIL_ALREADY_IN_USE');
+  });
+
+  it('lastActiveEncargado() is a 409 AppError with code LAST_ACTIVE_ENCARGADO', () => {
+    const error = lastActiveEncargado();
+
+    expect(error.status).toBe(409);
+    expect(error.code).toBe('LAST_ACTIVE_ENCARGADO');
+  });
+
+  it('toErrorEnvelope() maps userNotFound() to a 404 { error: { code: "USER_NOT_FOUND" } } envelope', () => {
+    const result = toErrorEnvelope(userNotFound());
+
+    expect(result.status).toBe(404);
+    expect(result.body).toEqual({
+      error: { code: 'USER_NOT_FOUND', message: expect.any(String) },
+    });
+  });
+
+  it('toErrorEnvelope() maps emailAlreadyInUse() to a 409 { error: { code: "EMAIL_ALREADY_IN_USE" } } envelope', () => {
+    const result = toErrorEnvelope(emailAlreadyInUse());
+
+    expect(result.status).toBe(409);
+    expect(result.body).toEqual({
+      error: { code: 'EMAIL_ALREADY_IN_USE', message: expect.any(String) },
+    });
+  });
+
+  it('toErrorEnvelope() maps lastActiveEncargado() to a 409 { error: { code: "LAST_ACTIVE_ENCARGADO" } } envelope', () => {
+    const result = toErrorEnvelope(lastActiveEncargado());
+
+    expect(result.status).toBe(409);
+    expect(result.body).toEqual({
+      error: { code: 'LAST_ACTIVE_ENCARGADO', message: expect.any(String) },
+    });
   });
 });
 
