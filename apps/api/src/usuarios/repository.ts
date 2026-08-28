@@ -1,4 +1,4 @@
-import { desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import type { DbExecutor } from '../db/client.js';
 import { usuarios } from '../db/schema.js';
 import { emailAlreadyInUse } from '../lib/errors.js';
@@ -61,6 +61,8 @@ export interface UsuariosRepo {
   ): Promise<{ rows: UsuarioResumen[]; total: number }>;
   findById(id: string): Promise<UsuarioResumen | undefined>;
   findByIdForUpdate(id: string): Promise<UsuarioResumen | undefined>;
+  // S2b — the D2 predicate lock. Returns the ids it locked.
+  lockActiveEncargados(): Promise<string[]>;
   create(input: NuevoUsuario): Promise<UsuarioResumen>; // maps 23505 -> 409 (D9)
   update(id: string, cambios: CambiosUsuario): Promise<UsuarioResumen>; // maps 23505 -> 409
   setActivo(id: string, activo: boolean): Promise<UsuarioResumen>;
@@ -228,6 +230,27 @@ export class DrizzleUsuariosRepo implements UsuariosRepo {
       .limit(1)
       .for('update');
     return rows[0];
+  }
+
+  // The D2 predicate lock, and the reason the guard is two statements
+  // instead of one conditional UPDATE. The last-encargado invariant spans
+  // rows, so a WHERE-clause EXISTS evaluates against a snapshot where a
+  // concurrent transaction's uncommitted write is invisible: both see a
+  // second active encargado, both commit, zero remain. FOR UPDATE closes
+  // it because after a lock wait Postgres re-evaluates the predicate
+  // against the NEW row version, so the row the other transaction just
+  // deactivated drops out of this set.
+  //
+  // `order by id` is the total lock order of D3, taken here and then on
+  // the target — never the reverse, which is a real deadlock cycle.
+  async lockActiveEncargados(): Promise<string[]> {
+    const rows = await this.db
+      .select({ id: usuarios.id })
+      .from(usuarios)
+      .where(and(eq(usuarios.rol, 'encargado'), eq(usuarios.activo, true)))
+      .orderBy(asc(usuarios.id))
+      .for('update');
+    return rows.map((row) => row.id);
   }
 
   // No findByEmail pre-check (design.md D9). A read-then-insert leaves a

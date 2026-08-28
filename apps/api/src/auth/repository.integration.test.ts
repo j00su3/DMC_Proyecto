@@ -170,4 +170,33 @@ describe('auth repository (integration, real Postgres)', () => {
       'valid-own',
     ]);
   });
+
+  // D10. Unlike deleteOthers, this keeps nothing: on an admin action the
+  // actor is a different principal, so there is no caller-owned session on
+  // the target worth preserving. Unlike purgeExpired, it does not care
+  // whether a session has expired — a live one is exactly what must go.
+  it('deleteAllForUser removes every session of the target, expired or not, and none of any other user', async () => {
+    const usuario = await insertUsuario();
+    const otro = await insertUsuario();
+    await sesionesRepo.create({
+      id: 'valid-target',
+      usuarioId: usuario.id,
+      expiraEn: new Date(Date.now() + 100_000),
+    });
+    await sesionesRepo.create({
+      id: 'expired-target',
+      usuarioId: usuario.id,
+      expiraEn: new Date(Date.now() - 1000),
+    });
+    await sesionesRepo.create({
+      id: 'valid-other',
+      usuarioId: otro.id,
+      expiraEn: new Date(Date.now() + 100_000),
+    });
+
+    await sesionesRepo.deleteAllForUser(usuario.id);
+
+    const remaining = await db.select({ id: sesiones.id }).from(sesiones);
+    expect(remaining.map((row) => row.id)).toEqual(['valid-other']);
+  });
 });

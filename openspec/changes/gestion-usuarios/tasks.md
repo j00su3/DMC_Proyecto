@@ -84,27 +84,46 @@ Profile*. Design refs: D9, D15, D16 (naming), D17.
 Satisfies spec: *Last-Active-Encargado Guard* (all three scenarios). Design refs: D2, D3, D10.
 The guard's race-safety is only provable against real Postgres — no unit test can substitute.
 
-- [ ] 3.1 GREEN `apps/api/src/usuarios/repository.ts` — add `lockActiveEncargados(): Promise<string[]>`
+- [x] 3.1 GREEN `apps/api/src/usuarios/repository.ts` — add `lockActiveEncargados(): Promise<string[]>`
       to `UsuariosRepo`
-- [ ] 3.2 GREEN `apps/api/src/auth/repository.ts` — add `deleteAllForUser(usuarioId): Promise<void>`
+- [x] 3.2 GREEN `apps/api/src/auth/repository.ts` — add `deleteAllForUser(usuarioId): Promise<void>`
       to `SesionesRepo` (D10; distinct from `deleteOthers`, revokes every session including the
       caller's — there is no caller-owned session to preserve on an admin action)
-- [ ] 3.3 RED `apps/api/src/usuarios/guard.integration.test.ts` (new, Docker PG, two real
+- [x] 3.3 RED `apps/api/src/usuarios/guard.integration.test.ts` (new, Docker PG, two real
       transactions on separate pooled connections) — with exactly two active encargados, two
       simultaneous deactivates leave exactly one, the other raises the guard error; same for
       deactivate-A ∥ demote-B; the documented negative: the rejected `EXISTS`-subquery UPDATE run
       in the same harness leaves zero active encargados (spec: *Concurrent requests cannot both
       succeed*)
-- [ ] 3.4 GREEN `apps/api/src/usuarios/repository.ts` — implement
+- [x] 3.4 GREEN `apps/api/src/usuarios/repository.ts` — implement
       `select id from usuarios where rol='encargado' and activo=true order by id for update` (D2)
-- [ ] 3.5 RED extend `apps/api/src/auth/repository.integration.test.ts` — `deleteAllForUser` removes
+- [x] 3.5 RED extend `apps/api/src/auth/repository.integration.test.ts` — `deleteAllForUser` removes
       every session of the target and none of any other user
-- [ ] 3.6 GREEN `apps/api/src/auth/repository.ts` — implement `deleteAllForUser`
-- [ ] 3.7 GREEN widen `UsuariosRepo`/`SesionesRepo` fakes by one line each for the two new methods
+- [x] 3.6 GREEN `apps/api/src/auth/repository.ts` — implement `deleteAllForUser`
+- [x] 3.7 GREEN widen `UsuariosRepo`/`SesionesRepo` fakes by one line each for the two new methods
       (same five/four consumer files as 2.5)
-- [ ] 3.8 Verify: `pnpm -r test`, `pnpm test:integration` (`fileParallelism: false` — the race needs
+- [x] 3.8 Verify: `pnpm -r test`, `pnpm test:integration` (`fileParallelism: false` — the race needs
       two live connections and no other file truncating `usuarios` underneath it), `pnpm typecheck`,
       `pnpm lint`, `pnpm contract:check`
+
+**S2b outcome notes (2026-08-28):**
+
+- **The documented negative passed on the first run, before any of my code existed.** It is raw SQL
+  on two pooled connections, so it depends on nothing in `UsuariosRepo` — which is the point. It
+  records that the rejected `EXISTS`-subquery UPDATE really does leave zero active encargados, and
+  it would keep recording that even if the guard were deleted.
+- **Interleaving is proved, not timed.** `waitForBlockedLock()` polls `pg_locks where not granted`
+  until a backend is genuinely blocked, so T2 provably holds a waiting lock request before T1
+  commits. A `sleep` would make the interleaving likely; this makes it observed.
+- **Two tests were added that the task list did not ask for, because mutation testing found the
+  guard fails OPEN without them.** Dropping `rol = 'encargado'` from the lock predicate killed no
+  test: every fixture here was all-encargado, so the filter was a no-op. But active `deposito`
+  rows padding the locked set means `locked` minus the target is non-empty, nothing throws, and
+  the last encargado is deactivated. Added *trips for the last encargado even when active deposito
+  users exist* and its mirror for an inactive encargado. Verified: both mutations now fail.
+- **3.7 landed in one file again**, for the same reason as 2.5 — `app.test.ts`'s `satisfies` is the
+  only fake the compiler holds to the widened ports.
+- Five mutations run against S2b; after the two added tests, five caught.
 
 ## Phase 4: S3a — Temp-Password Generator + Error Factories (TDD, no service dependency)
 

@@ -49,6 +49,7 @@ function fakeRepos() {
       list: unusedRepoMethod,
       findById: unusedRepoMethod,
       findByIdForUpdate: unusedRepoMethod,
+      lockActiveEncargados: unusedRepoMethod,
       create: unusedRepoMethod,
       update: unusedRepoMethod,
       setActivo: unusedRepoMethod,
@@ -60,6 +61,7 @@ function fakeRepos() {
       delete: async () => {},
       purgeExpired: async () => {},
       deleteOthers: async () => {},
+      deleteAllForUser: unusedRepoMethod,
     } satisfies SesionesRepo,
     auditoria: {
       record: async () => {},
