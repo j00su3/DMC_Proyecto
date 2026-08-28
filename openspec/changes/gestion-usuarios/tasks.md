@@ -237,14 +237,14 @@ Satisfies spec: *User Creation With Temporary Password*, *Duplicate email on cre
 Initiated Password Reset* (both scenarios), *Locked Account Is Rescuable By Reset*. Design refs:
 D7, D8, D11, D12.
 
-- [ ] 7.1 RED extend `apps/api/src/routes/usuarios.test.ts` — `deposito` → 403, unauthenticated →
+- [x] 7.1 RED extend `apps/api/src/routes/usuarios.test.ts` — `deposito` → 403, unauthenticated →
       401 on `POST /api/usuarios` and `POST /api/usuarios/:id/password-reset`; `passwordTemporal`
       present in both 201/200 bodies and absent from every other response body; `Cache-Control:
       no-store` on both
-- [ ] 7.2 GREEN `apps/api/src/routes/usuarios.ts` — `usuarioConPasswordDto` (disjoint from
+- [x] 7.2 GREEN `apps/api/src/routes/usuarios.ts` — `usuarioConPasswordDto` (disjoint from
       `usuarioResumenDto`, D8); `POST /api/usuarios` and `POST /api/usuarios/:id/password-reset`;
       `reply.header('Cache-Control', 'no-store')` on both
-- [ ] 7.3 RED extend `apps/api/src/routes/usuarios.integration.test.ts` — create → login with the
+- [x] 7.3 RED extend `apps/api/src/routes/usuarios.integration.test.ts` — create → login with the
       returned temporary password → `GET /api/usuarios` returns 403
       `PASSWORD_CHANGE_REQUIRED` → `POST /auth/password` clears it; a reset on a locked account
       lets that account log in immediately (D11); exactly one `auditoria` row per mutation
@@ -252,10 +252,34 @@ D7, D8, D11, D12.
       every session of the target while the actor's own session still resolves (D10); a forced
       audit-insert failure leaves the user row and sessions unchanged, returns 500
       `AUDIT_WRITE_FAILED`
-- [ ] 7.4 GREEN — confirm 7.3 passes against 7.2
-- [ ] 7.5 Run `pnpm contract` to regenerate for these two paths
-- [ ] 7.6 Verify: `pnpm -r test`, `pnpm test:integration`, `pnpm typecheck`, `pnpm lint`,
+- [x] 7.4 GREEN — confirm 7.3 passes against 7.2
+- [x] 7.5 Run `pnpm contract` to regenerate for these two paths
+- [x] 7.6 Verify: `pnpm -r test`, `pnpm test:integration`, `pnpm typecheck`, `pnpm lint`,
       `pnpm contract:check`
+
+**S4b1 outcome notes (2026-08-28):**
+
+- **Mutation Q4 exposed a real non-repudiation hole.** Passing `request.params.id` as `actorId` on
+  the reset route — filing the TARGET as the actor — killed no test. That is precisely the lie the
+  auditoria table exists to prevent: D12's whole claim is that an admin reset is the row where
+  `usuario_id` and `entidad_id` differ, and the trail would have said the user reset their own
+  password. The `crear` test asserted the actor; the reset test did not. Fixed by asserting
+  `usuario_id === encargado.id` and `!== objetivo.id` directly. Verified: Q4 now fails.
+- **Mutation Q7: the email was not validated as an email.** No test sent a malformed address, so
+  `z.string()` in place of `z.string().email()` was invisible while the contract advertised
+  `format: email`. Added a 400 case.
+- **The rollback proof uses a REAL transaction.** `failingUow` wraps `createUnitOfWork(db)` and
+  replaces only `repos.auditoria`, so the usuarios UPDATE and the session delete are genuine
+  Postgres writes and the ROLLBACK is the real one. Asserted on all three: the hash unchanged, the
+  flag unchanged, and the target's session still resolving — plus zero audit rows.
+- **`afterAll` scope bug in the integration file.** `getPool().end()` sat inside the first
+  `describe`, so it closed the pool before the second `describe` ran and all seven new tests died
+  with "Cannot use a pool after calling end". Hoisted to file scope. Harness bug, not a product
+  bug, but it failed loudly rather than silently — which is why it was found in one run.
+- **The contract now proves D8 structurally.** `passwordTemporal` appears in exactly two responses
+  across the whole OpenAPI document: `POST /api/usuarios` 201 and
+  `POST /api/usuarios/{id}/password-reset` 200.
+- Seven mutations run against S4b1; after the two added tests, seven caught.
 
 ## Phase 8: S4b2 — Update + Deactivate + Reactivate Routes (TDD + contract, integration)
 

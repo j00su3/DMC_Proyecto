@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../app.js';
 import { hashPassword } from '../auth/password.js';
 import { getDb, getPool } from '../db/pool.js';
 import { usuarios } from '../db/schema.js';
+import { type UnitOfWork, createUnitOfWork } from '../db/uow.js';
 
 // The REAL app over real Postgres: real repos, real RBAC hook, real session
 // cookie. The unit suite proves the handlers against fakes; this proves the
@@ -55,20 +56,23 @@ async function loginAs(
   return decodeURIComponent(sid);
 }
 
+// File scope, NOT inside a describe: `afterAll` fires when its own block
+// finishes, so closing the pool inside the first describe kills it for every
+// later one in the same file.
+afterAll(async () => {
+  await getPool().end();
+});
+
 describe('usuarios read routes (integration, real app + real Postgres)', () => {
   let app: Awaited<ReturnType<typeof buildApp>> | undefined;
 
   beforeEach(async () => {
-    await db.execute(sql`truncate table sesiones, usuarios cascade`);
+    await db.execute(sql`truncate table auditoria, sesiones, usuarios cascade`);
   });
 
   afterEach(async () => {
     await app?.close();
     app = undefined;
-  });
-
-  afterAll(async () => {
-    await getPool().end();
   });
 
   it('lists real rows for an encargado and never serialises the hash', async () => {
@@ -178,5 +182,314 @@ describe('usuarios read routes (integration, real app + real Postgres)', () => {
     ];
     expect(ids).toHaveLength(3);
     expect(new Set(ids).size).toBe(3);
+  });
+});
+
+describe('usuarios write routes (integration, real app + real Postgres)', () => {
+  let app: Awaited<ReturnType<typeof buildApp>> | undefined;
+
+  beforeEach(async () => {
+    await db.execute(sql`truncate table auditoria, sesiones, usuarios cascade`);
+  });
+
+  afterEach(async () => {
+    await app?.close();
+    app = undefined;
+  });
+
+  async function auditRows(entidadId: string) {
+    const result = await db.execute(
+      sql`select accion, usuario_id, datos_previos, datos_posteriores
+            from auditoria where entidad_id = ${entidadId} order by creado_en`,
+    );
+    return (
+      result as unknown as {
+        rows: {
+          accion: string;
+          usuario_id: string;
+          datos_previos: unknown;
+          datos_posteriores: unknown;
+        }[];
+      }
+    ).rows;
+  }
+
+  it('creates a user whose temporary password works and forces a change on first use', async () => {
+    const encargado = await seedUsuario('encargado');
+    app = await buildApp({ cookieSecret: COOKIE_SECRET });
+    await app.ready();
+    const sid = await loginAs(app, encargado.email);
+
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/usuarios',
+      payload: {
+        nombre: 'Beto Deposito',
+        email: 'beto@example.com',
+        rol: 'deposito',
+      },
+      cookies: { sid },
+    });
+    expect(created.statusCode).toBe(201);
+    const temporal = created.json().passwordTemporal;
+
+    // The whole point of the temporary-password flow: the credential the
+    // encargado reads out loud actually logs in.
+    const login = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email: 'beto@example.com', password: temporal },
+    });
+    expect(login.statusCode).toBe(200);
+    const rawCookie = login.headers['set-cookie'];
+    const betoSid = decodeURIComponent(
+      /sid=([^;]+)/.exec(
+        (Array.isArray(rawCookie) ? rawCookie[0] : rawCookie) ?? '',
+      )?.[1] ?? '',
+    );
+
+    // ...and then goes nowhere until the password is changed. Enforced
+    // server-side, not by the SPA router (app-shell-login D3).
+    const blocked = await app.inject({
+      method: 'GET',
+      url: '/api/usuarios',
+      cookies: { sid: betoSid },
+    });
+    expect(blocked.statusCode).toBe(403);
+    expect(blocked.json().error.code).toBe('PASSWORD_CHANGE_REQUIRED');
+
+    const changed = await app.inject({
+      method: 'POST',
+      url: '/api/auth/password',
+      payload: {
+        currentPassword: temporal,
+        newPassword: 'a-brand-new-password-1',
+      },
+      cookies: { sid: betoSid },
+    });
+    expect(changed.statusCode).toBe(200);
+
+    const me = await app.inject({
+      method: 'GET',
+      url: '/api/auth/me',
+      cookies: { sid: betoSid },
+    });
+    expect(me.statusCode).toBe(200);
+    expect(me.json().usuario.debeCambiarPassword).toBe(false);
+  });
+
+  it('files exactly one crear audit row, with no hash in either snapshot', async () => {
+    const encargado = await seedUsuario('encargado');
+    app = await buildApp({ cookieSecret: COOKIE_SECRET });
+    await app.ready();
+    const sid = await loginAs(app, encargado.email);
+
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/usuarios',
+      payload: {
+        nombre: 'Beto Deposito',
+        email: 'beto@example.com',
+        rol: 'deposito',
+      },
+      cookies: { sid },
+    });
+
+    const rows = await auditRows(created.json().usuario.id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.accion).toBe('crear');
+    // Actor, not subject: an admin action is exactly the row where the two
+    // differ (D12).
+    expect(rows[0]?.usuario_id).toBe(encargado.id);
+    expect(rows[0]?.datos_previos).toBeNull();
+    expect(JSON.stringify(rows[0]?.datos_posteriores)).not.toContain(
+      'hashContrasena',
+    );
+  });
+
+  it('rescues a locked account: the reset password logs in immediately', async () => {
+    const encargado = await seedUsuario('encargado');
+    const victima = await seedUsuario('deposito', 'Victima');
+    // Locked out by brute force, with the window still open.
+    await db
+      .update(usuarios)
+      .set({
+        intentosFallidos: 5,
+        bloqueadoHasta: new Date(Date.now() + 300_000),
+      })
+      .where(eq(usuarios.id, victima.id));
+    app = await buildApp({ cookieSecret: COOKIE_SECRET });
+    await app.ready();
+    const sid = await loginAs(app, encargado.email);
+
+    const reset = await app.inject({
+      method: 'POST',
+      url: `/api/usuarios/${victima.id}/password-reset`,
+      cookies: { sid },
+    });
+    expect(reset.statusCode).toBe(200);
+
+    // D11 is a correctness requirement, not a nicety: auth/service.ts checks
+    // the lockout BEFORE verifying the password, so without clearing it in
+    // the same statement the victim could never spend the credential the
+    // encargado just issued.
+    const login = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: {
+        email: victima.email,
+        password: reset.json().passwordTemporal,
+      },
+    });
+    expect(login.statusCode).toBe(200);
+  });
+
+  it('revokes every session of the target while the actor keeps its own', async () => {
+    const encargado = await seedUsuario('encargado');
+    const objetivo = await seedUsuario('deposito', 'Objetivo');
+    app = await buildApp({ cookieSecret: COOKIE_SECRET });
+    await app.ready();
+    const actorSid = await loginAs(app, encargado.email);
+    const objetivoSid = await loginAs(app, objetivo.email);
+
+    const reset = await app.inject({
+      method: 'POST',
+      url: `/api/usuarios/${objetivo.id}/password-reset`,
+      cookies: { sid: actorSid },
+    });
+    expect(reset.statusCode).toBe(200);
+
+    // D10: every session of the target dies, including ones opened before
+    // the reset — the trigger is normally a compromised credential.
+    const objetivoMe = await app.inject({
+      method: 'GET',
+      url: '/api/auth/me',
+      cookies: { sid: objetivoSid },
+    });
+    expect(objetivoMe.statusCode).toBe(401);
+
+    // The actor is a different principal and keeps working.
+    const actorMe = await app.inject({
+      method: 'GET',
+      url: '/api/auth/me',
+      cookies: { sid: actorSid },
+    });
+    expect(actorMe.statusCode).toBe(200);
+  });
+
+  it('files cambiar_password with the prior lockout state', async () => {
+    const encargado = await seedUsuario('encargado');
+    const objetivo = await seedUsuario('deposito', 'Objetivo');
+    await db
+      .update(usuarios)
+      .set({ intentosFallidos: 4 })
+      .where(eq(usuarios.id, objetivo.id));
+    app = await buildApp({ cookieSecret: COOKIE_SECRET });
+    await app.ready();
+    const sid = await loginAs(app, encargado.email);
+
+    await app.inject({
+      method: 'POST',
+      url: `/api/usuarios/${objetivo.id}/password-reset`,
+      cookies: { sid },
+    });
+
+    const rows = await auditRows(objetivo.id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.accion).toBe('cambiar_password');
+    // The non-repudiation property itself (D12): an admin reset is exactly
+    // the row where the actor and the subject differ. File the target as the
+    // actor and the trail says the user reset their own password — which is
+    // the specific lie the whole auditoria table exists to prevent.
+    expect(rows[0]?.usuario_id).toBe(encargado.id);
+    expect(rows[0]?.usuario_id).not.toBe(objetivo.id);
+    expect(rows[0]?.datos_previos).toMatchObject({ intentosFallidos: 4 });
+    expect(rows[0]?.datos_posteriores).toMatchObject({
+      debeCambiarPassword: true,
+      intentosFallidos: 0,
+      bloqueadoHasta: null,
+    });
+    expect(JSON.stringify(rows[0])).not.toContain('hashContrasena');
+  });
+
+  it('rolls back the whole reset when the audit write fails', async () => {
+    const encargado = await seedUsuario('encargado');
+    const objetivo = await seedUsuario('deposito', 'Objetivo');
+    const hashAntes = objetivo.hashContrasena;
+
+    // A REAL transaction whose audit repo throws. The usuarios UPDATE and
+    // the session delete are genuine Postgres writes; only recordAudit
+    // fails, so this exercises the actual ROLLBACK rather than a fake one.
+    const realUow = createUnitOfWork(db);
+    const failingUow: UnitOfWork = {
+      run: (work) =>
+        realUow.run((repos) =>
+          work({
+            ...repos,
+            auditoria: {
+              record: async () => {
+                throw new Error('forced audit failure');
+              },
+            },
+          }),
+        ),
+    };
+    app = await buildApp({ cookieSecret: COOKIE_SECRET, uow: failingUow });
+    await app.ready();
+    const sid = await loginAs(app, encargado.email);
+    const objetivoSid = await loginAs(app, objetivo.email);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/usuarios/${objetivo.id}/password-reset`,
+      cookies: { sid },
+    });
+
+    expect(response.statusCode).toBe(500);
+    expect(response.json().error.code).toBe('AUDIT_WRITE_FAILED');
+
+    // Nothing moved: not the hash, not the flag, not the counters.
+    const [row] = await db
+      .select()
+      .from(usuarios)
+      .where(eq(usuarios.id, objetivo.id));
+    expect(row?.hashContrasena).toBe(hashAntes);
+    expect(row?.debeCambiarPassword).toBe(false);
+    // And the session revocation rolled back with it — the target can still
+    // use the session it had, because the reset never happened.
+    const objetivoMe = await app.inject({
+      method: 'GET',
+      url: '/api/auth/me',
+      cookies: { sid: objetivoSid },
+    });
+    expect(objetivoMe.statusCode).toBe(200);
+    expect(await auditRows(objetivo.id)).toHaveLength(0);
+  });
+
+  it('rejects a duplicate email with 409 and writes nothing', async () => {
+    const encargado = await seedUsuario('encargado');
+    app = await buildApp({ cookieSecret: COOKIE_SECRET });
+    await app.ready();
+    const sid = await loginAs(app, encargado.email);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/usuarios',
+      payload: {
+        nombre: 'Clon',
+        email: encargado.email,
+        rol: 'deposito',
+      },
+      cookies: { sid },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('EMAIL_ALREADY_IN_USE');
+    // The 23505 is raised inside uow.run, so the transaction rolls back and
+    // no audit row survives (D9).
+    const result = await db.execute(
+      sql`select count(*)::int as n from auditoria`,
+    );
+    expect((result as unknown as { rows: { n: number }[] }).rows[0]?.n).toBe(0);
   });
 });

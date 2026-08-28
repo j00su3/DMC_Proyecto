@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../app.js';
 import type { AuditoriaRepo } from '../auditoria/repository.js';
 import type { SesionesRepo } from '../auth/repository.js';
+import type { UnitOfWork } from '../db/uow.js';
 import type {
   Usuario,
   UsuarioResumen,
@@ -55,6 +56,16 @@ function fakeRepos(
       updatePassword: async () => {},
       list: async () => ({ rows: [], total: 0 }),
       findById: async () => undefined,
+      findByIdForUpdate: async () => makeResumen(),
+      findLockoutState: async () => ({
+        intentosFallidos: 0,
+        bloqueadoHasta: null,
+      }),
+      lockActiveEncargados: async () => [],
+      create: async () => makeResumen({ debeCambiarPassword: true }),
+      update: async () => makeResumen(),
+      setActivo: async () => makeResumen(),
+      resetPassword: async () => makeResumen({ debeCambiarPassword: true }),
       ...usuarios,
     } as UsuariosRepo,
     sesiones: {
@@ -63,9 +74,21 @@ function fakeRepos(
       delete: async () => {},
       purgeExpired: async () => {},
       deleteOthers: async () => {},
+      deleteAllForUser: async () => {},
       ...sesiones,
     } as SesionesRepo,
     auditoria: { record: async () => {} } as AuditoriaRepo,
+  };
+}
+
+// `uow.run` hands the callback the SAME fakes, mirroring what
+// `createUnitOfWork` does with `buildRepos(tx)`. Without this the write
+// routes would reach for repos this suite never configured.
+function fakeUow(repos: ReturnType<typeof fakeRepos>): UnitOfWork {
+  return {
+    async run(work) {
+      return work(repos as never);
+    },
   };
 }
 
@@ -74,9 +97,15 @@ function fakeRepos(
 async function buildWithSession(
   sesion: Usuario | undefined,
   usuarios: Partial<UsuariosRepo> = {},
+  auditoria: Partial<AuditoriaRepo> = {},
 ) {
+  const repos = fakeRepos(usuarios, { findValid: async () => sesion });
+  if (auditoria.record) {
+    repos.auditoria.record = auditoria.record;
+  }
   const app = await buildApp({
-    repos: fakeRepos(usuarios, { findValid: async () => sesion }),
+    repos,
+    uow: fakeUow(repos),
     cookieSecret: COOKIE_SECRET,
   });
   await app.ready();
@@ -157,9 +186,10 @@ describe('GET /api/usuarios', () => {
   });
 
   it('never serialises hashContrasena, even when the repo leaks it', async () => {
-    // The DTO is the last line of defence. D15 keeps the hash out of the
-    // projection, but a response schema that passes rows through unfiltered
-    // would surface whatever a future repo change starts returning.
+    // Two layers keep the hash out: the Zod response schema strips unknown
+    // keys, and the DTO builds an explicit object. This asserts the OUTCOME
+    // rather than either layer, which is why it survives a change to one of
+    // them and fails only when both are gone.
     app = await buildWithSession(makeUsuario(), {
       list: async () =>
         ({
@@ -257,5 +287,265 @@ describe('GET /api/usuarios/:id', () => {
 
     expect(response.statusCode).toBe(400);
     expect(response.json().error.code).toBe('VALIDATION_ERROR');
+  });
+});
+
+describe('POST /api/usuarios', () => {
+  let app: Awaited<ReturnType<typeof buildApp>> | undefined;
+
+  afterEach(async () => {
+    await app?.close();
+    app = undefined;
+  });
+
+  const body = {
+    nombre: 'Beto Deposito',
+    email: 'beto@example.com',
+    rol: 'deposito' as const,
+  };
+
+  it('returns 401 UNAUTHORIZED without a session', async () => {
+    app = await buildWithSession(undefined);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/usuarios',
+      payload: body,
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json().error.code).toBe('UNAUTHORIZED');
+  });
+
+  it('returns 403 FORBIDDEN for a deposito session', async () => {
+    app = await buildWithSession(makeUsuario({ rol: 'deposito' }));
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/usuarios',
+      payload: body,
+      cookies: { sid: app.signCookie('valid-token') },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json().error.code).toBe('FORBIDDEN');
+  });
+
+  it('returns 201 with the usuario and a temporary password', async () => {
+    app = await buildWithSession(makeUsuario());
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/usuarios',
+      payload: body,
+      cookies: { sid: app.signCookie('valid-token') },
+    });
+
+    expect(response.statusCode).toBe(201);
+    const payload = response.json();
+    expect(payload.usuario.id).toBe(TARGET_ID);
+    expect(payload.usuario.debeCambiarPassword).toBe(true);
+    expect(typeof payload.passwordTemporal).toBe('string');
+    expect(payload.passwordTemporal).toHaveLength(16);
+  });
+
+  it('sets Cache-Control: no-store so the temporary password is never cached', async () => {
+    app = await buildWithSession(makeUsuario());
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/usuarios',
+      payload: body,
+      cookies: { sid: app.signCookie('valid-token') },
+    });
+
+    // D8: the plaintext leaves once, in this body. A cache — browser, proxy
+    // or CDN — holding that response is a second copy nobody accounted for.
+    expect(response.headers['cache-control']).toBe('no-store');
+  });
+
+  it('maps a duplicate email to 409 EMAIL_ALREADY_IN_USE', async () => {
+    const { emailAlreadyInUse } = await import('../lib/errors.js');
+    app = await buildWithSession(makeUsuario(), {
+      create: async () => {
+        throw emailAlreadyInUse();
+      },
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/usuarios',
+      payload: body,
+      cookies: { sid: app.signCookie('valid-token') },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('EMAIL_ALREADY_IN_USE');
+  });
+
+  it('rejects a body missing nombre with VALIDATION_ERROR', async () => {
+    app = await buildWithSession(makeUsuario());
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/usuarios',
+      payload: { email: 'beto@example.com', rol: 'deposito' },
+      cookies: { sid: app.signCookie('valid-token') },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('rejects a malformed email with VALIDATION_ERROR', async () => {
+    app = await buildWithSession(makeUsuario());
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/usuarios',
+      payload: { ...body, email: 'not-an-email' },
+      cookies: { sid: app.signCookie('valid-token') },
+    });
+
+    // The contract advertises `format: email`. Accepting garbage here
+    // creates a row whose owner cannot be reached and whose login the
+    // encargado cannot reproduce.
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('rejects a rol outside the enum with VALIDATION_ERROR', async () => {
+    app = await buildWithSession(makeUsuario());
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/usuarios',
+      payload: { ...body, rol: 'administrador' },
+      cookies: { sid: app.signCookie('valid-token') },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('VALIDATION_ERROR');
+  });
+});
+
+describe('POST /api/usuarios/:id/password-reset', () => {
+  let app: Awaited<ReturnType<typeof buildApp>> | undefined;
+
+  afterEach(async () => {
+    await app?.close();
+    app = undefined;
+  });
+
+  const url = `/api/usuarios/${TARGET_ID}/password-reset`;
+
+  it('returns 401 UNAUTHORIZED without a session', async () => {
+    app = await buildWithSession(undefined);
+
+    const response = await app.inject({ method: 'POST', url });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json().error.code).toBe('UNAUTHORIZED');
+  });
+
+  it('returns 403 FORBIDDEN for a deposito session', async () => {
+    app = await buildWithSession(makeUsuario({ rol: 'deposito' }));
+
+    const response = await app.inject({
+      method: 'POST',
+      url,
+      cookies: { sid: app.signCookie('valid-token') },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json().error.code).toBe('FORBIDDEN');
+  });
+
+  it('returns 200 with a temporary password and no-store', async () => {
+    app = await buildWithSession(makeUsuario());
+
+    const response = await app.inject({
+      method: 'POST',
+      url,
+      cookies: { sid: app.signCookie('valid-token') },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().passwordTemporal).toHaveLength(16);
+    expect(response.json().usuario.debeCambiarPassword).toBe(true);
+    expect(response.headers['cache-control']).toBe('no-store');
+  });
+
+  it('returns 404 USER_NOT_FOUND for an id that matches no row', async () => {
+    app = await buildWithSession(makeUsuario(), {
+      findByIdForUpdate: async () => undefined,
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url,
+      cookies: { sid: app.signCookie('valid-token') },
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json().error.code).toBe('USER_NOT_FOUND');
+  });
+
+  it('surfaces a failed audit write as 500 AUDIT_WRITE_FAILED and returns no password', async () => {
+    app = await buildWithSession(
+      makeUsuario(),
+      {},
+      {
+        record: async () => {
+          throw new Error('audit table unavailable');
+        },
+      },
+    );
+
+    const response = await app.inject({
+      method: 'POST',
+      url,
+      cookies: { sid: app.signCookie('valid-token') },
+    });
+
+    expect(response.statusCode).toBe(500);
+    expect(response.json().error.code).toBe('AUDIT_WRITE_FAILED');
+    // The temporary password must not reach the client on a failed write:
+    // the transaction rolled back, so the credential it names does not exist
+    // in the database and handing it over would be a lie the user acts on.
+    expect(response.body).not.toContain('passwordTemporal');
+  });
+});
+
+describe('the temporary password never appears on a read route', () => {
+  let app: Awaited<ReturnType<typeof buildApp>> | undefined;
+
+  afterEach(async () => {
+    await app?.close();
+    app = undefined;
+  });
+
+  it('is absent from list and get responses', async () => {
+    app = await buildWithSession(makeUsuario(), {
+      list: async () => ({ rows: [makeResumen()], total: 1 }),
+      findById: async () => makeResumen(),
+    });
+    const cookies = { sid: app.signCookie('valid-token') };
+
+    const list = await app.inject({
+      method: 'GET',
+      url: '/api/usuarios',
+      cookies,
+    });
+    const get = await app.inject({
+      method: 'GET',
+      url: `/api/usuarios/${TARGET_ID}`,
+      cookies,
+    });
+
+    // usuarioConPasswordDto is disjoint from usuarioResumenDto (D8) — the
+    // key exists on exactly two responses in the whole API.
+    expect(list.body).not.toContain('passwordTemporal');
+    expect(get.body).not.toContain('passwordTemporal');
   });
 });

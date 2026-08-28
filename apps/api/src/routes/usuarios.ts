@@ -1,10 +1,15 @@
 import type { FastifyPluginAsync } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { errorEnvelopeSchema } from '../lib/errors.js';
+import { errorEnvelopeSchema, unauthorized } from '../lib/errors.js';
 import { pageQuerySchema, paginated } from '../lib/pagination.js';
 import type { UsuarioResumen } from '../usuarios/repository.js';
-import { getUsuario, listUsuarios } from '../usuarios/service.js';
+import {
+  createUsuario,
+  getUsuario,
+  listUsuarios,
+  resetUsuarioPassword,
+} from '../usuarios/service.js';
 
 // Its own DTO, deliberately NOT auth.ts's `usuarioDto` (D16). The two
 // answer different questions — auth's describes the caller to itself and
@@ -41,6 +46,22 @@ const paginatedUsuarios = z.object({
 
 const idParams = z.object({ id: z.string().uuid() });
 
+const crearUsuarioBody = z.object({
+  nombre: z.string().min(1),
+  email: z.string().email(),
+  rol: z.enum(['encargado', 'deposito']),
+});
+
+// Disjoint from `usuarioResumenDto` on purpose (D8). The plaintext is a key
+// that exists on exactly two responses in the whole API, and keeping it in
+// its own schema is what makes that checkable rather than a convention —
+// an optional field on the shared DTO would put it one careless spread away
+// from every read route.
+const usuarioConPasswordDto = z.object({
+  usuario: usuarioResumenDto,
+  passwordTemporal: z.string(),
+});
+
 function toDto(usuario: UsuarioResumen) {
   return {
     id: usuario.id,
@@ -51,6 +72,19 @@ function toDto(usuario: UsuarioResumen) {
     debeCambiarPassword: usuario.debeCambiarPassword,
     creadoEn: usuario.creadoEn,
   };
+}
+
+// `request.user` is typed nullable because the RBAC hook decorates it for
+// every request, including the ones it lets through unauthenticated. On a
+// route carrying `roles: ['encargado']` the hook has already thrown 403 for
+// a null user, so this is an unreachable branch — but it is the actor id
+// that ends up in the audit trail, and a silent `?? ''` there would write a
+// row that names nobody.
+function requireActorId(user: { id: string } | null): string {
+  if (!user) {
+    throw unauthorized();
+  }
+  return user.id;
 }
 
 const usuariosRoutes: FastifyPluginAsync = async (app) => {
@@ -99,6 +133,62 @@ const usuariosRoutes: FastifyPluginAsync = async (app) => {
       // wrong URL or asked for a user that is gone.
       const usuario = await getUsuario(app.repos, request.params.id);
       return { usuario: toDto(usuario) };
+    },
+  );
+
+  typed.post(
+    '/usuarios',
+    {
+      config: { roles: ['encargado'] },
+      schema: {
+        body: crearUsuarioBody,
+        response: {
+          201: usuarioConPasswordDto,
+          400: errorEnvelopeSchema,
+          401: errorEnvelopeSchema,
+          403: errorEnvelopeSchema,
+          409: errorEnvelopeSchema,
+          500: errorEnvelopeSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const actorId = requireActorId(request.user);
+      const { usuario, passwordTemporal } = await createUsuario(app.uow, {
+        ...request.body,
+        actorId,
+      });
+      // The plaintext leaves here and nowhere else, so nothing downstream
+      // may keep a copy — browser, proxy or CDN (D8).
+      reply.header('Cache-Control', 'no-store');
+      reply.status(201);
+      return { usuario: toDto(usuario), passwordTemporal };
+    },
+  );
+
+  typed.post(
+    '/usuarios/:id/password-reset',
+    {
+      config: { roles: ['encargado'] },
+      schema: {
+        params: idParams,
+        response: {
+          200: usuarioConPasswordDto,
+          401: errorEnvelopeSchema,
+          403: errorEnvelopeSchema,
+          404: errorEnvelopeSchema,
+          500: errorEnvelopeSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const actorId = requireActorId(request.user);
+      const { usuario, passwordTemporal } = await resetUsuarioPassword(
+        app.uow,
+        { id: request.params.id, actorId },
+      );
+      reply.header('Cache-Control', 'no-store');
+      return { usuario: toDto(usuario), passwordTemporal };
     },
   );
 };
