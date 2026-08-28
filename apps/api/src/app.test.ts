@@ -50,6 +50,7 @@ function fakeRepos() {
       findById: unusedRepoMethod,
       findByIdForUpdate: unusedRepoMethod,
       lockActiveEncargados: unusedRepoMethod,
+      findLockoutState: unusedRepoMethod,
       create: unusedRepoMethod,
       update: unusedRepoMethod,
       setActivo: unusedRepoMethod,

@@ -148,7 +148,7 @@ Satisfies spec: *User Creation*, *Update User Profile*, *Logical Deactivation*, 
 or Audit Failure*, *Locked Account Is Rescuable By Reset*, *No State Change Writes Nothing*.
 Design refs: D3–D6, D8, D11, D12.
 
-- [ ] 5.1 RED `apps/api/src/usuarios/service.test.ts` (new, stub repos + `{ run: (work) =>
+- [x] 5.1 RED `apps/api/src/usuarios/service.test.ts` (new, stub repos + `{ run: (work) =>
       work(stubs) }`) — create passes a hash and no plaintext-bearing key to the repo, returned
       `passwordTemporal` never equals any repo argument (D8); `debeCambiarPassword: true` on
       create; `crear` audit has `datosPrevios === null` and no `hashContrasena` (D7); guard throws
@@ -157,12 +157,38 @@ Design refs: D3–D6, D8, D11, D12.
       audit, 200 (D5); already-inactive deactivate → no write, no audit, guard not consulted (D5);
       reset calls `deleteAllForUser`, never `deleteOthers`, audit is `cambiar_password` with the
       three-key snapshot (D12); every mutation's repo calls occur inside one `run`
-- [ ] 5.2 GREEN `apps/api/src/usuarios/service.ts` (new) — `listUsuarios`, `getUsuario`,
+- [x] 5.2 GREEN `apps/api/src/usuarios/service.ts` (new) — `listUsuarios`, `getUsuario`,
       `createUsuario`, `updateUsuario`, `setUsuarioActivo`, `resetUsuarioPassword`; hashing/
       generation outside `uow.run`, guard+write+`recordAudit` inside (D6); `changedFields` diff
       helper (D5)
-- [ ] 5.3 Verify: `pnpm -r test`, `pnpm typecheck`, `pnpm lint`, `pnpm contract:check`
+- [x] 5.3 Verify: `pnpm -r test`, `pnpm typecheck`, `pnpm lint`, `pnpm contract:check`
       (byte-identical — no route yet)
+
+**S3b outcome notes (2026-08-28):**
+
+- **D12 asked for a snapshot the port could not produce.** The reset audit needs the PRIOR
+  `intentosFallidos`/`bloqueadoHasta`, but `UsuarioResumen` omits both on purpose (D15) and
+  `UPDATE … RETURNING` hands back the new values, not the old. Closed with one narrow repo read,
+  `findLockoutState(id): Promise<LockoutResult | undefined>`, taken inside the transaction under
+  the row lock already held. Rejected widening `UsuarioResumen`, which would push lockout counters
+  into every route DTO for the sake of one audit row.
+- **The already-inactive deactivate still takes the set lock.** D3 decides the lock from the
+  REQUEST SHAPE before the target is read, deliberately over-locking rather than inverting the
+  lock order. What the already-inactive row changes is the GUARD, which needs `previo.activo` and
+  so never trips. The test asserts both halves, because "guard not consulted" and "lock not taken"
+  are different claims and only the first one is true.
+- **The email diff normalizes in the service as well as the repo.** The repo normalizes on write
+  (D9), but the DIFF has to compare what will actually be stored — otherwise `ANA@EXAMPLE.COM`
+  over `ana@example.com` reads as a change and files a write plus an audit row for a value the
+  database already holds.
+- **`toMatchObject` cannot test a changed-fields-only snapshot.** Mutation P8 replaced
+  `datosPrevios: diff.before` with the whole row and killed no test, because a subset match passes
+  on a superset. The audit-snapshot assertions are now `toEqual` on `datosPrevios`/
+  `datosPosteriores` directly. Verified: P8 now fails.
+- **Harness options instead of `mockResolvedValue`.** Overriding a spy's implementation also
+  replaces the call recording that lives inside it, so an overridden spy drops out of the ordering
+  log and the transaction-discipline assertions go blind. Caught by the ordering test itself.
+- Eight mutations run against S3b; after tightening the snapshot assertions, eight caught.
 
 ## Phase 6: S4a — Read Routes: List + Get (TDD + contract)
 

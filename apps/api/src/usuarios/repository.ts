@@ -63,6 +63,10 @@ export interface UsuariosRepo {
   findByIdForUpdate(id: string): Promise<UsuarioResumen | undefined>;
   // S2b — the D2 predicate lock. Returns the ids it locked.
   lockActiveEncargados(): Promise<string[]>;
+  // S3b — the lockout columns UsuarioResumen deliberately omits. D12's
+  // reset audit needs their PRIOR values, and `UPDATE … RETURNING` returns
+  // the new ones, so they have to be read before the write.
+  findLockoutState(id: string): Promise<LockoutResult | undefined>;
   create(input: NuevoUsuario): Promise<UsuarioResumen>; // maps 23505 -> 409 (D9)
   update(id: string, cambios: CambiosUsuario): Promise<UsuarioResumen>; // maps 23505 -> 409
   setActivo(id: string, activo: boolean): Promise<UsuarioResumen>;
@@ -251,6 +255,21 @@ export class DrizzleUsuariosRepo implements UsuariosRepo {
       .orderBy(asc(usuarios.id))
       .for('update');
     return rows.map((row) => row.id);
+  }
+
+  // The lockout columns UsuarioResumen omits on purpose (D15), read
+  // separately so they never enter a route DTO. D12's reset audit needs
+  // their PRIOR values and `UPDATE … RETURNING` hands back the new ones.
+  async findLockoutState(id: string): Promise<LockoutResult | undefined> {
+    const rows = await this.db
+      .select({
+        intentosFallidos: usuarios.intentosFallidos,
+        bloqueadoHasta: usuarios.bloqueadoHasta,
+      })
+      .from(usuarios)
+      .where(eq(usuarios.id, id))
+      .limit(1);
+    return rows[0];
   }
 
   // No findByEmail pre-check (design.md D9). A read-then-insert leaves a
