@@ -195,23 +195,41 @@ Design refs: D3–D6, D8, D11, D12.
 Satisfies spec: *Role Gate on Every User-Management Route* (partial), *List Users (Paginated)*,
 *Get User by Id*. Design refs: D15–D17.
 
-- [ ] 6.1 RED `apps/api/src/routes/usuarios.test.ts` (new, `buildApp({ repos, uow, cookieSecret })`
+- [x] 6.1 RED `apps/api/src/routes/usuarios.test.ts` (new, `buildApp({ repos, uow, cookieSecret })`
       + `inject`) — `deposito` → 403 and unauthenticated → 401 on `GET /api/usuarios` and
       `GET /api/usuarios/:id`; default pagination shape; explicit `?page&pageSize` echoed; unknown
       `:id` → 404 `USER_NOT_FOUND`
-- [ ] 6.2 GREEN `apps/api/src/routes/usuarios.ts` (new) — `usuarioResumenDto` (own DTO, not
+- [x] 6.2 GREEN `apps/api/src/routes/usuarios.ts` (new) — `usuarioResumenDto` (own DTO, not
       `auth.ts`'s, per D16); `GET /api/usuarios` (`pageQuerySchema` + `paginated()` verbatim, D17)
       and `GET /api/usuarios/:id`; both `config: { roles: ['encargado'] }`, reads via `app.repos`
       not `uow` (D17)
-- [ ] 6.3 GREEN `apps/api/src/app.ts` — `app.register(usuariosRoutes, { prefix: '/api' })` after
+- [x] 6.3 GREEN `apps/api/src/app.ts` — `app.register(usuariosRoutes, { prefix: '/api' })` after
       `authPlugin`
-- [ ] 6.4 RED `apps/api/src/routes/usuarios.integration.test.ts` (new, real app + Docker PG) — list
+- [x] 6.4 RED `apps/api/src/routes/usuarios.integration.test.ts` (new, real app + Docker PG) — list
       and get against seeded users, no `hash_contrasena` field in any response
-- [ ] 6.5 GREEN — confirm 6.4 passes against 6.2/6.3
-- [ ] 6.6 Run `pnpm contract` to regenerate `openapi.json`/`schema.d.ts` for these two paths
+- [x] 6.5 GREEN — confirm 6.4 passes against 6.2/6.3
+- [x] 6.6 Run `pnpm contract` to regenerate `openapi.json`/`schema.d.ts` for these two paths
       (generated, exempt from TDD and from the authored-line count)
-- [ ] 6.7 Verify: `pnpm -r test`, `pnpm test:integration`, `pnpm typecheck`, `pnpm lint`,
+- [x] 6.7 Verify: `pnpm -r test`, `pnpm test:integration`, `pnpm typecheck`, `pnpm lint`,
       `pnpm contract:check`
+
+**S4a outcome notes (2026-08-28):**
+
+- **The contract diff alone is 525 raw lines** (348 in `openapi.json`, 177 in `schema.d.ts`) for two
+  paths. The ledger attempt was acquired at 2500 against the RAW expectation rather than the
+  authored one, per the note further down this file — a 400-line cap would have blocked on
+  generated files nobody wrote.
+- **`contract:check` fails on regenerated-but-unstaged files.** It runs `pnpm contract && git diff
+  --exit-code`, which compares the working tree to the INDEX. Regenerating and not staging reads
+  as drift. Stage the two generated files before running it; this is not a real contract failure.
+- **Mutation R4 survived and was proven behaviour-neutral, not a coverage gap.** Replacing
+  `toDto`'s explicit field list with a spread changed no output. Three probes established why: the
+  Zod response schema strips unknown keys, AND `toDto` builds an explicit object; with either one
+  alone the hash still never leaves, and only disabling BOTH lets it through — which the leak test
+  does catch. The test asserts the property that matters (no hash in the response bytes), not
+  which layer produced it, so no test was added. The code comment claiming `toDto` was "the last
+  line of defence" was wrong and has been corrected to say what was measured.
+- Five mutations run against S4a: four caught, one proven neutral by construction.
 
 ## Phase 7: S4b1 — Create + Password-Reset Routes (TDD + contract, integration)
 
@@ -219,14 +237,14 @@ Satisfies spec: *User Creation With Temporary Password*, *Duplicate email on cre
 Initiated Password Reset* (both scenarios), *Locked Account Is Rescuable By Reset*. Design refs:
 D7, D8, D11, D12.
 
-- [ ] 7.1 RED extend `apps/api/src/routes/usuarios.test.ts` — `deposito` → 403, unauthenticated →
+- [x] 7.1 RED extend `apps/api/src/routes/usuarios.test.ts` — `deposito` → 403, unauthenticated →
       401 on `POST /api/usuarios` and `POST /api/usuarios/:id/password-reset`; `passwordTemporal`
       present in both 201/200 bodies and absent from every other response body; `Cache-Control:
       no-store` on both
-- [ ] 7.2 GREEN `apps/api/src/routes/usuarios.ts` — `usuarioConPasswordDto` (disjoint from
+- [x] 7.2 GREEN `apps/api/src/routes/usuarios.ts` — `usuarioConPasswordDto` (disjoint from
       `usuarioResumenDto`, D8); `POST /api/usuarios` and `POST /api/usuarios/:id/password-reset`;
       `reply.header('Cache-Control', 'no-store')` on both
-- [ ] 7.3 RED extend `apps/api/src/routes/usuarios.integration.test.ts` — create → login with the
+- [x] 7.3 RED extend `apps/api/src/routes/usuarios.integration.test.ts` — create → login with the
       returned temporary password → `GET /api/usuarios` returns 403
       `PASSWORD_CHANGE_REQUIRED` → `POST /auth/password` clears it; a reset on a locked account
       lets that account log in immediately (D11); exactly one `auditoria` row per mutation
@@ -234,10 +252,34 @@ D7, D8, D11, D12.
       every session of the target while the actor's own session still resolves (D10); a forced
       audit-insert failure leaves the user row and sessions unchanged, returns 500
       `AUDIT_WRITE_FAILED`
-- [ ] 7.4 GREEN — confirm 7.3 passes against 7.2
-- [ ] 7.5 Run `pnpm contract` to regenerate for these two paths
-- [ ] 7.6 Verify: `pnpm -r test`, `pnpm test:integration`, `pnpm typecheck`, `pnpm lint`,
+- [x] 7.4 GREEN — confirm 7.3 passes against 7.2
+- [x] 7.5 Run `pnpm contract` to regenerate for these two paths
+- [x] 7.6 Verify: `pnpm -r test`, `pnpm test:integration`, `pnpm typecheck`, `pnpm lint`,
       `pnpm contract:check`
+
+**S4b1 outcome notes (2026-08-28):**
+
+- **Mutation Q4 exposed a real non-repudiation hole.** Passing `request.params.id` as `actorId` on
+  the reset route — filing the TARGET as the actor — killed no test. That is precisely the lie the
+  auditoria table exists to prevent: D12's whole claim is that an admin reset is the row where
+  `usuario_id` and `entidad_id` differ, and the trail would have said the user reset their own
+  password. The `crear` test asserted the actor; the reset test did not. Fixed by asserting
+  `usuario_id === encargado.id` and `!== objetivo.id` directly. Verified: Q4 now fails.
+- **Mutation Q7: the email was not validated as an email.** No test sent a malformed address, so
+  `z.string()` in place of `z.string().email()` was invisible while the contract advertised
+  `format: email`. Added a 400 case.
+- **The rollback proof uses a REAL transaction.** `failingUow` wraps `createUnitOfWork(db)` and
+  replaces only `repos.auditoria`, so the usuarios UPDATE and the session delete are genuine
+  Postgres writes and the ROLLBACK is the real one. Asserted on all three: the hash unchanged, the
+  flag unchanged, and the target's session still resolving — plus zero audit rows.
+- **`afterAll` scope bug in the integration file.** `getPool().end()` sat inside the first
+  `describe`, so it closed the pool before the second `describe` ran and all seven new tests died
+  with "Cannot use a pool after calling end". Hoisted to file scope. Harness bug, not a product
+  bug, but it failed loudly rather than silently — which is why it was found in one run.
+- **The contract now proves D8 structurally.** `passwordTemporal` appears in exactly two responses
+  across the whole OpenAPI document: `POST /api/usuarios` 201 and
+  `POST /api/usuarios/{id}/password-reset` 200.
+- Seven mutations run against S4b1; after the two added tests, seven caught.
 
 ## Phase 8: S4b2 — Update + Deactivate + Reactivate Routes (TDD + contract, integration)
 
@@ -245,31 +287,57 @@ Satisfies spec: *Update User Profile and Role*, *Logical Deactivation*, *Reactiv
 Active-Encargado Guard* (route-level), *No State Change Writes Nothing*, *PATCH Rejects an
 `activo` Key*. Design refs: D4, D5, D13.
 
-- [ ] 8.1 RED extend `apps/api/src/routes/usuarios.test.ts` — `deposito` → 403, unauthenticated →
+- [x] 8.1 RED extend `apps/api/src/routes/usuarios.test.ts` — `deposito` → 403, unauthenticated →
       401 on `PATCH /api/usuarios/:id`, `POST .../deactivate`, `POST .../reactivate`; `PATCH` with
       an `activo` key → 400 `VALIDATION_ERROR` before any handler runs; `PATCH` with `{}` → 400
       (D13)
-- [ ] 8.2 GREEN `apps/api/src/routes/usuarios.ts` — `PATCH /api/usuarios/:id` (Zod body rejects
+- [x] 8.2 GREEN `apps/api/src/routes/usuarios.ts` — `PATCH /api/usuarios/:id` (Zod body rejects
       `activo`, requires ≥1 of `nombre`/`email`/`rol`), `POST .../deactivate`,
       `POST .../reactivate`
-- [ ] 8.3 RED extend `apps/api/src/routes/usuarios.integration.test.ts` — successful update/
+- [x] 8.3 RED extend `apps/api/src/routes/usuarios.integration.test.ts` — successful update/
       deactivate/reactivate each produce one correctly-verbed `auditoria` row; deactivate makes the
       target's next request with its old session cookie 401; deactivating/demoting the last
       encargado → 409 `LAST_ACTIVE_ENCARGADO`, row unchanged, no audit row; already-inactive
       deactivate and unchanged `PATCH` → 200, no write, no audit row (D5)
-- [ ] 8.4 GREEN — confirm 8.3 passes against 8.2
-- [ ] 8.5 Run `pnpm contract` to regenerate for the remaining three paths — all seven routes now
+- [x] 8.4 GREEN — confirm 8.3 passes against 8.2
+- [x] 8.5 Run `pnpm contract` to regenerate for the remaining three paths — all seven routes now
       present, `openapi.json`/`schema.d.ts` complete for `user-management`
-- [ ] 8.6 Verify: `pnpm -r test`, `pnpm test:integration`, `pnpm typecheck`, `pnpm lint`,
+- [x] 8.6 Verify: `pnpm -r test`, `pnpm test:integration`, `pnpm typecheck`, `pnpm lint`,
       `pnpm contract:check`
+
+**S4b2 outcome notes (2026-08-28):**
+
+- **All seven user-management routes are now in the contract**, with their full response-code sets.
+  `openapi.json`/`schema.d.ts` are complete for this change.
+- **`.strict()` is the load-bearing half of the PATCH body, not `.partial()`.** Dropping it lets an
+  `activo` key through, which is the exact ambiguity D13 exists to make unreachable. The unit test
+  proves the rejection happens BEFORE the handler by asserting a `handlerReached` flag stays false,
+  not merely that the status is 400 — a handler-side check would also return 400.
+- **The refine is what stops an empty body.** `{}` satisfies every optional field, produces an
+  empty diff and would answer 200 having done nothing, i.e. a success code for a request that
+  expressed no intent.
+- **T4 was caught, unlike S4b1's Q4.** The same mutation — filing the target as the audit actor —
+  died here because the update integration test asserts `usuario_id === encargado.id`. The gap
+  found in S4b1 was closed before it could recur.
+- Six mutations run against S4b2; six caught, none survived.
+
+**Bookkeeping (Phase 9):**
+
+- **9.1 verified in practice, not just from precedent.** After merging #35, PR #36 was still based
+  on `docs/sdd-planning-gestion-usuarios` — GitHub did not auto-retarget. `gh pr edit 36 --base
+  main` was required. `deleteBranchOnMerge` is `false` on this repo, so a merge cannot close a
+  stacked dependent, but the retarget is still mandatory for the diff to be reviewable.
+- **9.3 confirmed: no environment change.** No `.env*` file is touched by this change and no new
+  source file reads `process.env`. `DATABASE_URL` and `COOKIE_SECRET` remain the only inputs, both
+  already provisioned. No manual user step is needed before any PR in this change merges.
 
 ## Phase 9: Bookkeeping
 
-- [ ] 9.1 Before merging each PR except the last, `gh pr edit <next-pr-number> --base main` — GitHub
+- [x] 9.1 Before merging each PR except the last, `gh pr edit <next-pr-number> --base main` — GitHub
       does not auto-retarget a stacked PR when its base merges (verified precedent:
       `auditoria-general`); delete a merged branch only after confirming the retarget landed
 - [ ] 9.2 Mark checkboxes complete as each of the eight PRs merges to `main`
-- [ ] 9.3 No `.env*` change and no new environment variable for this change (`DATABASE_URL`/
+- [x] 9.3 No `.env*` change and no new environment variable for this change (`DATABASE_URL`/
       `COOKIE_SECRET` are the only inputs) — confirm no manual user step is needed before S4a merges
 
 ## Review Workload Forecast
