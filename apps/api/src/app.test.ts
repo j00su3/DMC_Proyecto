@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildApp } from './app.js';
 import type { AuditoriaRepo } from './auditoria/repository.js';
 import type { SesionesRepo } from './auth/repository.js';
+import type { MovimientosRepo } from './movimientos/repository.js';
+import type { ProductosRepo } from './productos/repository.js';
 import type { ProveedoresRepo } from './proveedores/repository.js';
 import type { UsuariosRepo } from './usuarios/repository.js';
 
@@ -78,6 +80,20 @@ function fakeRepos() {
       update: unusedRepoMethod,
       setActivo: unusedRepoMethod,
     } satisfies ProveedoresRepo,
+    // These tests exercise logging and wiring, never product/ledger
+    // management (same reasoning as the proveedores stub above).
+    productos: {
+      list: unusedRepoMethod,
+      findById: unusedRepoMethod,
+      findByIdForUpdate: unusedRepoMethod,
+      create: unusedRepoMethod,
+      update: unusedRepoMethod,
+      setActivo: unusedRepoMethod,
+      aplicarDelta: unusedRepoMethod,
+    } satisfies ProductosRepo,
+    movimientos: {
+      create: unusedRepoMethod,
+    } satisfies MovimientosRepo,
   };
 }
 

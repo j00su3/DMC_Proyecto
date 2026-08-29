@@ -26,3 +26,6 @@ pgdata/
 # `npx skills add adminoryslabs/Armory --skill <name>` after cloning to recreate
 # them, or point your agent at .agents/skills/ directly.
 .claude/skills/
+
+# CodeGraph local index — per-checkout, never shared
+.codegraph/

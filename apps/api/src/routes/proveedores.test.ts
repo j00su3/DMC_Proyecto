@@ -3,6 +3,8 @@ import { buildApp } from '../app.js';
 import type { AuditoriaRepo } from '../auditoria/repository.js';
 import type { SesionesRepo } from '../auth/repository.js';
 import type { UnitOfWork } from '../db/uow.js';
+import type { MovimientosRepo } from '../movimientos/repository.js';
+import type { ProductosRepo } from '../productos/repository.js';
 import type { Proveedor, ProveedoresRepo } from '../proveedores/repository.js';
 import type { Usuario, UsuariosRepo } from '../usuarios/repository.js';
 
@@ -61,6 +63,8 @@ function fakeRepos(
       setActivo: async () => makeProveedor(),
       ...proveedores,
     } as ProveedoresRepo,
+    productos: {} as ProductosRepo,
+    movimientos: {} as MovimientosRepo,
   };
 }
 
