@@ -200,7 +200,7 @@ Satisfies spec at the repository layer, proven against real Postgres, not yet re
 
 **Forecast: ~160 prod / ~230 test = ~390 raw diff. At budget.**
 
-- [ ] 2.1 RED `apps/api/src/productos/repository.integration.test.ts` (new, Docker PG) — against
+- [x] 2.1 RED `apps/api/src/productos/repository.integration.test.ts` (new, Docker PG) — against
       code that does not exist: `list(page, pageSize)` paginates and returns the correct `total` on
       an out-of-range page; `list(page, pageSize, q)` filters on `nombre` **and** `sku`
       case-insensitively and the count statement reflects the same filter (the D7 trap — assert
@@ -213,7 +213,7 @@ Satisfies spec at the repository layer, proven against real Postgres, not yet re
       a normal increment; returns `undefined` when `activo = false`; returns `undefined` when the
       result would go negative; returns the correct value under two concurrent calls (serialized by
       the row's own UPDATE, not a separate lock)
-- [ ] 2.2 GREEN `apps/api/src/productos/repository.ts` (new) — `Producto`, `NuevoProducto`,
+- [x] 2.2 GREEN `apps/api/src/productos/repository.ts` (new) — `Producto`, `NuevoProducto`,
       `CambiosProducto` (no `stockActual` key), `ProductosRepo` port (`list`, `findById`,
       `findByIdForUpdate`, `create`, `update`, `setActivo`, `aplicarDelta`), `DrizzleProductosRepo`.
       `create`/`update` catch `isUniqueViolation` (imported from `../lib/db-errors.js`, per proposal
@@ -224,7 +224,7 @@ Satisfies spec at the repository layer, proven against real Postgres, not yet re
       selector must be written `where lower(sku) = lower($1)` at the call site). `q` composes
       `(nombre ILIKE :pattern OR sku ILIKE :pattern)` into **both** the page query and the count
       query, with `pattern` escaped for `\`, `%`, `_` before binding (D7)
-- [ ] 2.3 Verify: `pnpm --filter api test`, `pnpm --filter api test:integration`, `pnpm typecheck`,
+- [x] 2.3 Verify: `pnpm --filter api test`, `pnpm --filter api test:integration`, `pnpm typecheck`,
       `pnpm lint`
 
 ## Phase 3: S2b — `MovimientosRepo` + `Repos` Widening
