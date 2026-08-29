@@ -11,6 +11,7 @@ import {
   lastActiveEncargado,
   notFoundEnvelope,
   passwordChangeRequired,
+  supplierNameInUse,
   toErrorEnvelope,
   unauthorized,
   userNotFound,
@@ -191,6 +192,26 @@ describe('user-management error factories (design.md D14)', () => {
     expect(result.status).toBe(409);
     expect(result.body).toEqual({
       error: { code: 'LAST_ACTIVE_ENCARGADO', message: expect.any(String) },
+    });
+  });
+});
+
+describe('supplier-management error factories (design.md D12, S3a slice)', () => {
+  it('supplierNameInUse() is a 409 AppError with code SUPPLIER_NAME_IN_USE and no details', () => {
+    const error = supplierNameInUse();
+
+    expect(error).toBeInstanceOf(AppError);
+    expect(error.status).toBe(409);
+    expect(error.code).toBe('SUPPLIER_NAME_IN_USE');
+    expect(error.details).toBeUndefined();
+  });
+
+  it('toErrorEnvelope() maps supplierNameInUse() to a 409 { error: { code: "SUPPLIER_NAME_IN_USE" } } envelope', () => {
+    const result = toErrorEnvelope(supplierNameInUse());
+
+    expect(result.status).toBe(409);
+    expect(result.body).toEqual({
+      error: { code: 'SUPPLIER_NAME_IN_USE', message: expect.any(String) },
     });
   });
 });
