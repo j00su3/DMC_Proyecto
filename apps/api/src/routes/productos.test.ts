@@ -343,6 +343,33 @@ describe('PATCH /api/productos/:id — .strict() rejects stockActual before any 
     expect(response.json().error.code).toBe('VALIDATION_ERROR');
     expect(handlerReached).toBe(false);
   });
+
+  // The spec writes the key as `stock_actual` (`spec.md:101-104`), the column
+  // spelling, while this API is camelCase over the wire like every other route
+  // (`creadoEn`, `debeCambiarPassword`). `.strict()` refuses both spellings
+  // because neither is in the shape, but only the camelCase one was proven.
+  // The spec names this one, so it gets its own assertion rather than relying
+  // on the reader to infer that the other case is covered.
+  it("rejects the spec's snake_case stock_actual key the same way", async () => {
+    let handlerReached = false;
+    app = await buildWithSession(makeUsuario(), {
+      findByIdForUpdate: async () => {
+        handlerReached = true;
+        return makeProducto();
+      },
+    });
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: routes.update(),
+      payload: { stock_actual: 999 },
+      cookies: { sid: app.signCookie('valid-token') },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('VALIDATION_ERROR');
+    expect(handlerReached).toBe(false);
+  });
 });
 
 describe('POST /api/productos', () => {
