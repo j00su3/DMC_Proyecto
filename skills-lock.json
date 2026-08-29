@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "auditar-drift": {
+      "source": "adminoryslabs/Armory",
+      "sourceType": "github",
+      "skillPath": "skills/auditar-drift/SKILL.md",
+      "computedHash": "38d2ec8747eee73ab388628552d97d92e9ad542b4e3f7e1fe23ce54a37266846"
+    },
+    "deploy-pass": {
+      "source": "adminoryslabs/Armory",
+      "sourceType": "github",
+      "skillPath": "skills/deploy-pass/SKILL.md",
+      "computedHash": "add0137d1686ed3ec8c5ded67b49da7a35bdb8fdb073bc5d92844027a56f8383"
+    },
+    "security-pass": {
+      "source": "adminoryslabs/Armory",
+      "sourceType": "github",
+      "skillPath": "skills/security-pass/SKILL.md",
+      "computedHash": "f2443bf5b3505b8bb1ef023127541b815b94541c747b8fd552ba2101de2a3eb5"
+    }
+  }
+}
