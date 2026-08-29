@@ -265,9 +265,10 @@ requirements S5a proved with stubs. Depends on S5a.
       --base main` — GitHub does not auto-retarget a stacked PR when its base merges (precedent:
       `gestion-usuarios` #36→#37→#38, `pantalla-usuarios`); delete a merged branch only after
       confirming the retarget landed
-- [ ] 8.3 After the last slice merges, confirm the two Open Questions the design left unresolved
+- [x] 8.3 After the last slice merges, confirm the two Open Questions the design left unresolved
       (wire-code language consistency, `isUniqueViolation`'s non-discriminating 23505 mapping) are
-      still recorded as open questions in the archived design, not silently dropped
+      still recorded as open questions in the archived design, not silently dropped — **CONFIRMED**
+      on 2026-08-29: both remain unchecked at design.md:364 and design.md:371
 
 ## Requirement Coverage Map
 

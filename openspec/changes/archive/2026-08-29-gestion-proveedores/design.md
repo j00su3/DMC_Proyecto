@@ -361,13 +361,20 @@ Chained PRs recommended: Yes
       That is precisely why S2's RED test still asserts the accented pair against whatever the
       database actually does — the test is what keeps this true in every environment, and a failure
       there is a real signal about that environment, not a flaky test to relax.
-- [ ] **Wire-code language.** `SUPPLIER_NOT_FOUND` and `SUPPLIER_NAME_IN_USE` are taken verbatim
-      from the ratified spec and are the mechanical SCREAMING_SNAKE of the factory names
-      `gestion-usuarios` D14 already anticipated. But `SUPPLIER_NAME_IN_USE` is fully Spanish
-      while `EMAIL_ALREADY_IN_USE` is fully English, and `nombre` is a field name, not the domain
-      entity noun the naming rule exempts. Changing a ratified wire code needs a spec delta, not a
-      design decision, so this design follows the spec. Flagged so the owner can amend before archive
-      if consistency matters more than the spec's current letter.
+- [x] **Wire-code language — RESOLVED before implementation, 2026-08-29.** This question was
+      written while the proposed codes were `PROVEEDOR_NOT_FOUND` and `PROVEEDOR_NOMBRE_EN_USO`,
+      which mixed Spanish into the wire surface while `EMAIL_ALREADY_IN_USE` was English. Both were
+      renamed to `SUPPLIER_NOT_FOUND` and `SUPPLIER_NAME_IN_USE` (with matching `supplierNotFound()`
+      / `supplierNameInUse()` factories) before a single line of implementation was written, so the
+      spec delta this question said would be required was never needed — nothing ratified had
+      shipped yet.
+
+      The paragraph that stood here until archive still described the pre-rename codes and claimed
+      `SUPPLIER_NAME_IN_USE` was "fully Spanish". That was stale and factually wrong:
+      `apps/api/src/lib/errors.ts:169` carries `SUPPLIER_NAME_IN_USE`, which is English and matches
+      the project convention that types and repos are Spanish (`Proveedor`, `ProveedoresRepo`) while
+      error factories and codes are English. Corrected rather than archived as an open question,
+      because carrying forward a question about a code that does not exist misleads the next reader.
 - [ ] **`isUniqueViolation` does not discriminate on constraint name** (D13). Harmless today for both
       tables; the day either gains a second unique column the mapping mislabels. Recommend a separate
       hardening item rather than folding a rewrite into a relocation.
