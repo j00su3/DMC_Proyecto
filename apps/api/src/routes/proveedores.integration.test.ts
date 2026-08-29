@@ -58,12 +58,13 @@ async function loginAs(
 
 async function auditRowsFor(entidadId: string) {
   const result = await db.execute(
-    sql`select accion, usuario_id, datos_previos, datos_posteriores
+    sql`select entidad, accion, usuario_id, datos_previos, datos_posteriores
           from auditoria where entidad_id = ${entidadId} order by creado_en`,
   );
   return (
     result as unknown as {
       rows: {
+        entidad: string;
         accion: string;
         usuario_id: string;
         datos_previos: Record<string, unknown> | null;
@@ -242,6 +243,91 @@ describe('proveedores uniqueness and lifecycle (integration, real app + real Pos
     expect(rows).toHaveLength(1);
   });
 
+  it('refuses a PATCH that takes another supplier normalized name, changing no field', async () => {
+    const encargado = await seedUsuario('encargado');
+    app = await buildApp({ cookieSecret: COOKIE_SECRET });
+    await app.ready();
+    const sid = await loginAs(app, encargado.email);
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/proveedores',
+      payload: { nombre: 'Distribuidora Norte' },
+      cookies: { sid },
+    });
+    const second = await app.inject({
+      method: 'POST',
+      url: '/api/proveedores',
+      payload: { nombre: 'Ferreteria Sur' },
+      cookies: { sid },
+    });
+    const id = second.json().proveedor.id;
+
+    const collision = await app.inject({
+      method: 'PATCH',
+      url: `/api/proveedores/${id}`,
+      payload: { nombre: 'distribuidora norte' },
+      cookies: { sid },
+    });
+
+    expect(collision.statusCode).toBe(409);
+    expect(collision.json().error.code).toBe('SUPPLIER_NAME_IN_USE');
+
+    // The repository suite proves `repo.update()` maps 23505. This proves the
+    // whole chain: `updateProveedor` runs a `changedFields` diff between the
+    // request and the repository (service.ts), and a diff that folded case
+    // would short-circuit before the index ever saw the collision — leaving a
+    // silent 200 that every other test in this repo would still call green.
+    const after = await app.inject({
+      method: 'GET',
+      url: `/api/proveedores/${id}`,
+      cookies: { sid },
+    });
+    expect(after.json().proveedor.nombre).toBe('Ferreteria Sur');
+    // Only the original crear row — the refused PATCH filed no `actualizar`.
+    const rows = await auditRowsFor(id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.accion).toBe('crear');
+  });
+
+  it('lets a deactivated supplier name keep blocking a duplicate create', async () => {
+    const encargado = await seedUsuario('encargado');
+    app = await buildApp({ cookieSecret: COOKIE_SECRET });
+    await app.ready();
+    const sid = await loginAs(app, encargado.email);
+
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/proveedores',
+      payload: { nombre: 'Distribuidora Norte' },
+      cookies: { sid },
+    });
+    const id = created.json().proveedor.id;
+    const deactivated = await app.inject({
+      method: 'POST',
+      url: `/api/proveedores/${id}/deactivate`,
+      cookies: { sid },
+    });
+    expect(deactivated.json().proveedor.activo).toBe(false);
+
+    const duplicate = await app.inject({
+      method: 'POST',
+      url: '/api/proveedores',
+      payload: { nombre: 'DISTRIBUIDORA NORTE' },
+      cookies: { sid },
+    });
+
+    expect(duplicate.statusCode).toBe(409);
+    expect(duplicate.json().error.code).toBe('SUPPLIER_NAME_IN_USE');
+    // The unique index carries no partial `WHERE activo` clause, so an
+    // inactive row still owns its name. Pinning it here means adding such a
+    // clause later fails loudly instead of silently allowing the duplicate.
+    const count = await db.execute(
+      sql`select count(*)::int as n from proveedores`,
+    );
+    expect((count as unknown as { rows: { n: number }[] }).rows[0]?.n).toBe(1);
+  });
+
   it('reports 404 SUPPLIER_NOT_FOUND for an id that matches no row', async () => {
     const encargado = await seedUsuario('encargado');
     app = await buildApp({ cookieSecret: COOKIE_SECRET });
@@ -355,6 +441,10 @@ describe('proveedores audit trail and atomic rollback (integration, real app + r
     expect(rows[0]?.accion).toBe('crear');
     expect(rows[0]?.usuario_id).toBe(encargado.id);
     expect(rows[0]?.datos_previos).toBeNull();
+    // Read back from Postgres, not trusted from the service: `entidad` was
+    // previously proven only against a fake `recordAudit`, so a wrong literal
+    // would have survived every green test in this suite.
+    expect(rows[0]?.entidad).toBe('proveedores');
   });
 
   it('files exactly one actualizar row with only the changed field, in both directions', async () => {
@@ -422,6 +512,12 @@ describe('proveedores audit trail and atomic rollback (integration, real app + r
     expect(rows).toHaveLength(3);
     expect(rows[2]?.accion).toBe('reactivar');
     expect(rows[2]?.usuario_id).toBe(encargado.id);
+    // Every verb across the whole lifecycle files under the same entidad.
+    expect(rows.map((row) => row.entidad)).toEqual([
+      'proveedores',
+      'proveedores',
+      'proveedores',
+    ]);
   });
 
   it('rolls back the whole create when the paired audit write fails', async () => {
