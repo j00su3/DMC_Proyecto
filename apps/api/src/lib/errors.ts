@@ -172,6 +172,14 @@ export function supplierNameInUse(): AppError {
   );
 }
 
+// design.md D7: thrown by the service when findByIdForUpdate returns
+// undefined, never by the repository (see proveedores/repository.ts's
+// expectOneRow precedent). D14: distinct from notFoundEnvelope() so "no such
+// path" and "no such supplier" stay distinguishable in logs and clients.
+export function supplierNotFound(): AppError {
+  return new AppError('SUPPLIER_NOT_FOUND', 'Supplier not found', 404);
+}
+
 export function toErrorEnvelope(error: unknown): MappedError {
   if (hasValidationErrors(error)) {
     return {

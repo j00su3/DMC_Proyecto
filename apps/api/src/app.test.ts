@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildApp } from './app.js';
 import type { AuditoriaRepo } from './auditoria/repository.js';
 import type { SesionesRepo } from './auth/repository.js';
+import type { ProveedoresRepo } from './proveedores/repository.js';
 import type { UsuariosRepo } from './usuarios/repository.js';
 
 /**
@@ -67,6 +68,16 @@ function fakeRepos() {
     auditoria: {
       record: async () => {},
     } satisfies AuditoriaRepo,
+    // These tests exercise logging and wiring, never supplier management
+    // (same reasoning as the usuarios stub above).
+    proveedores: {
+      list: unusedRepoMethod,
+      findById: unusedRepoMethod,
+      findByIdForUpdate: unusedRepoMethod,
+      create: unusedRepoMethod,
+      update: unusedRepoMethod,
+      setActivo: unusedRepoMethod,
+    } satisfies ProveedoresRepo,
   };
 }
 

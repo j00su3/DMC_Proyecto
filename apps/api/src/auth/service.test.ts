@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { AuditoriaRepo } from '../auditoria/repository.js';
+import type { ProveedoresRepo } from '../proveedores/repository.js';
 import type { Usuario, UsuariosRepo } from '../usuarios/repository.js';
 import { hashPassword, verifyPassword } from './password.js';
 import type { SesionesRepo } from './repository.js';
@@ -197,6 +198,11 @@ function fakeUow(
       record: async () => {},
       ...overrides.auditoria,
     } as AuditoriaRepo,
+    // Only present so `run`'s callback satisfies the plugin-wide `Repos`
+    // type that `UnitOfWork` (db/uow.ts) requires — changePassword() never
+    // touches proveedores, unlike auth/service.ts's own two-key local
+    // `Repos` that `login`/`logout`/`resolveSession` use above.
+    proveedores: {} as ProveedoresRepo,
   };
   const state = { committed: false, calls: 0 };
   async function run<T>(work: (r: typeof repos) => Promise<T>): Promise<T> {
