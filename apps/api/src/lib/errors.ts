@@ -159,6 +159,19 @@ export function lastActiveEncargado(): AppError {
   );
 }
 
+// design.md D12: 409 not 422 — same reasoning as emailAlreadyInUse(). The
+// wire code is taken verbatim from the ratified spec
+// (specs/supplier-management/spec.md). Moved into S3a (ahead of the rest of
+// S4's error factories) because proveedores/repository.ts's create/update
+// throw it directly on a caught 23505 and cannot compile without it.
+export function supplierNameInUse(): AppError {
+  return new AppError(
+    'SUPPLIER_NAME_IN_USE',
+    'Supplier name is already in use by another supplier',
+    409,
+  );
+}
+
 export function toErrorEnvelope(error: unknown): MappedError {
   if (hasValidationErrors(error)) {
     return {

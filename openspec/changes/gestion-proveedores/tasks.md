@@ -110,12 +110,12 @@ HTTP): **Case-Insensitive Name Uniqueness With Original-Casing Storage** (constr
 (persistence half), **Reactivation** (persistence half). Depends on S1 (`isUniqueViolation`), S2
 (table + index exist).
 
-- [ ] 3a.1 RED `apps/api/src/lib/errors.test.ts` (extend) — `supplierNameInUse()` → 409
+- [x] 3a.1 RED `apps/api/src/lib/errors.test.ts` (extend) — `supplierNameInUse()` → 409
       `SUPPLIER_NAME_IN_USE`, no `details`, `toErrorEnvelope` maps it (D12). This is the one
       factory moved out of the design's S4 grouping — see the correction note above
-- [ ] 3a.2 GREEN `apps/api/src/lib/errors.ts` (extend) — add `supplierNameInUse()`, matching
+- [x] 3a.2 GREEN `apps/api/src/lib/errors.ts` (extend) — add `supplierNameInUse()`, matching
       `emailAlreadyInUse()`'s shape exactly
-- [ ] 3a.3 RED `apps/api/src/proveedores/repository.integration.test.ts` (new, Docker PG) — against
+- [x] 3a.3 RED `apps/api/src/proveedores/repository.integration.test.ts` (new, Docker PG) — against
       code that does not exist: `list(page, pageSize)` paginates and returns the correct `total`
       on an **out-of-range page** (the D9 windowed-count trap, asserted as a value); ordering
       (`desc(creadoEn), desc(id)`) stays stable across pages when `creadoEn` ties (D9);
@@ -123,13 +123,13 @@ HTTP): **Case-Insensitive Name Uniqueness With Original-Casing Storage** (constr
       `SUPPLIER_NAME_IN_USE` (not a raw pg error) on a duplicate name, case-insensitively (D13);
       `setActivo(false)` leaves the row present and readable, never deletes (D8); `update` with
       `contacto: null` clears an existing value (D11)
-- [ ] 3a.4 GREEN `apps/api/src/proveedores/repository.ts` (new) — `Proveedor`, `NuevoProveedor`,
+- [x] 3a.4 GREEN `apps/api/src/proveedores/repository.ts` (new) — `Proveedor`, `NuevoProveedor`,
       `CambiosProveedor`, `ProveedoresRepo`, `DrizzleProveedoresRepo` per the design's Interfaces
       section. `create`/`update` catch and `import { isUniqueViolation } from '../lib/db-errors.js'`
       then `throw supplierNameInUse()` on a hit, mirroring `usuarios/repository.ts:293-294,
       315-316` exactly. No `findByNombre` method exists on the port, deliberately (D2). No
       set-lock or predicate-lock method exists, deliberately (D7, D8)
-- [ ] 3a.5 Verify: `pnpm --filter api test`, `pnpm --filter api test:integration`, `pnpm typecheck`,
+- [x] 3a.5 Verify: `pnpm --filter api test`, `pnpm --filter api test:integration`, `pnpm typecheck`,
       `pnpm lint`
 
 ## Phase 4: S3b — `Repos` Widening + Stub Churn
