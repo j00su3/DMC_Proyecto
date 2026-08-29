@@ -272,7 +272,7 @@ Transaction** (`spec.md:70-94`), **Field-Level Permission — `stock_minimo` Res
 
 **Forecast: ~150 prod / ~240 test = ~390 raw diff. At budget.**
 
-- [ ] 4.1 RED `apps/api/src/productos/service.test.ts` (new, fake repos + `{ run: (work) =>
+- [x] 4.1 RED `apps/api/src/productos/service.test.ts` (new, fake repos + `{ run: (work) =>
       work(stubs) }`) — against code that does not exist: `crearProducto` with `stockInicial = 0`
       calls `productos.create` and **not** `movimientos.create` or `aplicarDelta`;
       `stockInicial = 50` calls `productos.create` (with `stockActual: 0`), then `aplicarDelta(id,
@@ -287,7 +287,7 @@ Transaction** (`spec.md:70-94`), **Field-Level Permission — `stock_minimo` Res
       `supplierInactive()`, both before the product insert; every call happens inside exactly one
       `uow.run` invocation; the final statement inside `uow.run` is `recordAudit({ entidad:
       'productos', accion: 'crear', ... })`
-- [ ] 4.2 GREEN `apps/api/src/productos/service.ts` (new) — `crearProducto` only in this slice
+- [x] 4.2 GREEN `apps/api/src/productos/service.ts` (new) — `crearProducto` only in this slice
       (`actualizarProducto`/`setProductoActivo`/`listProductos`/`getProducto` are Phase 5).
       `requireActor(request.user): { id, rol }`, generalised from
       `routes/proveedores.ts:76-81`'s `requireActorId` (D6). Field guard and inactive-supplier guard
@@ -295,7 +295,7 @@ Transaction** (`spec.md:70-94`), **Field-Level Permission — `stock_minimo` Res
       `uow.run`: `proveedores.findById` → product insert with `stockActual: 0` → (if `stockInicial >
       0`) `aplicarDelta` then `movimientos.create` with `stockResultante` from `aplicarDelta`'s
       return → `recordAudit` last
-- [ ] 4.3 Verify: `pnpm --filter api test`, `pnpm typecheck`, `pnpm lint`
+- [x] 4.3 Verify: `pnpm --filter api test`, `pnpm typecheck`, `pnpm lint`
 
 ## Phase 5: S3b — Product Service, Read/Update/Deactivate Paths
 
