@@ -13,6 +13,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 
@@ -37,6 +38,32 @@ export const usuarios = pgTable('usuarios', {
     .notNull()
     .default(false),
 });
+
+// Supplier directory (backlog #4). See design.md D1-D3: case-insensitive
+// name uniqueness is a functional unique index on lower(nombre), never a
+// generated column or TS-side case folding — the column stays plain text so
+// the stored value is exactly what was submitted (D2). `text`, not
+// `varchar` — a varchar column makes Postgres add a `::text` cast to the
+// index expression that a later query predicate would then fail to match.
+export const proveedores = pgTable(
+  'proveedores',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    nombre: text('nombre').notNull(),
+    contacto: text('contacto'),
+    activo: boolean('activo').notNull().default(true),
+    creadoEn: timestamp('creado_en', { withTimezone: true, mode: 'date' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    // The name is mandatory, not stylistic: drizzle-kit exits 1 on an
+    // unnamed expression index (design.md D1).
+    uniqueIndex('proveedores_nombre_lower_unique').on(
+      sql`lower(${table.nombre})`,
+    ),
+  ],
+);
 
 export const sesiones = pgTable(
   'sesiones',
