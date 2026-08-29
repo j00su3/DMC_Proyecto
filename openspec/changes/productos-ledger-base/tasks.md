@@ -404,7 +404,7 @@ pressure. Depends on S4b (needs the live `POST /api/productos` route).
 "S5-core" shape from `design.md`'s own stated fallback ("keep exactly the four atomicity tests…
 roughly 150 lines instead of 500"), adopted here as the default, not the fallback.**
 
-- [ ] 8.1 RED `apps/api/src/routes/productos.integration.test.ts` (new, real app + Docker PG,
+- [x] 8.1 RED `apps/api/src/routes/productos.integration.test.ts` (new, real app + Docker PG,
       `failingUow` technique from `apps/api/src/routes/proveedores.integration.test.ts:526-543` — a
       real `createUnitOfWork(db)` with one repo replaced by a thrower):
       1. **Positive.** Create with `stockInicial = 5` ⇒ `productos.stock_actual = 5`; exactly one
@@ -416,9 +416,17 @@ roughly 150 lines instead of 500"), adopted here as the default, not the fallbac
       3. **Audit fails.** `auditoria.record` throws ⇒ same three zeroes, response
          `500 { error: { code: "AUDIT_WRITE_FAILED" } }`
       4. **Zero initial stock.** `stockInicial = 0` ⇒ product row exists, zero `movimientos` rows
-- [ ] 8.2 GREEN whatever wiring gap 8.1 exposes (expected: none — S3a/S3b/S4a/S4b already implement
+
+      All four passed on first run against the already-shipped S3a/S3b/S4a/S4b production code — no
+      RED-from-missing-implementation was possible here (see 8.2). To avoid trusting a
+      never-failing test, the two rollback assertions (`countRows('productos')` after a forced
+      `movimientos`/`auditoria` failure) were mutated to expect `1` instead of `0` and re-run: both
+      failed with "expected +0 to be 1", proving the count really is 0 (a genuine rollback, not a
+      vacuous assertion), then reverted to the correct `0` and re-run green. See apply-progress for
+      full evidence.
+- [x] 8.2 GREEN whatever wiring gap 8.1 exposes (expected: none — S3a/S3b/S4a/S4b already implement
       this path; this slice is the real-Postgres proof, not new production code)
-- [ ] 8.3 Verify: `pnpm --filter api test`, `pnpm --filter api test:integration`, `pnpm typecheck`,
+- [x] 8.3 Verify: `pnpm --filter api test`, `pnpm --filter api test:integration`, `pnpm typecheck`,
       `pnpm lint`
 
 ## Phase 9: S5-breadth — RBAC/Pagination/Search Real-Session Re-Proof (stretch, droppable)
