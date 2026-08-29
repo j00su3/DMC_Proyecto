@@ -19,3 +19,10 @@ dist/
 
 # Docker volumes (bind mounts, if any)
 pgdata/
+
+# Agent skills are versioned as real files under .agents/skills/ plus
+# skills-lock.json. The .claude/skills/ entries are absolute symlinks into this
+# machine's checkout, created by `npx skills add` — portable for nobody. Run
+# `npx skills add adminoryslabs/Armory --skill <name>` after cloning to recreate
+# them, or point your agent at .agents/skills/ directly.
+.claude/skills/
