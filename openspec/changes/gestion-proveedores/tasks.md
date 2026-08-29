@@ -197,24 +197,26 @@ Satisfies spec: **Role Gate — Read/Write Split** (unit half), **Supplier Creat
 Id** (HTTP shape), **Update Supplier Profile** (including the `.strict()` rejection of `activo`),
 **Logical Deactivation**, **Reactivation** (HTTP shapes). Depends on S4.
 
-- [ ] 5a.1 RED `apps/api/src/routes/proveedores.test.ts` (new, `buildApp({ repos, uow,
+- [x] 5a.1 RED `apps/api/src/routes/proveedores.test.ts` (new, `buildApp({ repos, uow,
       cookieSecret })` + `inject`) — against code that does not exist: the full 6×role matrix —
       `deposito` → 200 on both GETs, 403 `FORBIDDEN` on all four writes; unauthenticated → 401 on
       all six; a flagged (`debeCambiarPassword`) user → 403 `PASSWORD_CHANGE_REQUIRED` on all six
       (D6, inherited hook ordering); `PATCH` with an `activo` key → 400 `VALIDATION_ERROR`;
       `PATCH` with `{}` → 400 (`.refine(keys.length > 0)`); `nombre: '   '` → 400 after trimming
       (D3); `contacto: null` accepted, `contacto: ''` rejected (D11)
-- [ ] 5a.2 GREEN `apps/api/src/routes/proveedores.ts` (new) — six routes: `GET /api/proveedores`,
+- [x] 5a.2 GREEN `apps/api/src/routes/proveedores.ts` (new) — six routes: `GET /api/proveedores`,
       `GET /api/proveedores/:id` with `config: { roles: ['encargado', 'deposito'] }`;
       `POST /api/proveedores`, `PATCH /api/proveedores/:id`,
       `POST /api/proveedores/:id/deactivate`, `POST /api/proveedores/:id/reactivate` with
       `config: { roles: ['encargado'] }` (D6). `nombre`/`contacto` trimmed at the Zod boundary
       (D3); `PATCH` body is `.strict()` and `.refine(keys.length > 0)` (D11); every route declares
       each reachable status in its Zod `response` map
-- [ ] 5a.3 GREEN `apps/api/src/app.ts` — `app.register(proveedoresRoutes, { prefix: '/api' })`,
+- [x] 5a.3 GREEN `apps/api/src/app.ts` — `app.register(proveedoresRoutes, { prefix: '/api' })`,
       registered **after** `authPlugin`, alongside the other route plugins (D6 — registering before
       the auth hook silently drops coverage)
-- [ ] 5a.4 Verify: `pnpm --filter api test`, `pnpm typecheck`, `pnpm lint`
+- [x] 5a.4 Verify: `pnpm --filter api test`, `pnpm typecheck`, `pnpm lint` — also ran
+      `pnpm contract:check` (this slice DOES change the contract, unlike S1–S4) and
+      `pnpm test:integration`, all verified twice green
 
 ## Phase 7: S5b — Real-Session Integration Suite + Contract
 
