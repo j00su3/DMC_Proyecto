@@ -977,9 +977,14 @@ El orden de severidad y el orden de atención no coinciden, porque hay dependenc
 
 ## Gobernanza / Decisión requerida
 
-Los siguientes hallazgos **no pueden resolverse sin una decisión humana**. Este pase no tiene
+Los siguientes hallazgos **no podían resolverse sin una decisión humana**. Este pase no tenía
 autoridad para cambiar arquitectura, ADRs, alcance de producto ni para aceptar un riesgo en nombre
-del propietario, así que quedan aquí abiertos de forma deliberada:
+del propietario, así que quedaron abiertos de forma deliberada.
+
+> **Cerrados el 2026-08-29 por el propietario.** Las tres decisiones están tomadas y registradas en
+> los documentos que las gobiernan; abajo se conserva el planteo original de cada una, seguido de la
+> resolución. La **implementación** de SEC-001 y SEC-008 es trabajo pendiente, anotado en
+> `docs/BACKLOG.md`: la decisión está cerrada, el código todavía no.
 
 - **SEC-001 — `DESIGN / ADR CHANGE`.** `docs/adrs/0007-sesion-cookie-rbac-propio.md:52-53` dejó
   explícitamente abierta la elección entre bloqueo "por usuario y/o IP", y la implementación tomó solo
@@ -1000,3 +1005,15 @@ del propietario, así que quedan aquí abiertos de forma deliberada:
 
 **Ningún hallazgo de este pase fue marcado `ACCEPT RISK`.** Todos tienen una remediación concreta
 propuesta; ninguno se cerró declarándolo tolerable por cuenta de este análisis.
+
+### Resoluciones (2026-08-29)
+
+| Hallazgo | Decisión | Registrada en |
+| --- | --- | --- |
+| SEC-001 | Verificar la contraseña **antes** de rechazar por bloqueo: una credencial correcta concede acceso aunque la cuenta esté bloqueada, y limpia el contador. Descartado el bloqueo por IP mientras no exista `trustProxy` (SEC-003), porque hoy todos los clientes comparten la IP del proxy de Vercel. | `docs/adrs/0007-sesion-cookie-rbac-propio.md` § Actualizado 2026-08-29 |
+| SEC-008 | Almacenar `sha256(token)` como clave primaria de `sesiones`; el token en claro viaja sólo en la cookie. La justificación original del ADR se conserva: un hash no es un secreto, así que no hay nada que sincronizar. | `docs/adrs/0007-sesion-cookie-rbac-propio.md` § Actualizado 2026-08-29 |
+| SEC-012 | Rastro permanente **sin datos personales**: las instantáneas seudonimizan el correo y la identidad del actor queda en el UUID `auditoria.usuario_id`. Una supresión limpia el dato en `usuarios` y el rastro sobrevive. Descartada la ventana de retención con purga, que le pondría vencimiento al no repudio. | `docs/PRD.md` § Supuestos y riesgos abiertos |
+
+**SEC-001 y SEC-008 siguen sin implementar.** Esta sección registra decisiones, no código. Ningún
+hallazgo de este pase quedó cerrado declarándolo tolerable.
+
