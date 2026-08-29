@@ -29,6 +29,13 @@
       "when": 1787968629149,
       "tag": "0003_light_blizzard",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788032253914,
+      "tag": "0004_legal_shinobi_shaw",
+      "breakpoints": true
     }
   ]
 }

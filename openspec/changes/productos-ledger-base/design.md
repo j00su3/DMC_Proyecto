@@ -507,16 +507,25 @@ input and already exists.
 
 Spec-reconciliation items — the spec wins on every one of these:
 
-- [ ] **[RECONCILE-1]** `stockActual` in `FIELD_CLASSIFICATION.productos.excludedFields` (D2).
+- [x] **[RECONCILE-1]** `stockActual` in `FIELD_CLASSIFICATION.productos.excludedFields` (D2).
       Design position: excluded, per ADR-0012. Flips if the spec requires the `crear` audit
       snapshot to carry opening stock.
-- [ ] **[RECONCILE-2]** The wire code for the inactive-supplier refusal. Design proposes
+      **Resolved 2026-08-29 — excluded.** The spec is silent on snapshot contents, so the owner
+      decided directly, upholding the design position (ADR-0012 rules 1 and 2). See `tasks.md` R1.
+- [x] **[RECONCILE-2]** The wire code for the inactive-supplier refusal. Design proposes
       `SUPPLIER_INACTIVE` / 409. The proposal ratifies the rule, not the name.
-- [ ] **[RECONCILE-3]** `productos.proveedor_id` NOT NULL. `TECH-DESIGNv2.md:103` lists the FK
+      **Resolved 2026-08-29 by the spec — `SUPPLIER_INACTIVE`.** Used verbatim at `spec.md:24`
+      and `:200`. See `tasks.md` R2.
+- [x] **[RECONCILE-3]** `productos.proveedor_id` NOT NULL. `TECH-DESIGNv2.md:103` lists the FK
       unconditionally and D8 presumes a supplier is always chosen, but nothing states a product
       may not exist without one.
-- [ ] **[RECONCILE-4]** `CHECK (tipo <> 'ajuste' OR motivo IS NOT NULL)` (D5). Recommended now
+      **Resolved 2026-08-29 — NOT NULL.** The spec is silent, so the owner decided directly,
+      upholding the design position. See `tasks.md` R3.
+- [x] **[RECONCILE-4]** `CHECK (tipo <> 'ajuste' OR motivo IS NOT NULL)` (D5). Recommended now
       to avoid reopening the table in #6; drop it if the spec scopes the motivo rule to #6.
+      **Resolved 2026-08-29 by the spec — dropped.** `spec.md:121-133` states the table "MUST
+      enforce **two** CHECK constraints" and names only sign/type and discrepancy; a motivo CHECK
+      would be a third. #6 owns the motivo rule. See `tasks.md` R4.
 - [ ] `cantidad <> 0`: not shipped, because `TECH-DESIGNv2.md:125` says `ajuste` is *libre*.
       Unreachable from #5. Named here so #6 decides it rather than inherits it.
 - [ ] Whether `q` should also match `categoria`. Design says no (name and SKU only, per the
