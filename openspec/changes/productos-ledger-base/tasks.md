@@ -334,24 +334,36 @@ Depends on S3b.
 reasoning `gestion-proveedores`'s S3a used (peeling a smaller unit would cost more in review focus
 than it saves in line count); flag for `size:exception` if it drifts further during apply.**
 
-- [ ] 6.1 RED `apps/api/src/routes/productos.test.ts` (new, `buildApp({ repos, uow, cookieSecret })`
-      + `inject`) — against code that does not exist: unauthenticated → 401 on all five routes this
-      slice adds; `deposito` → 200/201 on both GETs and on `POST` without `stock_minimo`; `deposito`
-      → 403 `FIELD_RESERVED_FOR_ENCARGADO` on `POST`/`PATCH` with `stock_minimo` present (any
-      value); `encargado` → 200/201/200 on all three with `stock_minimo` present; `PATCH` with a
-      `stock_actual` key → 400 `VALIDATION_ERROR` before any handler runs; `POST` missing
-      `proveedor_id` → 400; duplicate `sku` on `POST`/`PATCH` → 409 `SKU_ALREADY_IN_USE`; inactive
-      `proveedor_id` on `POST`/`PATCH` → 409 `SUPPLIER_INACTIVE`; `GET /api/productos?q=...` reaches
-      the service; `GET /api/productos?page&pageSize` responds with the `{ data, page, pageSize,
-      total }` envelope
-- [ ] 6.2 GREEN `apps/api/src/routes/productos.ts` (new, partial — this slice only) —
+- [x] 6.1 RED `apps/api/src/routes/productos.test.ts` (new — built its own minimal test app
+      registering `productosRoutes` directly, since `buildApp` does not mount this plugin until task
+      7.2 (S4b); see the apply note below) + `inject`) — against code that does not exist:
+      unauthenticated → 401 on all four routes this slice adds (**apply note**: this task's own text
+      said "all five" — stale, same class of inaccuracy as its own flagged "task 6.4" reference below;
+      this slice adds exactly four routes, deactivate/reactivate is S4b); `deposito` → 200/201 on both
+      GETs and on `POST` without `stockMinimo`; `deposito` → 403 `FIELD_RESERVED_FOR_ENCARGADO` on
+      `POST`/`PATCH` with `stockMinimo` present (any value); `encargado` → 200/201/200 on all three
+      with `stockMinimo` present; `PATCH` with a `stockActual` key → 400 `VALIDATION_ERROR` before any
+      handler runs; `POST` missing `proveedorId` → 400; duplicate `sku` on `POST`/`PATCH` → 409
+      `SKU_ALREADY_IN_USE`; inactive `proveedorId` on `POST`/`PATCH` → 409 `SUPPLIER_INACTIVE`;
+      `GET /api/productos?q=...` reaches the service; `GET /api/productos?page&pageSize` responds with
+      the `{ data, page, pageSize, total }` envelope. **Apply note**: wire fields are camelCase
+      (`stockMinimo`/`proveedorId`/`stockActual`), not the snake_case spelling this task's own prose
+      uses — the codebase convention is camelCase over the wire (proven by `usuarios.ts`'s
+      `debeCambiarPassword` DTO field) and `productos/service.ts`'s already-shipped
+      `CrearProductoInput`/`CambiosProducto` types (S3a/S3b) already use camelCase keys the route just
+      forwards unchanged; snake_case would require an unprecedented mapping layer this task never
+      asked for.
+- [x] 6.2 GREEN `apps/api/src/routes/productos.ts` (new, partial — this slice only) —
       `GET /api/productos`, `GET /api/productos/:id`, `POST /api/productos`,
       `PATCH /api/productos/:id`, each `config: { roles: ['encargado', 'deposito'] }` (spec's Role
       Gate requirement). `crearProductoBody`/`actualizarProductoBody` Zod schemas — the latter
-      `.strict()`, with **no `stock_actual` field in its shape at all**, same technique as
-      `actualizarProveedorBody` (`routes/proveedores.ts:52-60`)
-- [ ] 6.3 Verify: `pnpm --filter api test`, `pnpm typecheck`, `pnpm lint` (`contract:check` deferred
-      to 6.4 — the route now changes observable API surface)
+      `.strict()`, with **no `stockActual` field in its shape at all**, same technique as
+      `actualizarProveedorBody` (`routes/proveedores.ts:52-60`). Plugin is NOT registered in `app.ts`
+      in this slice (task 7.2 owns that) — `apps/api/openapi.json` stays byte-identical, confirmed by
+      `pnpm contract:check`.
+- [x] 6.3 Verify: `pnpm --filter api test`, `pnpm typecheck`, `pnpm lint`. `contract:check` also run
+      here (not deferred to a "task 6.4" — no such task exists; the next contract-affecting task is
+      7.3) and confirmed byte-identical, since this plugin is not yet registered in `app.ts`.
 
 ## Phase 7: S4b — Routes: Deactivate/Reactivate + Contract Regeneration
 
