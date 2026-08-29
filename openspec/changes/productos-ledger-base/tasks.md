@@ -109,7 +109,7 @@ endpoint yet.
 
 **Forecast: ~90 prod / ~200 test = ~290 raw diff. Under budget.**
 
-- [ ] 1.1 RED `apps/api/src/db/schema.integration.test.ts` (extend, Docker PG) — against a database
+- [x] 1.1 RED `apps/api/src/db/schema.integration.test.ts` (extend, Docker PG) — against a database
       with no `productos`/`movimientos` tables: insert `entrada` with negative `cantidad` → CHECK
       rejects; insert `salida`/`venta` with positive `cantidad` → CHECK rejects; insert `ajuste`
       with any sign → accepted; insert `es_discrepancia = true` with `tipo = 'entrada'` → CHECK
@@ -118,7 +118,7 @@ endpoint yet.
       vs `'abc-1'`) collide via `productos_sku_lower_unique`, surviving row keeps original casing;
       a `productos` insert with `proveedor_id` pointing at a deleted/nonexistent supplier → FK
       violation; `pnpm db:generate` run twice emits no second migration file (round-trip proof)
-- [ ] 1.2 GREEN `apps/api/src/db/schema.ts` (modify) — add `movimientoTipo` pgEnum (complete:
+- [x] 1.2 GREEN `apps/api/src/db/schema.ts` (modify) — add `movimientoTipo` pgEnum (complete:
       `entrada | salida | ajuste | venta | anulacion`, D5); `productos` table (`id`, `nombre`,
       `sku: text not null`, `productos_sku_lower_unique` functional index on `lower(sku)`,
       `categoria: text` nullable, `stockActual: integer not null default 0`,
@@ -137,10 +137,10 @@ endpoint yet.
       "two CHECK constraints" count (`spec.md:121-133`).** No `cantidad <> 0` CHECK (design's own
       resolved Open Question, not a RECONCILE item — `TECH-DESIGNv2.md:125` states `ajuste` is
       *libre*)
-- [ ] 1.3 GREEN generate and apply the migration: `pnpm db:generate` → `apps/api/drizzle/0004_*.sql`
+- [x] 1.3 GREEN generate and apply the migration: `pnpm db:generate` → `apps/api/drizzle/0004_*.sql`
       + `meta/0004_snapshot.json`; `pnpm db:migrate` against the local Docker Postgres; re-run 1.1 →
       green
-- [ ] 1.4 Verify the round-trip claim from 1.1's last assertion: `pnpm db:generate` a second time
+- [x] 1.4 Verify the round-trip claim from 1.1's last assertion: `pnpm db:generate` a second time
       emits no new migration file
 - [ ] 1.5 RED `apps/api/src/lib/errors.test.ts` (extend) — against factories that do not exist:
       `productNotFound()` → 404 `PRODUCT_NOT_FOUND`; `skuAlreadyInUse()` → 409 `SKU_ALREADY_IN_USE`;
