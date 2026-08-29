@@ -373,18 +373,23 @@ the same PR chain link or the next, never before (the route file it extends must
 
 **Forecast: ~110 prod / ~140 test = ~250 raw diff. Under budget.**
 
-- [ ] 7.1 RED `apps/api/src/routes/productos.test.ts` (extend) — `deposito` → 403 `FORBIDDEN` (plain
+- [x] 7.1 RED `apps/api/src/routes/productos.test.ts` (extend) — `deposito` → 403 `FORBIDDEN` (plain
       code, not the field-level one — ordinary RBAC per D6's table) on both
       `POST /api/productos/:id/{deactivate,reactivate}`; `encargado` → 200 on both; a deactivated
-      product still returns 200 (not 404) from `GET /api/productos/:id`, with `activo: false`
-- [ ] 7.2 GREEN `apps/api/src/routes/productos.ts` (extend) —
+      product still returns 200 (not 404) from `GET /api/productos/:id`, with `activo: false`.
+      Confirmed RED for the right reason: both new assertions failed with 404 (route did not exist
+      yet), not 403/200 — the deactivated-GET assertion passed immediately since GET already
+      existed and the fake repo just needed `activo: false` wired through.
+- [x] 7.2 GREEN `apps/api/src/routes/productos.ts` (extend) —
       `POST /api/productos/:id/deactivate`, `POST /api/productos/:id/reactivate`, each `config: {
       roles: ['encargado'] }`. Register `productosRoutes` in `apps/api/src/app.ts`, after
       `authPlugin`, alongside the other route plugins (registering before the auth hook silently
-      drops coverage — the precedent's own D6 note)
-- [ ] 7.3 GREEN regenerate the contract: `pnpm contract` → `apps/api/openapi.json`,
+      drops coverage — the precedent's own D6 note). Also dropped `routes/productos.test.ts`'s local
+      `buildTestApp()` copy in favour of the real `buildApp` from `app.ts` now that it knows the
+      routes — see apply-progress for the reasoning.
+- [x] 7.3 GREEN regenerate the contract: `pnpm contract` → `apps/api/openapi.json`,
       `apps/web/src/api/schema.d.ts` pick up all six `productos` paths and every declared status
-- [ ] 7.4 Verify: `pnpm --filter api test`, `pnpm typecheck`, `pnpm lint`, `pnpm contract:check` (now
+- [x] 7.4 Verify: `pnpm --filter api test`, `pnpm typecheck`, `pnpm lint`, `pnpm contract:check` (now
       asserts real content, not byte-identity)
 
 ## Phase 8: S5-core — Atomicity Proof (mandatory, not droppable)

@@ -18,6 +18,7 @@ import dbPlugin, { type DbLike } from './plugins/db.js';
 import reposPlugin, { type Repos } from './plugins/repos.js';
 import authRoutes from './routes/auth.js';
 import healthRoutes from './routes/health.js';
+import productosRoutes from './routes/productos.js';
 import proveedoresRoutes from './routes/proveedores.js';
 import usuariosRoutes from './routes/usuarios.js';
 
@@ -106,6 +107,7 @@ export async function buildApp(
   // silently drop the default-deny guarantee for these routes.
   app.register(usuariosRoutes, { prefix: '/api' });
   app.register(proveedoresRoutes, { prefix: '/api' });
+  app.register(productosRoutes, { prefix: '/api' });
 
   app.setErrorHandler((error, _request, reply) => {
     const { status, body } = toErrorEnvelope(error);

@@ -1,70 +1,32 @@
-import rateLimit from '@fastify/rate-limit';
-import swagger from '@fastify/swagger';
-import Fastify, { type FastifyInstance } from 'fastify';
-import {
-  type ZodTypeProvider,
-  jsonSchemaTransform,
-  serializerCompiler,
-  validatorCompiler,
-} from 'fastify-type-provider-zod';
+import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
+import { buildApp } from '../app.js';
 import type { AuditoriaRepo } from '../auditoria/repository.js';
 import type { SesionesRepo } from '../auth/repository.js';
 import type { UnitOfWork } from '../db/uow.js';
-import { notFoundEnvelope, toErrorEnvelope } from '../lib/errors.js';
 import type { MovimientosRepo } from '../movimientos/repository.js';
-import authPlugin from '../plugins/auth.js';
-import cookiePlugin from '../plugins/cookie.js';
-import dbPlugin from '../plugins/db.js';
-import reposPlugin from '../plugins/repos.js';
+import type { Repos } from '../plugins/repos.js';
 import type { Producto, ProductosRepo } from '../productos/repository.js';
 import type { Proveedor, ProveedoresRepo } from '../proveedores/repository.js';
 import type { Usuario, UsuariosRepo } from '../usuarios/repository.js';
-import productosRoutes from './productos.js';
 
-// `productosRoutes` is NOT registered in app.ts yet — that is Phase 7 (S4b)'s
-// task 7.2. This slice (S4a) only ships the route file itself, so this test
-// file builds its own minimal app instead of using `buildApp` from
-// `app.ts` (which does not know about this plugin yet), mirroring
-// `app.ts`'s own plugin registration order exactly. Do NOT wire this into
-// `app.ts` here — that would silently pull S4b's work into S4a and add an
-// observable route to `apps/api/openapi.json` this slice never regenerates.
+// `productosRoutes` is registered in `app.ts` as of task 7.2 (Phase 7,
+// S4b), so this file builds its app through the REAL `buildApp` — the same
+// plugin registration order (including `authPlugin` before every route
+// plugin) production actually runs — instead of a local copy of it. A copy
+// cannot detect a divergence from the thing it copies (see app.ts's own
+// registration-order note); using `buildApp` directly removes that risk.
 async function buildTestApp(opts: {
   repos: ReturnType<typeof fakeRepos>;
   uow: UnitOfWork;
   cookieSecret: string;
 }): Promise<FastifyInstance> {
-  const app = Fastify({ logger: false }).withTypeProvider<ZodTypeProvider>();
-
-  app.setValidatorCompiler(validatorCompiler);
-  app.setSerializerCompiler(serializerCompiler);
-
-  await app.register(swagger, {
-    openapi: { info: { title: 'test', version: '0.0.0' } },
-    transform: jsonSchemaTransform,
-  });
-
-  await app.register(cookiePlugin, { secret: opts.cookieSecret });
-  await app.register(dbPlugin, {});
-  await app.register(reposPlugin, {
-    repos: opts.repos as never,
+  const app = await buildApp({
+    repos: opts.repos as unknown as Repos,
     uow: opts.uow,
+    cookieSecret: opts.cookieSecret,
+    rateLimitMax: 10,
   });
-  await app.register(authPlugin);
-  await app.register(rateLimit, { global: false });
-  app.decorate('rateLimitMax', 10);
-
-  app.register(productosRoutes, { prefix: '/api' });
-
-  app.setErrorHandler((error, _request, reply) => {
-    const { status, body } = toErrorEnvelope(error);
-    reply.status(status).send(body);
-  });
-  app.setNotFoundHandler((_request, reply) => {
-    const { status, body } = notFoundEnvelope();
-    reply.status(status).send(body);
-  });
-
   await app.ready();
   return app;
 }
@@ -516,5 +478,70 @@ describe('GET /api/productos', () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ page: 1, pageSize: 20, total: 1 });
     expect(response.json().data).toHaveLength(1);
+  });
+});
+
+describe('POST /api/productos/:id/{deactivate,reactivate} — encargado-only (Phase 7, S4b)', () => {
+  let app: FastifyInstance | undefined;
+
+  afterEach(async () => {
+    await app?.close();
+    app = undefined;
+  });
+
+  const routesLifecycle = {
+    deactivate: () => `/api/productos/${PRODUCT_ID}/deactivate`,
+    reactivate: () => `/api/productos/${PRODUCT_ID}/reactivate`,
+  };
+
+  it('returns 403 FORBIDDEN (plain code) for a deposito session on both routes', async () => {
+    app = await buildWithSession(makeUsuario({ rol: 'deposito' }));
+    const cookies = { sid: app.signCookie('valid-token') };
+
+    for (const url of [
+      routesLifecycle.deactivate(),
+      routesLifecycle.reactivate(),
+    ]) {
+      const response = await app.inject({ method: 'POST', url, cookies });
+      expect(response.statusCode).toBe(403);
+      expect(response.json().error.code).toBe('FORBIDDEN');
+    }
+  });
+
+  it('returns 200 for an encargado session on both routes', async () => {
+    app = await buildWithSession(makeUsuario({ rol: 'encargado' }), {
+      setActivo: async (_id, activo) => makeProducto({ activo }),
+    });
+    const cookies = { sid: app.signCookie('valid-token') };
+
+    const deactivateResponse = await app.inject({
+      method: 'POST',
+      url: routesLifecycle.deactivate(),
+      cookies,
+    });
+    expect(deactivateResponse.statusCode).toBe(200);
+
+    const reactivateResponse = await app.inject({
+      method: 'POST',
+      url: routesLifecycle.reactivate(),
+      cookies,
+    });
+    expect(reactivateResponse.statusCode).toBe(200);
+  });
+
+  it('a deactivated product still returns 200 (not 404) from GET /api/productos/:id, with activo: false', async () => {
+    app = await buildWithSession(makeUsuario({ rol: 'encargado' }), {
+      findById: async () => makeProducto({ activo: false }),
+    });
+    const cookies = { sid: app.signCookie('valid-token') };
+
+    const response = await app.inject({
+      method: 'GET',
+      url: routes.get(),
+      cookies,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().producto.activo).toBe(false);
   });
 });

@@ -10,13 +10,13 @@ import {
   getProducto,
   listProductos,
   requireActor,
+  setProductoActivo,
 } from '../productos/service.js';
 
-// tasks.md Phase 6 (S4a) — this file ships GET/POST/PATCH only.
-// POST /api/productos/:id/{deactivate,reactivate} are Phase 7 (S4b), and
-// this plugin is NOT registered in app.ts yet — that registration is task
-// 7.2, deliberately deferred so `apps/api/openapi.json` stays
-// byte-identical for this slice (`pnpm contract:check` proves it).
+// tasks.md Phase 6 (S4a) shipped GET/POST/PATCH; Phase 7 (S4b) adds
+// POST /api/productos/:id/{deactivate,reactivate} below and registers this
+// plugin in app.ts (task 7.2), so `apps/api/openapi.json` now carries all
+// six `productos` paths (`pnpm contract:check` proves it post-regeneration).
 
 const productoDto = z.object({
   id: z.string(),
@@ -208,6 +208,40 @@ const productosRoutes: FastifyPluginAsync = async (app) => {
       return { producto: toDto(producto) };
     },
   );
+
+  // encargado-only, same two-explicit-routes shape as
+  // routes/proveedores.ts:189-217 (D11 precedent): the URL segment names
+  // the transition, so the audit verb is decided by which route was
+  // called, never inferred from a diff.
+  for (const [segment, activo] of [
+    ['deactivate', false],
+    ['reactivate', true],
+  ] as const) {
+    typed.post(
+      `/productos/:id/${segment}`,
+      {
+        config: { roles: ['encargado'] },
+        schema: {
+          params: idParams,
+          response: {
+            200: okProducto,
+            401: errorEnvelopeSchema,
+            403: errorEnvelopeSchema,
+            404: errorEnvelopeSchema,
+          },
+        },
+      },
+      async (request) => {
+        const actor = requireActor(request.user);
+        const producto = await setProductoActivo(app.uow, {
+          id: request.params.id,
+          activo,
+          actor,
+        });
+        return { producto: toDto(producto) };
+      },
+    );
+  }
 };
 
 export default productosRoutes;
