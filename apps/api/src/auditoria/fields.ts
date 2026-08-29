@@ -32,4 +32,10 @@ export const FIELD_CLASSIFICATION = {
     ],
     excludedFields: [HASH_CONTRASENA_DENYLIST_FIELD],
   },
+  // #4 gives this entity its call site (S4). No excluded field — nothing on
+  // `proveedores` is secret (design.md D5).
+  proveedores: {
+    auditableFields: ['id', 'nombre', 'contacto', 'activo', 'creadoEn'],
+    excludedFields: [],
+  },
 } as const satisfies Record<string, EntityFieldClassification>;
