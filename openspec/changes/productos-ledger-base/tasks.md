@@ -309,7 +309,7 @@ level — already covered by 2.1's compile assertion, re-asserted here at the se
 
 **Forecast: ~90 prod / ~170 test = ~260 raw diff. Under budget.**
 
-- [ ] 5.1 RED `apps/api/src/productos/service.test.ts` (extend) — `actualizarProducto` with an empty
+- [x] 5.1 RED `apps/api/src/productos/service.test.ts` (extend) — `actualizarProducto` with an empty
       diff makes no repo write and no `recordAudit` call (mirrors `proveedores/service.ts`'s D10
       no-op rule); `findByIdForUpdate` returning `undefined` throws `productNotFound()` before any
       write; a PATCH that includes `proveedorId` re-runs the inactive-supplier guard; a PATCH that
@@ -318,9 +318,9 @@ level — already covered by 2.1's compile assertion, re-asserted here at the se
       that matters more"); `setProductoActivo(id, false)`/`(id, true)` each wrap one repo call and
       one `recordAudit` inside `uow.run`; `listProductos`/`getProducto` pass `q` through to the
       repository unchanged
-- [ ] 5.2 GREEN `apps/api/src/productos/service.ts` (extend) — `actualizarProducto`,
+- [x] 5.2 GREEN `apps/api/src/productos/service.ts` (extend) — `actualizarProducto`,
       `setProductoActivo`, `listProductos`, `getProducto`
-- [ ] 5.3 Verify: `pnpm --filter api test`, `pnpm typecheck`, `pnpm lint`
+- [x] 5.3 Verify: `pnpm --filter api test`, `pnpm typecheck`, `pnpm lint`
 
 ## Phase 6: S4a — Routes: Read + Create + Update
 
