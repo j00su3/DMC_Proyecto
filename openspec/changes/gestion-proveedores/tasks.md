@@ -224,7 +224,7 @@ Satisfies spec: **Role Gate** (integration half, real `deposito` session), **Aud
 Mutation** (end-to-end proof), **Atomic Rollback on Audit Failure**. Completes the HTTP-shape
 requirements S5a proved with stubs. Depends on S5a.
 
-- [ ] 5b.1 RED `apps/api/src/routes/proveedores.integration.test.ts` (new, real app + Docker PG,
+- [x] 5b.1 RED `apps/api/src/routes/proveedores.integration.test.ts` (new, real app + Docker PG,
       no stubs) — against code with no reachable route (S5a's routes exist, this file is new): a
       real `deposito` session's write attempt is refused *and* the table and `auditoria` are
       unchanged afterward (D6, the genuine authorization-boundary proof, not a stubbed one);
@@ -233,24 +233,35 @@ requirements S5a proved with stubs. Depends on S5a.
       existing row's casing is unchanged; a deactivated supplier is still `200` on
       `GET /api/proveedores/:id` with `activo = false` (D8); a forced audit-insert failure leaves
       the target row unchanged and returns `500 { error: { code: "AUDIT_WRITE_FAILED" } }`
-- [ ] 5b.2 GREEN whatever S5a wiring gap the integration suite exposes (expected: none, since S5a
+- [x] 5b.2 GREEN whatever S5a wiring gap the integration suite exposes (expected: none, since S5a
       already proves the same matrix against fakes — this slice is the real-Postgres proof, not
       new production code)
-- [ ] 5b.3 GREEN regenerate the contract: `pnpm contract` (or the project's equivalent) →
+- [x] 5b.3 GREEN regenerate the contract: `pnpm contract` (or the project's equivalent) →
       `apps/api/openapi.json`, `apps/web/src/api/schema.d.ts` pick up the six new paths and every
       declared status. This is also the proof that Zod `.trim()` (D3) survives
       `jsonSchemaTransform` — if `contract:check` fails here, the documented fallback is
       `.min(1).refine(v => v.trim().length > 0)` plus a service-level `trim()`, not dropping the
       rule
-- [ ] 5b.4 Verify: `pnpm --filter api test`, `pnpm --filter api test:integration`, `pnpm typecheck`,
+- [x] 5b.4 Verify: `pnpm --filter api test`, `pnpm --filter api test:integration`, `pnpm typecheck`,
       `pnpm lint`, `pnpm contract:check` (now asserts real content, not byte-identity)
+
+**S5b closing notes (2026-08-29)**
+
+- 5b.2: no wiring gap surfaced. S5a's routes, service and repository were correct against real
+  Postgres and a real session cookie; not one production line changed in this slice.
+- 5b.3: already satisfied by PR4 (S5a), which regenerated `apps/api/openapi.json` and
+  `apps/web/src/api/schema.d.ts` with the six proveedores paths when the routes landed. Zod
+  `.trim()` (D3) survived `jsonSchemaTransform` — no fallback needed. `contract:check` is
+  byte-identical here, which is the correct result for a test-only slice.
+- 8.2: not applicable to this PR. PR5 is the last link in the chain, so there is no next PR to
+  retarget.
 
 ## Phase 8: Bookkeeping
 
-- [ ] 8.1 Confirm no `.env*` file is touched and no new environment variable is introduced by any
+- [x] 8.1 Confirm no `.env*` file is touched and no new environment variable is introduced by any
       slice — `DATABASE_URL` already exists and is the only input (per design's Migration/Rollout
       section); no manual user step is needed before any PR merges
-- [ ] 8.2 Before merging each PR except the last in a stacked chain, `gh pr edit <next-pr-number>
+- [x] 8.2 Before merging each PR except the last in a stacked chain, `gh pr edit <next-pr-number>
       --base main` — GitHub does not auto-retarget a stacked PR when its base merges (precedent:
       `gestion-usuarios` #36→#37→#38, `pantalla-usuarios`); delete a merged branch only after
       confirming the retarget landed
