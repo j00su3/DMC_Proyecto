@@ -199,6 +199,18 @@ Que la tienda tenga una fuente única y actualizada de su inventario, de modo qu
   certificado, punto de venta habilitado, contingencia ante caídas del servicio). Conviene tenerlo
   en cuenta en el modelo de datos de la venta desde v1, aunque no se implemente todavía.
 - **Decisión tomada**: el producto es una **aplicación web** (uso desde navegador).
+- **Decisión tomada (2026-08-29, cierra SEC-012 de `SECURITY.md`)**: el **rastro de auditoría es
+  permanente** —el no repudio del flujo de contraseña temporal lo exige— pero **no conserva datos
+  personales**. Las instantáneas `datos_previos` / `datos_posteriores` seudonimizan el correo; la
+  identidad del actor queda en `auditoria.usuario_id`, que es un UUID sin significado por sí mismo y
+  basta para probar quién hizo qué. Ante una solicitud de supresión se limpia el dato personal en
+  `usuarios` y el rastro sobrevive apuntando a un identificador vacío: se satisface la supresión sin
+  perder la prueba de que la acción ocurrió. Se descartó una ventana de retención con purga
+  programada, porque le pondría fecha de vencimiento al no repudio.
+  Consecuencia que hasta ahora no estaba escrita en ninguna parte: `auditoria.usuario_id` lleva
+  `onDelete: 'restrict'`, de modo que **un usuario que haya realizado una sola operación auditada ya
+  no puede borrarse de la base**. El sistema ofrece baja lógica; el borrado físico es inalcanzable
+  por diseño, y esta decisión lo asume de forma deliberada.
 - **Decisión tomada**: sistema **multiusuario con roles** (encargado / personal de depósito), con
   login por cuenta individual.
 - **Decisión tomada**: el **escaneo de código de barras se pospone** para una versión posterior; v1

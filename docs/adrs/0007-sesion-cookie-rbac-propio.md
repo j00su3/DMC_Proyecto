@@ -6,6 +6,11 @@ Aceptado — actualizado 2026-08-13: se agregan el permiso por campo de `stock_m
 `SameSite=Lax` en la cookie de sesión (resuelve A7 y S10 de la Ronda 2 de
 `REVISION-ADVERSARIAL.md`; ver `TECH-DESIGNv2.md`).
 
+Actualizado 2026-08-29: se cierra la política de bloqueo que la Decisión había dejado abierta
+("por usuario y/o IP") y se revierte el almacenamiento en claro del token de sesión, ratificado el
+2026-08-24. Ver la sección *Actualizado 2026-08-29* más abajo (SEC-001 y SEC-008 de
+`docs/SECURITY.md`).
+
 Actualizado 2026-08-24: implementado el hash de contraseña con **argon2id** (parámetros base
 OWASP: `memoryCost=19456`, `timeCost=2`, `parallelism=1`) sobre la alternativa bcrypt mencionada
 en la Decisión original. La sesión no usa un token separado: el `id` de la fila `sesiones`
@@ -56,6 +61,41 @@ ver [[0009-despliegue-local]]), ya que la API de gestión de usuarios requiere e
 como encargado para usarla. El reset de contraseña vía flujo propio (email) queda fuera de v1; como
 vía de rescate si el único encargado pierde su contraseña, se documenta un procedimiento
 administrativo manual (resetear el hash directo en base) fuera de la aplicación.
+
+### Actualizado 2026-08-29 — resoluciones del pase de seguridad (SEC-001, SEC-008)
+
+Ambas cierran huecos que este ADR había dejado abiertos o ratificado, y que `docs/SECURITY.md`
+documentó con evidencia. Se registran aquí porque pertenecen a la decisión, no al informe.
+
+**Política de bloqueo (SEC-001).** La Decisión original dice "por usuario y/o IP" y dejó la
+elección sin cerrar; lo implementado bloquea únicamente por usuario, y el bloqueo se evalúa
+**antes** de verificar la contraseña. Eso convierte el control en una denegación de servicio: quien
+conozca el correo del único `encargado` lo deja fuera de forma indefinida con cinco peticiones cada
+cinco minutos, un ritmo muy por debajo del límite de diez por minuto de la ruta.
+
+Se resuelve **verificando la contraseña antes de rechazar por bloqueo**: una credencial correcta
+concede acceso aunque la cuenta esté bloqueada, y limpia el contador. El bloqueo pasa a ser lo que
+siempre quiso ser —una defensa contra la adivinación— en lugar de una negación de servicio contra
+el titular legítimo. Quien adivina mal sigue bloqueado; quien sabe su contraseña nunca queda fuera.
+
+Se descartó el bloqueo por IP —opción que este mismo ADR insinuaba— porque hoy no hay `trustProxy`
+configurado en la API y el rewrite de `vercel.json` hace que todos los clientes legítimos compartan
+la IP del proxy: bloquear por IP dejaría fuera a la tienda entera de una sola vez. Queda disponible
+como refuerzo posterior, una vez corregido SEC-003.
+
+Coste asumido: `argon2.verify` pasa a ejecutarse también sobre cuentas bloqueadas. Queda acotado
+por el rate-limit de la ruta de login (ver SEC-004).
+
+**Almacenamiento del token de sesión (SEC-008).** La actualización del 2026-08-24 ratificó que el
+`id` de la fila `sesiones` sea directamente el valor que viaja en la cookie, justificándolo en que
+"no hay un segundo secreto de sesión que mantener sincronizado con la fila".
+
+Esa justificación se conserva íntegra al almacenar `sha256(token)` como clave primaria, **porque un
+hash no es un secreto**: no hay nada que sincronizar ni que custodiar. El token en claro viaja sólo
+en la cookie; `findValid` hashea el valor recibido antes de buscarlo. Una lectura de la base deja de
+rendir credenciales utilizables, y el coste de cómputo es despreciable frente a argon2.
+
+Se adopta el hash. Efecto colateral aceptado: el despliegue invalida todas las sesiones activas.
 
 ## Alternativas consideradas
 
