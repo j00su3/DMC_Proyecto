@@ -161,7 +161,7 @@ purely for the 400-line budget; there is no dependency reason to separate it fro
 may be folded into the same PR as S1a if the combined diff still clears 400 — measure the actual PR
 before deciding.
 
-- [ ] 1.8 RED `apps/api/src/auditoria/fields.test.ts` (extend) — against `FIELD_CLASSIFICATION`
+- [x] 1.8 RED `apps/api/src/auditoria/fields.test.ts` (extend) — against `FIELD_CLASSIFICATION`
       with no `productos` key: assert a `productos` key exists; assert
       `auditableFields` exactly equals every column name from `getTableColumns(productos)` **except**
       `stockActual`, failing by column name when one is missing or extra; assert `stockActual`
@@ -169,10 +169,10 @@ before deciding.
       2026-08-29; see the RECONCILE section**); a compile-level assertion that a throwaway
       `recordAudit({ entidad: 'productos', ... })` call type-checks (`tsc --noEmit`) only after 1.9
       lands — this is the proof that the compile gate, not just the pgEnum, is what's closing
-- [ ] 1.9 GREEN `apps/api/src/auditoria/fields.ts` (extend) — add `productos: { auditableFields: [
+- [x] 1.9 GREEN `apps/api/src/auditoria/fields.ts` (extend) — add `productos: { auditableFields: [
       'id', 'nombre', 'sku', 'categoria', 'stockMinimo', 'precio', 'proveedorId', 'activo',
       'creadoEn' ], excludedFields: ['stockActual'] }` (D2/R1, settled)
-- [ ] 1.10 Verify: `pnpm --filter api test`, `pnpm --filter api test:integration`, `pnpm typecheck`,
+- [x] 1.10 Verify: `pnpm --filter api test`, `pnpm --filter api test:integration`, `pnpm typecheck`,
       `pnpm lint`, `pnpm contract:check` (byte-identical — no route touched yet)
 
 ## Phase 1c: Deploy gate — migrate Neon before this PR merges

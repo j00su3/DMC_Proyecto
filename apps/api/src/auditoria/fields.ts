@@ -38,4 +38,23 @@ export const FIELD_CLASSIFICATION = {
     auditableFields: ['id', 'nombre', 'contacto', 'activo', 'creadoEn'],
     excludedFields: [],
   },
+  // #5 (S3a/S3b) gives this entity its call sites. `stockActual` is
+  // excluded, not secret (R1, owner-settled 2026-08-29): a change in
+  // physical units belongs to `movimientos` (ADR-0012 rule 1), and a
+  // movement already audits itself (rule 2), so repeating the same
+  // unchanging value in every snapshot would be noise, not signal.
+  productos: {
+    auditableFields: [
+      'id',
+      'nombre',
+      'sku',
+      'categoria',
+      'stockMinimo',
+      'precio',
+      'proveedorId',
+      'activo',
+      'creadoEn',
+    ],
+    excludedFields: ['stockActual'],
+  },
 } as const satisfies Record<string, EntityFieldClassification>;
