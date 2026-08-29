@@ -3,6 +3,7 @@ import { buildApp } from '../app.js';
 import type { AuditoriaRepo } from '../auditoria/repository.js';
 import { hashPassword } from '../auth/password.js';
 import type { SesionesRepo } from '../auth/repository.js';
+import type { ProveedoresRepo } from '../proveedores/repository.js';
 import type { Usuario, UsuariosRepo } from '../usuarios/repository.js';
 
 const COOKIE_SECRET = 'test-cookie-secret-at-least-32-characters-long';
@@ -48,6 +49,7 @@ function fakeRepos(
       ...sesiones,
     } as SesionesRepo,
     auditoria: { record: async () => {} } as AuditoriaRepo,
+    proveedores: {} as ProveedoresRepo,
   };
 }
 

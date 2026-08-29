@@ -137,12 +137,12 @@ HTTP): **Case-Insensitive Name Uniqueness With Original-Casing Storage** (constr
 No spec requirement alone; this is the wiring that makes S3a's repository reachable by the
 service layer in S4. Depends on S3a.
 
-- [ ] 3b.1 RED `apps/api/src/plugins/repos.test.ts` (extend) — `buildRepos` returns a `proveedores`
+- [x] 3b.1 RED `apps/api/src/plugins/repos.test.ts` (extend) — `buildRepos` returns a `proveedores`
       member bound to the given executor; the injected-fakes case includes it. Fails today because
       `Repos` has no `proveedores` key
-- [ ] 3b.2 GREEN `apps/api/src/plugins/repos.ts` — widen the `Repos` interface with `proveedores:
+- [x] 3b.2 GREEN `apps/api/src/plugins/repos.ts` — widen the `Repos` interface with `proveedores:
       ProveedoresRepo`; `buildRepos` constructs `new DrizzleProveedoresRepo(executor)`
-- [ ] 3b.3 GREEN fix the five test files this widening breaks by name, verified file-by-file in
+- [x] 3b.3 GREEN fix the five test files this widening breaks by name, verified file-by-file in
       `design.md`'s File Changes table:
       `apps/api/src/app.test.ts:33-71` (its `usuarios`-only stub uses `satisfies Repos`, so it
       fails on the missing key — add a `proveedores` fake),
@@ -152,8 +152,15 @@ service layer in S4. Depends on S3a.
       `apps/api/src/plugins/repos.test.ts:22-28,65-70,82-88`.
       Do **not** touch `usuarios/service.test.ts:127` (`as unknown as Repos`) or
       `auth/service.test.ts` (its own local two-key `Repos` interface) — both are unaffected by
-      design, and touching either is a signal this task went wrong
-- [ ] 3b.4 Verify: `pnpm --filter api test`, `pnpm typecheck`, `pnpm lint`, `pnpm contract:check`
+      design, and touching either is a signal this task went wrong.
+      **Deviation found during apply**: `auth/service.test.ts`'s `fakeUow()` helper (not the local
+      `Repos` interface `login`/`logout`/`resolveSession` use) also broke — its `run()` callback
+      flows through the *global* `UnitOfWork` type from `db/uow.ts` (via `changePassword(uow, ...)`),
+      which is bound to the plugin-wide `Repos`, not the module's own two-key type. Fixed by adding
+      a `proveedores: {} as ProveedoresRepo` fake inside `fakeUow()` only; the two-key `Repos`
+      interface and the `login`/`logout` tests that use it directly were untouched, matching the
+      design's stated intent for that file even though the file itself needed one line
+- [x] 3b.4 Verify: `pnpm --filter api test`, `pnpm typecheck`, `pnpm lint`, `pnpm contract:check`
       (still byte-identical — no route touched)
 
 ## Phase 5: S4 — Service + `supplierNotFound()`
@@ -164,10 +171,10 @@ Supplier Profile** (diff/no-op half), **Logical Deactivation** (no-op half), **R
 (no-op half), **Audit Obligation Per Mutation** (call-site half). Depends on S3b (`app.repos` /
 `app.uow` carry `proveedores`).
 
-- [ ] 4.1 RED `apps/api/src/lib/errors.test.ts` (extend) — `supplierNotFound()` → 404
+- [x] 4.1 RED `apps/api/src/lib/errors.test.ts` (extend) — `supplierNotFound()` → 404
       `SUPPLIER_NOT_FOUND`, no `details`, `toErrorEnvelope` maps it (D12)
-- [ ] 4.2 GREEN `apps/api/src/lib/errors.ts` (extend) — add `supplierNotFound()`
-- [ ] 4.3 RED `apps/api/src/proveedores/service.test.ts` (new, fake repos + `{ run: (work) =>
+- [x] 4.2 GREEN `apps/api/src/lib/errors.ts` (extend) — add `supplierNotFound()`
+- [x] 4.3 RED `apps/api/src/proveedores/service.test.ts` (new, fake repos + `{ run: (work) =>
       work(stubs) }`) — against code that does not exist: an empty diff on update/deactivate/
       reactivate makes **no** repo write and **no** `recordAudit` call, returns 200 with the
       current DTO (D10); `findByIdForUpdate` returning `undefined` throws `supplierNotFound()`
@@ -176,11 +183,11 @@ Supplier Profile** (diff/no-op half), **Logical Deactivation** (no-op half), **R
       only the changed fields, both directions; **the D8 negative** — deactivating the only active
       supplier succeeds and records `baja_logica`, with no guard consulted and no lock-set method
       existing on the port to consult
-- [ ] 4.4 GREEN `apps/api/src/proveedores/service.ts` (new) — `listProveedores`, `getProveedor`,
+- [x] 4.4 GREEN `apps/api/src/proveedores/service.ts` (new) — `listProveedores`, `getProveedor`,
       `createProveedor`, `updateProveedor`, `setProveedorActivo`. No `toLowerCase()` anywhere in
       this file — folding stays in SQL only (D2). Every mutation wrapped in one `app.uow.run`
       paired with `recordAudit({ entidad: 'proveedores', ... })`
-- [ ] 4.5 Verify: `pnpm --filter api test`, `pnpm typecheck`, `pnpm lint`, `pnpm contract:check`
+- [x] 4.5 Verify: `pnpm --filter api test`, `pnpm typecheck`, `pnpm lint`, `pnpm contract:check`
       (still byte-identical — no route touched)
 
 ## Phase 6: S5a — Routes + Role Matrix

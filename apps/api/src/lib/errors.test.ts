@@ -12,6 +12,7 @@ import {
   notFoundEnvelope,
   passwordChangeRequired,
   supplierNameInUse,
+  supplierNotFound,
   toErrorEnvelope,
   unauthorized,
   userNotFound,
@@ -212,6 +213,24 @@ describe('supplier-management error factories (design.md D12, S3a slice)', () =>
     expect(result.status).toBe(409);
     expect(result.body).toEqual({
       error: { code: 'SUPPLIER_NAME_IN_USE', message: expect.any(String) },
+    });
+  });
+
+  it('supplierNotFound() is a 404 AppError with code SUPPLIER_NOT_FOUND and no details', () => {
+    const error = supplierNotFound();
+
+    expect(error).toBeInstanceOf(AppError);
+    expect(error.status).toBe(404);
+    expect(error.code).toBe('SUPPLIER_NOT_FOUND');
+    expect(error.details).toBeUndefined();
+  });
+
+  it('toErrorEnvelope() maps supplierNotFound() to a 404 { error: { code: "SUPPLIER_NOT_FOUND" } } envelope', () => {
+    const result = toErrorEnvelope(supplierNotFound());
+
+    expect(result.status).toBe(404);
+    expect(result.body).toEqual({
+      error: { code: 'SUPPLIER_NOT_FOUND', message: expect.any(String) },
     });
   });
 });

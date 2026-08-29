@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { AuditoriaRepo } from '../auditoria/repository.js';
 import type { SesionesRepo } from '../auth/repository.js';
 import type { DbExecutor } from '../db/client.js';
+import type { ProveedoresRepo } from '../proveedores/repository.js';
 import type { UsuariosRepo } from '../usuarios/repository.js';
 import { type Repos, buildRepos } from './repos.js';
 import reposPlugin from './repos.js';
@@ -18,12 +19,14 @@ describe('repos plugin', () => {
     const fakeUsuarios = {} as UsuariosRepo;
     const fakeSesiones = {} as SesionesRepo;
     const fakeAuditoria = {} as AuditoriaRepo;
+    const fakeProveedores = {} as ProveedoresRepo;
 
     await app.register(reposPlugin, {
       repos: {
         usuarios: fakeUsuarios,
         sesiones: fakeSesiones,
         auditoria: fakeAuditoria,
+        proveedores: fakeProveedores,
       },
     });
     await app.ready();
@@ -31,6 +34,7 @@ describe('repos plugin', () => {
     expect(app.repos.usuarios).toBe(fakeUsuarios);
     expect(app.repos.sesiones).toBe(fakeSesiones);
     expect(app.repos.auditoria).toBe(fakeAuditoria);
+    expect(app.repos.proveedores).toBe(fakeProveedores);
 
     await app.close();
   });
@@ -44,6 +48,7 @@ describe('repos plugin', () => {
     expect(app.repos.usuarios).toBeDefined();
     expect(app.repos.sesiones).toBeDefined();
     expect(app.repos.auditoria).toBeDefined();
+    expect(app.repos.proveedores).toBeDefined();
 
     await app.close();
   });
@@ -67,6 +72,7 @@ describe('repos plugin', () => {
         usuarios: {} as UsuariosRepo,
         sesiones: {} as SesionesRepo,
         auditoria: {} as AuditoriaRepo,
+        proveedores: {} as ProveedoresRepo,
       });
 
     await app.register(reposPlugin, { uow: { run: fakeRun } });
@@ -85,5 +91,6 @@ describe('buildRepos', () => {
     expect(repos.usuarios).toBeDefined();
     expect(repos.sesiones).toBeDefined();
     expect(repos.auditoria).toBeDefined();
+    expect(repos.proveedores).toBeDefined();
   });
 });

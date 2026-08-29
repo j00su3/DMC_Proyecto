@@ -9,6 +9,10 @@ import type { DbExecutor } from '../db/client.js';
 import { getDb } from '../db/pool.js';
 import { type UnitOfWork, createUnitOfWork } from '../db/uow.js';
 import {
+  DrizzleProveedoresRepo,
+  type ProveedoresRepo,
+} from '../proveedores/repository.js';
+import {
   DrizzleUsuariosRepo,
   type UsuariosRepo,
 } from '../usuarios/repository.js';
@@ -17,6 +21,7 @@ export interface Repos {
   usuarios: UsuariosRepo;
   sesiones: SesionesRepo;
   auditoria: AuditoriaRepo;
+  proveedores: ProveedoresRepo;
 }
 
 // Binds every repo to the same executor (design.md D1/D2). Called with the
@@ -29,6 +34,7 @@ export function buildRepos(executor: DbExecutor): Repos {
     usuarios: new DrizzleUsuariosRepo(executor),
     sesiones: new DrizzleSesionesRepo(executor),
     auditoria: new DrizzleAuditoriaRepo(executor),
+    proveedores: new DrizzleProveedoresRepo(executor),
   };
 }
 

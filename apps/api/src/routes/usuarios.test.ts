@@ -3,6 +3,7 @@ import { buildApp } from '../app.js';
 import type { AuditoriaRepo } from '../auditoria/repository.js';
 import type { SesionesRepo } from '../auth/repository.js';
 import type { UnitOfWork } from '../db/uow.js';
+import type { ProveedoresRepo } from '../proveedores/repository.js';
 import type {
   Usuario,
   UsuarioResumen,
@@ -78,6 +79,7 @@ function fakeRepos(
       ...sesiones,
     } as SesionesRepo,
     auditoria: { record: async () => {} } as AuditoriaRepo,
+    proveedores: {} as ProveedoresRepo,
   };
 }
 
