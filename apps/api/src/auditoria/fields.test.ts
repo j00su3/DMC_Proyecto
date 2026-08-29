@@ -1,7 +1,9 @@
 import { getTableColumns } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
-import { proveedores, usuarios } from '../db/schema.js';
+import { productos, proveedores, usuarios } from '../db/schema.js';
 import { FIELD_CLASSIFICATION } from './fields.js';
+import type { AuditoriaRepo } from './repository.js';
+import { recordAudit } from './service.js';
 
 describe('FIELD_CLASSIFICATION', () => {
   it('classifies every usuarios column as auditable or excluded, failing by name when one is missing', () => {
@@ -45,4 +47,46 @@ describe('FIELD_CLASSIFICATION', () => {
     expect(stale).toEqual([]);
     expect(classified).toEqual(realColumns);
   });
+
+  // tasks.md task 1.8, backlog #5 (productos-ledger-base), S1b. R1 (settled
+  // by the owner 2026-08-29): stockActual belongs in excludedFields — a
+  // change in physical units belongs to movimientos (ADR-0012 rule 1), and
+  // a movement already audits itself (rule 2). This assertion fails by
+  // column name, not just count, when stockActual is missing from either
+  // list or when any other column is missing/extra.
+  it('classifies every productos column as auditable or excluded, excluding stockActual', () => {
+    const realColumns = Object.keys(getTableColumns(productos)).sort();
+    const { auditableFields, excludedFields } = FIELD_CLASSIFICATION.productos;
+    const classified: string[] = [...auditableFields, ...excludedFields].sort();
+
+    const missing = realColumns.filter(
+      (column) => !classified.includes(column),
+    );
+    const stale = classified.filter((column) => !realColumns.includes(column));
+
+    expect(missing).toEqual([]);
+    expect(stale).toEqual([]);
+    expect(classified).toEqual(realColumns);
+    expect(auditableFields).not.toContain('stockActual');
+    expect(excludedFields).toContain('stockActual');
+  });
+
+  // Compile-level proof that `AuditableEntidad = keyof typeof
+  // FIELD_CLASSIFICATION` — not the `entidadAuditoria` pgEnum — is what
+  // gates `recordAudit({ entidad: 'productos' })`. The pgEnum already lists
+  // 'productos' and would let this compile with no fields.ts entry at all;
+  // only adding the entry in task 1.9 makes this line type-check
+  // (`pnpm typecheck`). This function is never called — its only job is to
+  // exist and compile.
+  function _compileGateProof(repo: AuditoriaRepo) {
+    return recordAudit(repo, {
+      entidad: 'productos',
+      entidadId: 'x',
+      accion: 'crear',
+      usuarioId: 'x',
+      datosPrevios: null,
+      datosPosteriores: {},
+    });
+  }
+  void _compileGateProof;
 });
