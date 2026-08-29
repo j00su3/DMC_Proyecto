@@ -5,12 +5,16 @@ import {
   accountLocked,
   auditWriteFailed,
   emailAlreadyInUse,
+  fieldReservedForEncargado,
   forbidden,
   invalidCredentials,
   invalidCurrentPassword,
   lastActiveEncargado,
   notFoundEnvelope,
   passwordChangeRequired,
+  productNotFound,
+  skuAlreadyInUse,
+  supplierInactive,
   supplierNameInUse,
   supplierNotFound,
   toErrorEnvelope,
@@ -231,6 +235,83 @@ describe('supplier-management error factories (design.md D12, S3a slice)', () =>
     expect(result.status).toBe(404);
     expect(result.body).toEqual({
       error: { code: 'SUPPLIER_NOT_FOUND', message: expect.any(String) },
+    });
+  });
+});
+
+describe('product-management error factories (tasks.md 1.5, backlog #5, S1a)', () => {
+  it('productNotFound() is a 404 AppError with code PRODUCT_NOT_FOUND and no details', () => {
+    const error = productNotFound();
+
+    expect(error).toBeInstanceOf(AppError);
+    expect(error.status).toBe(404);
+    expect(error.code).toBe('PRODUCT_NOT_FOUND');
+    expect(error.details).toBeUndefined();
+  });
+
+  it('toErrorEnvelope() maps productNotFound() to a 404 { error: { code: "PRODUCT_NOT_FOUND" } } envelope', () => {
+    const result = toErrorEnvelope(productNotFound());
+
+    expect(result.status).toBe(404);
+    expect(result.body).toEqual({
+      error: { code: 'PRODUCT_NOT_FOUND', message: expect.any(String) },
+    });
+  });
+
+  it('skuAlreadyInUse() is a 409 AppError with code SKU_ALREADY_IN_USE and no details', () => {
+    const error = skuAlreadyInUse();
+
+    expect(error).toBeInstanceOf(AppError);
+    expect(error.status).toBe(409);
+    expect(error.code).toBe('SKU_ALREADY_IN_USE');
+    expect(error.details).toBeUndefined();
+  });
+
+  it('toErrorEnvelope() maps skuAlreadyInUse() to a 409 { error: { code: "SKU_ALREADY_IN_USE" } } envelope', () => {
+    const result = toErrorEnvelope(skuAlreadyInUse());
+
+    expect(result.status).toBe(409);
+    expect(result.body).toEqual({
+      error: { code: 'SKU_ALREADY_IN_USE', message: expect.any(String) },
+    });
+  });
+
+  it('fieldReservedForEncargado() is a 403 AppError with code FIELD_RESERVED_FOR_ENCARGADO and no details', () => {
+    const error = fieldReservedForEncargado();
+
+    expect(error).toBeInstanceOf(AppError);
+    expect(error.status).toBe(403);
+    expect(error.code).toBe('FIELD_RESERVED_FOR_ENCARGADO');
+    expect(error.details).toBeUndefined();
+  });
+
+  it('toErrorEnvelope() maps fieldReservedForEncargado() to a 403 { error: { code: "FIELD_RESERVED_FOR_ENCARGADO" } } envelope', () => {
+    const result = toErrorEnvelope(fieldReservedForEncargado());
+
+    expect(result.status).toBe(403);
+    expect(result.body).toEqual({
+      error: {
+        code: 'FIELD_RESERVED_FOR_ENCARGADO',
+        message: expect.any(String),
+      },
+    });
+  });
+
+  it('supplierInactive() is a 409 AppError with code SUPPLIER_INACTIVE and no details', () => {
+    const error = supplierInactive();
+
+    expect(error).toBeInstanceOf(AppError);
+    expect(error.status).toBe(409);
+    expect(error.code).toBe('SUPPLIER_INACTIVE');
+    expect(error.details).toBeUndefined();
+  });
+
+  it('toErrorEnvelope() maps supplierInactive() to a 409 { error: { code: "SUPPLIER_INACTIVE" } } envelope', () => {
+    const result = toErrorEnvelope(supplierInactive());
+
+    expect(result.status).toBe(409);
+    expect(result.body).toEqual({
+      error: { code: 'SUPPLIER_INACTIVE', message: expect.any(String) },
     });
   });
 });

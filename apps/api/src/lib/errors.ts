@@ -180,6 +180,50 @@ export function supplierNotFound(): AppError {
   return new AppError('SUPPLIER_NOT_FOUND', 'Supplier not found', 404);
 }
 
+// tasks.md task 1.5, backlog #5 (productos-ledger-base), S1a. Same shape as
+// emailAlreadyInUse()/supplierNameInUse() — no details, English UPPER_SNAKE
+// wire codes per the project's two-naming-families convention.
+
+// D14-equivalent: distinct from notFoundEnvelope() so "no such path" and "no
+// such product" stay distinguishable in logs and clients.
+export function productNotFound(): AppError {
+  return new AppError('PRODUCT_NOT_FOUND', 'Product not found', 404);
+}
+
+// 409 not 422 — same reasoning as emailAlreadyInUse()/supplierNameInUse():
+// the request is valid, but honoring it would collide with another active
+// product's sku, which conflicts with the current state of the products
+// collection.
+export function skuAlreadyInUse(): AppError {
+  return new AppError(
+    'SKU_ALREADY_IN_USE',
+    'SKU is already in use by another product',
+    409,
+  );
+}
+
+// Owner-approved deviation from docs/TECH-DESIGNv2.md:235's ratified
+// `campo_reservado_encargado` (English UPPER_SNAKE, LAST_ACTIVE_ENCARGADO
+// precedent) — recorded in the proposal (D2), not re-decided here.
+export function fieldReservedForEncargado(): AppError {
+  return new AppError(
+    'FIELD_RESERVED_FOR_ENCARGADO',
+    'This field can only be set by an encargado',
+    403,
+  );
+}
+
+// R2 (resolved by spec — spec.md:24, :200): 409 not 422, same reasoning as
+// emailAlreadyInUse() — the request is valid, but referencing an inactive
+// supplier conflicts with the current state of the suppliers collection.
+export function supplierInactive(): AppError {
+  return new AppError(
+    'SUPPLIER_INACTIVE',
+    'Supplier is inactive and cannot be referenced by a new product',
+    409,
+  );
+}
+
 export function toErrorEnvelope(error: unknown): MappedError {
   if (hasValidationErrors(error)) {
     return {

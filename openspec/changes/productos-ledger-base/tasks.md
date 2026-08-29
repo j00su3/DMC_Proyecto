@@ -142,15 +142,15 @@ endpoint yet.
       green
 - [x] 1.4 Verify the round-trip claim from 1.1's last assertion: `pnpm db:generate` a second time
       emits no new migration file
-- [ ] 1.5 RED `apps/api/src/lib/errors.test.ts` (extend) — against factories that do not exist:
+- [x] 1.5 RED `apps/api/src/lib/errors.test.ts` (extend) — against factories that do not exist:
       `productNotFound()` → 404 `PRODUCT_NOT_FOUND`; `skuAlreadyInUse()` → 409 `SKU_ALREADY_IN_USE`;
       `fieldReservedForEncargado()` → 403 `FIELD_RESERVED_FOR_ENCARGADO` (owner-approved deviation
       from `docs/TECH-DESIGNv2.md:235`'s `campo_reservado_encargado`, per proposal D2 — not
       re-decided here); `supplierInactive()` → 409 `SUPPLIER_INACTIVE` (**R2 — confirmed by spec**,
       `spec.md:24`, `:200`); all four map through `toErrorEnvelope`, none carries `details`
-- [ ] 1.6 GREEN `apps/api/src/lib/errors.ts` (extend) — add all four factories from 1.5, zero
+- [x] 1.6 GREEN `apps/api/src/lib/errors.ts` (extend) — add all four factories from 1.5, zero
       dependencies, matching the shape of `emailAlreadyInUse()`/`supplierNameInUse()` exactly
-- [ ] 1.7 Verify S1a: `pnpm --filter api test`, `pnpm --filter api test:integration`,
+- [x] 1.7 Verify S1a: `pnpm --filter api test`, `pnpm --filter api test:integration`,
       `pnpm typecheck`, `pnpm lint`, `pnpm contract:check` (byte-identical — no route touched
       yet). The audit compile gate is **not** part of S1a; it is Phase 1b, tasks 1.8-1.10.
 
