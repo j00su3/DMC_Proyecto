@@ -3,7 +3,14 @@ import type { UnitOfWork } from '../db/uow.js';
 import type { Repos } from '../plugins/repos.js';
 import type { Proveedor } from '../proveedores/repository.js';
 import type { Producto } from './repository.js';
-import { crearProducto, requireActor } from './service.js';
+import {
+  actualizarProducto,
+  crearProducto,
+  getProducto,
+  listProductos,
+  requireActor,
+  setProductoActivo,
+} from './service.js';
 
 const ACTOR_ENCARGADO_ID = '00000000-0000-4000-8000-0000000000e1';
 const ACTOR_DEPOSITO_ID = '00000000-0000-4000-8000-0000000000d1';
@@ -52,6 +59,11 @@ function harness(
     proveedor?: Proveedor | undefined;
     productoCreado?: Producto;
     aplicarDeltaResult?: number | undefined;
+    // Row returned by findByIdForUpdate/findById for the update/deactivate/
+    // get paths. Distinct key from `proveedor`'s presence-check idiom, since
+    // `undefined` here is itself a meaningful test case (product not found)
+    // rather than "use the default".
+    productoActual?: Producto | undefined;
   } = {},
 ) {
   let transactionOpen = false;
@@ -65,6 +77,8 @@ function harness(
 
   const proveedorRow = 'proveedor' in options ? options.proveedor : proveedor();
   const productoRow = options.productoCreado ?? producto();
+  const productoActualRow =
+    'productoActual' in options ? options.productoActual : producto();
 
   const proveedores = {
     findById: spy('proveedores.findById', async () => proveedorRow),
@@ -76,6 +90,21 @@ function harness(
       'productos.aplicarDelta',
       async () => options.aplicarDeltaResult,
     ),
+    findByIdForUpdate: spy(
+      'productos.findByIdForUpdate',
+      async () => productoActualRow,
+    ),
+    findById: spy('productos.findById', async () => productoActualRow),
+    update: spy('productos.update', async (_id: unknown, cambios: unknown) => ({
+      ...producto(),
+      ...(cambios as object),
+    })),
+    setActivo: spy(
+      'productos.setActivo',
+      async (_id: unknown, activo: unknown) =>
+        producto({ activo: activo as boolean }),
+    ),
+    list: spy('productos.list', async () => ({ rows: [], total: 0 })),
   };
 
   const movimientos = {
@@ -264,6 +293,176 @@ describe('crearProducto', () => {
     await crearProducto(h.repos, h.uow, baseInput() as any);
 
     expect(h.calls.at(-1)?.method).toBe('auditoria.record');
+  });
+});
+
+describe('actualizarProducto', () => {
+  it('with an empty diff makes no repo write and no recordAudit call (mirrors proveedores/service.ts D10)', async () => {
+    const h = harness();
+    const actual = producto();
+
+    const result = await actualizarProducto(h.repos, h.uow, {
+      id: PRODUCT_ID,
+      cambios: { nombre: actual.nombre },
+      actor: { id: ACTOR_ENCARGADO_ID, rol: 'encargado' },
+    });
+
+    expect(h.productos.update).not.toHaveBeenCalled();
+    expect(h.auditoria.record).not.toHaveBeenCalled();
+    expect(result).toEqual(actual);
+  });
+
+  it('findByIdForUpdate returning undefined throws productNotFound before any write', async () => {
+    const h = harness({ productoActual: undefined });
+
+    await expect(
+      actualizarProducto(h.repos, h.uow, {
+        id: PRODUCT_ID,
+        cambios: { nombre: 'Nuevo Nombre' },
+        actor: { id: ACTOR_ENCARGADO_ID, rol: 'encargado' },
+      }),
+    ).rejects.toMatchObject({ code: 'PRODUCT_NOT_FOUND' });
+
+    expect(h.productos.update).not.toHaveBeenCalled();
+    expect(h.auditoria.record).not.toHaveBeenCalled();
+  });
+
+  it('a deposito actor whose payload includes the key stockMinimo throws fieldReservedForEncargado before uow.run', async () => {
+    const h = harness();
+
+    await expect(
+      actualizarProducto(h.repos, h.uow, {
+        id: PRODUCT_ID,
+        cambios: { stockMinimo: null },
+        actor: { id: ACTOR_DEPOSITO_ID, rol: 'deposito' },
+      }),
+    ).rejects.toMatchObject({ code: 'FIELD_RESERVED_FOR_ENCARGADO' });
+    expect(h.uow.run).not.toHaveBeenCalled();
+  });
+
+  it('a PATCH that includes proveedorId re-runs the inactive-supplier guard', async () => {
+    const h = harness({ proveedor: proveedor({ activo: false }) });
+
+    await expect(
+      actualizarProducto(h.repos, h.uow, {
+        id: PRODUCT_ID,
+        cambios: { proveedorId: PROVEEDOR_ID },
+        actor: { id: ACTOR_ENCARGADO_ID, rol: 'encargado' },
+      }),
+    ).rejects.toMatchObject({ code: 'SUPPLIER_INACTIVE' });
+    expect(h.uow.run).not.toHaveBeenCalled();
+  });
+
+  // D8's TOCTOU-avoidance clause, and the assertion the proposal calls "the
+  // one that matters more": the guard is keyed on the INCOMING payload, not
+  // the product's stored supplier. A PATCH that omits proveedorId must
+  // never re-run it, even when the row's existing supplier is already
+  // inactive — otherwise a product whose supplier was later deactivated
+  // becomes permanently uneditable, unable even to have its name fixed.
+  it('a PATCH that omits proveedorId does NOT re-run the inactive-supplier guard, even when the product row already references an inactive supplier', async () => {
+    const h = harness({ proveedor: proveedor({ activo: false }) });
+
+    await expect(
+      actualizarProducto(h.repos, h.uow, {
+        id: PRODUCT_ID,
+        cambios: { nombre: 'Nombre Corregido' },
+        actor: { id: ACTOR_ENCARGADO_ID, rol: 'encargado' },
+      }),
+    ).resolves.toBeDefined();
+
+    expect(h.proveedores.findById).not.toHaveBeenCalled();
+    expect(h.productos.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('runs the update and recordAudit inside uow.run', async () => {
+    const h = harness();
+
+    await actualizarProducto(h.repos, h.uow, {
+      id: PRODUCT_ID,
+      cambios: { nombre: 'Nombre Corregido' },
+      actor: { id: ACTOR_ENCARGADO_ID, rol: 'encargado' },
+    });
+
+    expect(h.uow.run).toHaveBeenCalledTimes(1);
+    const writeCalls = h.calls.filter(
+      (c) => c.method === 'productos.update' || c.method === 'auditoria.record',
+    );
+    expect(writeCalls).toHaveLength(2);
+    expect(writeCalls.every((c) => c.insideTransaction)).toBe(true);
+  });
+});
+
+describe('setProductoActivo', () => {
+  it('setProductoActivo(id, false) wraps one repo call and one recordAudit inside a single uow.run', async () => {
+    const h = harness();
+
+    await setProductoActivo(h.uow, {
+      id: PRODUCT_ID,
+      activo: false,
+      actor: { id: ACTOR_ENCARGADO_ID, rol: 'encargado' },
+    });
+
+    expect(h.productos.setActivo).toHaveBeenCalledWith(PRODUCT_ID, false);
+    expect(h.productos.setActivo).toHaveBeenCalledTimes(1);
+    expect(h.auditoria.record).toHaveBeenCalledTimes(1);
+    expect(h.uow.run).toHaveBeenCalledTimes(1);
+    const writeCalls = h.calls.filter(
+      (c) =>
+        c.method === 'productos.setActivo' || c.method === 'auditoria.record',
+    );
+    expect(writeCalls.every((c) => c.insideTransaction)).toBe(true);
+  });
+
+  it('setProductoActivo(id, true) wraps one repo call and one recordAudit inside a single uow.run', async () => {
+    const h = harness();
+
+    await setProductoActivo(h.uow, {
+      id: PRODUCT_ID,
+      activo: true,
+      actor: { id: ACTOR_ENCARGADO_ID, rol: 'encargado' },
+    });
+
+    expect(h.productos.setActivo).toHaveBeenCalledWith(PRODUCT_ID, true);
+    expect(h.productos.setActivo).toHaveBeenCalledTimes(1);
+    expect(h.auditoria.record).toHaveBeenCalledTimes(1);
+    expect(h.uow.run).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('listProductos', () => {
+  it('passes q through to the repository unchanged', async () => {
+    const h = harness();
+
+    await listProductos(h.repos, { page: 2, pageSize: 10, q: 'torn' });
+
+    expect(h.productos.list).toHaveBeenCalledWith(2, 10, 'torn');
+  });
+
+  it('passes an undefined q through unchanged', async () => {
+    const h = harness();
+
+    await listProductos(h.repos, { page: 1, pageSize: 20 });
+
+    expect(h.productos.list).toHaveBeenCalledWith(1, 20, undefined);
+  });
+});
+
+describe('getProducto', () => {
+  it('returns the product for a found id', async () => {
+    const h = harness();
+
+    const result = await getProducto(h.repos, PRODUCT_ID);
+
+    expect(result).toEqual(producto());
+    expect(h.productos.findById).toHaveBeenCalledWith(PRODUCT_ID);
+  });
+
+  it('throws productNotFound for an id that matches no row', async () => {
+    const h = harness({ productoActual: undefined });
+
+    await expect(getProducto(h.repos, PRODUCT_ID)).rejects.toMatchObject({
+      code: 'PRODUCT_NOT_FOUND',
+    });
   });
 });
 
