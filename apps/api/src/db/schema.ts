@@ -9,6 +9,7 @@ import {
   index,
   integer,
   jsonb,
+  numeric,
   pgEnum,
   pgTable,
   text,
@@ -133,6 +134,100 @@ export const auditoria = pgTable(
     check(
       'auditoria_datos_previos_solo_en_crear',
       sql`(${table.accion} = 'crear'::accion_auditoria) = (${table.datosPrevios} is null)`,
+    ),
+  ],
+);
+
+// Product catalog + stock ledger (backlog #5, ADR-0003, ADR-0012). See
+// design.md D1-D9 and tasks.md's RECONCILE section for R2/R3/R4:
+// - R3 (owner decision 2026-08-29): proveedorId is NOT NULL — every product
+//   carries a supplier.
+// - R4 (resolved by spec — dropped): no
+//   `CHECK (tipo <> 'ajuste' OR motivo IS NOT NULL)`. spec.md's own count
+//   names exactly two CHECK constraints on `movimientos`; #6 owns the motivo
+//   rule.
+// No `cantidad <> 0` CHECK either — design's own resolved Open Question
+// (not a RECONCILE item): `ajuste` is deliberately libre
+// (TECH-DESIGNv2.md:125).
+export const movimientoTipo = pgEnum('movimiento_tipo', [
+  'entrada',
+  'salida',
+  'ajuste',
+  'venta',
+  'anulacion',
+]);
+
+export const productos = pgTable(
+  'productos',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    nombre: text('nombre').notNull(),
+    sku: text('sku').notNull(),
+    categoria: text('categoria'),
+    stockActual: integer('stock_actual').notNull().default(0),
+    stockMinimo: integer('stock_minimo'),
+    precio: numeric('precio', { precision: 12, scale: 2 }).notNull(),
+    // R3: NOT NULL, settled by the owner 2026-08-29 (spec silent — see
+    // tasks.md's RECONCILE section). `onDelete: 'restrict'` matches
+    // proveedores' own FK style — a supplier with products cannot be
+    // hard-deleted (suppliers are only ever deactivated, never deleted).
+    proveedorId: uuid('proveedor_id')
+      .notNull()
+      .references(() => proveedores.id, { onDelete: 'restrict' }),
+    activo: boolean('activo').notNull().default(true),
+    creadoEn: timestamp('creado_en', { withTimezone: true, mode: 'date' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    // Same functional-unique-index technique as proveedores_nombre_lower_unique
+    // (design.md D1 precedent): the column keeps the value exactly as
+    // submitted, only the index expression folds case.
+    uniqueIndex('productos_sku_lower_unique').on(sql`lower(${table.sku})`),
+  ],
+);
+
+export const movimientos = pgTable(
+  'movimientos',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    productoId: uuid('producto_id')
+      .notNull()
+      .references(() => productos.id, { onDelete: 'restrict' }),
+    tipo: movimientoTipo('tipo').notNull(),
+    cantidad: integer('cantidad').notNull(),
+    motivo: text('motivo'),
+    esDiscrepancia: boolean('es_discrepancia').notNull().default(false),
+    // No FK to a `usuarios` row is omitted here — the actor who performed
+    // the movement. Nullable would hide who made a stock change; kept
+    // required and referencing usuarios, mirroring auditoria.usuarioId.
+    usuarioId: uuid('usuario_id')
+      .notNull()
+      .references(() => usuarios.id, { onDelete: 'restrict' }),
+    fecha: timestamp('fecha', { withTimezone: true, mode: 'date' })
+      .notNull()
+      .defaultNow(),
+    // No FK — `ventas` does not exist until backlog #7.
+    ventaId: uuid('venta_id'),
+    stockResultante: integer('stock_resultante').notNull(),
+  },
+  (table) => [
+    index('movimientos_producto_id_fecha_idx').on(
+      table.productoId,
+      table.fecha,
+    ),
+    check(
+      'movimientos_signo_tipo',
+      sql`(
+        (${table.tipo} = 'entrada'::movimiento_tipo AND ${table.cantidad} > 0) OR
+        (${table.tipo} IN ('salida'::movimiento_tipo, 'venta'::movimiento_tipo) AND ${table.cantidad} < 0) OR
+        (${table.tipo} = 'anulacion'::movimiento_tipo AND ${table.cantidad} > 0) OR
+        (${table.tipo} = 'ajuste'::movimiento_tipo)
+      )`,
+    ),
+    check(
+      'movimientos_discrepancia_solo_ajuste',
+      sql`${table.esDiscrepancia} = false OR ${table.tipo} = 'ajuste'::movimiento_tipo`,
     ),
   ],
 );
