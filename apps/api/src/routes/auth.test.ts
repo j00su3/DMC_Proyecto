@@ -3,6 +3,8 @@ import { buildApp } from '../app.js';
 import type { AuditoriaRepo } from '../auditoria/repository.js';
 import { hashPassword } from '../auth/password.js';
 import type { SesionesRepo } from '../auth/repository.js';
+import type { MovimientosRepo } from '../movimientos/repository.js';
+import type { ProductosRepo } from '../productos/repository.js';
 import type { ProveedoresRepo } from '../proveedores/repository.js';
 import type { Usuario, UsuariosRepo } from '../usuarios/repository.js';
 
@@ -50,6 +52,8 @@ function fakeRepos(
     } as SesionesRepo,
     auditoria: { record: async () => {} } as AuditoriaRepo,
     proveedores: {} as ProveedoresRepo,
+    productos: {} as ProductosRepo,
+    movimientos: {} as MovimientosRepo,
   };
 }
 

@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import type { AuditoriaRepo } from '../auditoria/repository.js';
 import type { SesionesRepo } from '../auth/repository.js';
 import type { DbExecutor } from '../db/client.js';
+import type { MovimientosRepo } from '../movimientos/repository.js';
+import type { ProductosRepo } from '../productos/repository.js';
 import type { ProveedoresRepo } from '../proveedores/repository.js';
 import type { UsuariosRepo } from '../usuarios/repository.js';
 import { type Repos, buildRepos } from './repos.js';
@@ -20,6 +22,8 @@ describe('repos plugin', () => {
     const fakeSesiones = {} as SesionesRepo;
     const fakeAuditoria = {} as AuditoriaRepo;
     const fakeProveedores = {} as ProveedoresRepo;
+    const fakeProductos = {} as ProductosRepo;
+    const fakeMovimientos = {} as MovimientosRepo;
 
     await app.register(reposPlugin, {
       repos: {
@@ -27,6 +31,8 @@ describe('repos plugin', () => {
         sesiones: fakeSesiones,
         auditoria: fakeAuditoria,
         proveedores: fakeProveedores,
+        productos: fakeProductos,
+        movimientos: fakeMovimientos,
       },
     });
     await app.ready();
@@ -35,6 +41,8 @@ describe('repos plugin', () => {
     expect(app.repos.sesiones).toBe(fakeSesiones);
     expect(app.repos.auditoria).toBe(fakeAuditoria);
     expect(app.repos.proveedores).toBe(fakeProveedores);
+    expect(app.repos.productos).toBe(fakeProductos);
+    expect(app.repos.movimientos).toBe(fakeMovimientos);
 
     await app.close();
   });
@@ -49,6 +57,8 @@ describe('repos plugin', () => {
     expect(app.repos.sesiones).toBeDefined();
     expect(app.repos.auditoria).toBeDefined();
     expect(app.repos.proveedores).toBeDefined();
+    expect(app.repos.productos).toBeDefined();
+    expect(app.repos.movimientos).toBeDefined();
 
     await app.close();
   });
@@ -73,6 +83,8 @@ describe('repos plugin', () => {
         sesiones: {} as SesionesRepo,
         auditoria: {} as AuditoriaRepo,
         proveedores: {} as ProveedoresRepo,
+        productos: {} as ProductosRepo,
+        movimientos: {} as MovimientosRepo,
       });
 
     await app.register(reposPlugin, { uow: { run: fakeRun } });
@@ -92,5 +104,7 @@ describe('buildRepos', () => {
     expect(repos.sesiones).toBeDefined();
     expect(repos.auditoria).toBeDefined();
     expect(repos.proveedores).toBeDefined();
+    expect(repos.productos).toBeDefined();
+    expect(repos.movimientos).toBeDefined();
   });
 });

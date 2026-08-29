@@ -234,28 +234,32 @@ reachable by the service layer in Phase 4. Depends on S2a.
 
 **Forecast: ~90 prod / ~150 test = ~240 raw diff. Under budget.**
 
-- [ ] 3.1 RED `apps/api/src/movimientos/repository.integration.test.ts` (new, Docker PG) — against
+- [x] 3.1 RED `apps/api/src/movimientos/repository.integration.test.ts` (new, Docker PG) — against
       code that does not exist: `create` inserts a row and returns it with `stockResultante` taken
       verbatim from the input, never recomputed; a `create` that violates a CHECK (e.g. `tipo =
       'entrada'`, `esDiscrepancia = true`) surfaces the raw Postgres error uncaught — `Movimientos`
       has no domain-error mapping in this change, unlike `ProductosRepo`
-- [ ] 3.2 GREEN `apps/api/src/movimientos/repository.ts` (new) — `Movimiento`, `NuevoMovimiento`,
+- [x] 3.2 GREEN `apps/api/src/movimientos/repository.ts` (new) — `Movimiento`, `NuevoMovimiento`,
       `MovimientosRepo` port (`create` only, deliberately — makes the forced-failure fake in the
       Phase 6 atomicity test an honest full replacement, and #6 extends it), `DrizzleMovimientosRepo`
-- [ ] 3.3 RED `apps/api/src/plugins/repos.test.ts` (extend) — `buildRepos` returns `productos` and
+- [x] 3.3 RED `apps/api/src/plugins/repos.test.ts` (extend) — `buildRepos` returns `productos` and
       `movimientos` members bound to the given executor; the injected-fakes case includes both.
       Fails today because `Repos` has neither key
-- [ ] 3.4 GREEN `apps/api/src/plugins/repos.ts` (modify) — widen `Repos` with `productos:
+- [x] 3.4 GREEN `apps/api/src/plugins/repos.ts` (modify) — widen `Repos` with `productos:
       ProductosRepo` and `movimientos: MovimientosRepo`; `buildRepos` constructs
       `new DrizzleProductosRepo(executor)` and `new DrizzleMovimientosRepo(executor)`
-- [ ] 3.5 GREEN fix every test file this widening breaks by name (mirrors the precedent's Phase 4,
+- [x] 3.5 GREEN fix every test file this widening breaks by name (mirrors the precedent's Phase 4,
       task 3b.3 in `gestion-proveedores/tasks.md` — expect the same shape of breakage): `app.test.ts`
       (stub `satisfies Repos`), `plugins/auth.test.ts`, `routes/auth.test.ts`,
       `routes/usuarios.test.ts`, `routes/proveedores.test.ts`, `plugins/repos.test.ts`. Do **not**
       touch any file with its own local narrow `Repos` interface (e.g.
       `proveedores/service.test.ts`'s two-key type) unless it independently breaks — verify each
-      touched file against `git diff` before committing, not by assumption
-- [ ] 3.6 Verify: `pnpm --filter api test`, `pnpm typecheck`, `pnpm lint`, `pnpm contract:check`
+      touched file against `git diff` before committing, not by assumption.
+      **Apply note**: the prediction was incomplete — `pnpm typecheck` also broke
+      `apps/api/src/auth/service.test.ts` (its `fakeUow` builds a `Repos`-shaped object for
+      `changePassword`'s `UnitOfWork` param, not the file's own local two-key `Repos`), and it was
+      fixed alongside the six named files, confirmed by `git status --short` before committing
+- [x] 3.6 Verify: `pnpm --filter api test`, `pnpm typecheck`, `pnpm lint`, `pnpm contract:check`
       (still byte-identical — no route touched)
 
 ## Phase 4: S3a — Product Service, Create Path
