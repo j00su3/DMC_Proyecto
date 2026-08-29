@@ -1,5 +1,16 @@
 # Technical Design Document: Sistema de Gestión de Inventario para Tiendas (InvenTienda)
 
+> [!WARNING]
+> **Documento superseded — no citar como fuente de decisiones vigentes.**
+> `docs/TECH-DESIGNv2.md` reemplaza a este documento desde el 2026-08-13, incorporando
+> las resoluciones de la Ronda 2 de `docs/REVISION-ADVERSARIAL.md`. Este archivo se
+> conserva sólo como historial de la v1.
+>
+> Las secciones que cambiaron entre versiones son justamente las de los ítems aún no
+> implementados (movimientos, punto de venta, alertas), de modo que citar la v1 al
+> planificar trabajo nuevo produce decisiones sobre un diseño retirado. Ver
+> `docs/DRIFT.md` (D-07).
+
 **Tipo de proyecto:** Greenfield — se construye desde cero, sin repos previos que reconciliar.
 **Design.md disponible:** Sí — el modelo de datos se derivó del PRD y también de lo que las
 pantallas del Design.md revelan que el usuario debe ver (chips de estado, KPIs, tablas de
