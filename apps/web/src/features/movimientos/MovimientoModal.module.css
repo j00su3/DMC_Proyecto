@@ -1,0 +1,123 @@
+.closeButton {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  border: none;
+  background: var(--color-bg-app);
+  color: var(--color-text-muted-strong);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.closeButton:hover {
+  background: var(--color-border);
+}
+
+.divider {
+  height: 1px;
+  background: var(--color-divider);
+  margin: 0 0 16px;
+}
+
+.stepLabel {
+  margin: 0 0 16px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted-strong);
+}
+
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 0 20px;
+  padding: 0;
+  border: none;
+}
+
+.card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  cursor: pointer;
+}
+
+.card:has(input:checked) {
+  border-color: var(--color-accent);
+  background: var(--color-bg-app);
+}
+
+.cardDisabled {
+  cursor: not-allowed;
+  background: var(--color-bg-app);
+}
+
+.cardLabel {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.cardDisabled .cardLabel {
+  color: var(--color-text-muted-soft);
+}
+
+.stepBody {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 20px;
+}
+
+.fieldLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.stepBody input,
+.stepBody textarea {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  padding: 9px 14px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.error {
+  font-size: 12px;
+  color: var(--color-danger);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.auditNote {
+  margin: 20px 0 0;
+  font-size: 12px;
+  text-align: center;
+  color: var(--color-text-muted-soft);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
