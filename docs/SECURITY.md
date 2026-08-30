@@ -411,41 +411,41 @@ con `X-Forwarded-For` distintos sobre el mismo socket y afirma que **caen en un 
 segunda recibe `429`); otro test afirma que, con el secreto presentado, cada cliente reenviado
 obtiene el suyo. `plugins/clientIp.test.ts` cubre además el secreto incorrecto de la misma longitud.
 
-*Pendiente — decisión y acción del propietario.* Mientras Vercel no presente el secreto, el
-`keyGenerator` cae siempre al socket y los usuarios legítimos siguen compartiendo un balde. Cerrarlo
-requiere dos pasos que no son código de este repo y **no se hicieron aquí a propósito**: un
-`middleware.ts` en Vercel es la única vía para agregar una cabecera de petición (`rewrites` no lo
-permite y `headers` es para respuestas), y un archivo con ese nombre en la raíz lo toma el despliegue
-automáticamente — mal configurado, `/api/*` deja de rutear. Eso es una caída, no una degradación, y
-merece un despliegue que alguien pueda mirar.
+*Pendiente — sólo las variables de entorno.* El `middleware.ts` ya está en la raíz del repo desde el
+2026-08-30: es la única vía en este despliegue para agregar una cabecera de **petición**, porque
+`rewrites` no lo permite y el `headers` de `vercel.json` configura respuestas. Pero mientras
+`PROXY_SHARED_SECRET` no exista en ambas plataformas, el middleware devuelve `next()` y el
+`keyGenerator` cae siempre al socket, así que los usuarios legítimos siguen compartiendo un balde.
+
+Ese `next()` es deliberado y es lo que hace seguro tener el archivo en el repo antes de que las
+variables existan: sin secreto no toca nada, y el rewrite de `vercel.json` sigue atendiendo `/api`
+igual que siempre.
 
 Pasos, cuando haya ventana para verificarlos:
 
 1. Generar un secreto (`openssl rand -base64 32`).
 2. Cargarlo como `PROXY_SHARED_SECRET` en Render, y como variable de entorno del proyecto en Vercel.
-3. Crear `middleware.ts` en la raíz del repo:
+3. `middleware.ts` en la raíz del repo — **ya está en el repo** desde el 2026-08-30; sólo resta
+   que las variables existan para que haga algo.
+4. **El rewrite de `/api/:path*` en `vercel.json` se CONSERVA a propósito.** Una versión anterior de
+   estos pasos decía quitarlo: es un error y está corregido. Si el middleware no llega a cargar,
+   `/api/*` caería en el catch-all de la SPA —que excluye `/api/`— y devolvería 404. Conservando
+   ambos, un fallo del middleware es una degradación (sin cabecera, mismo comportamiento que hoy) y
+   no una caída.
+5. Verificar tras el despliegue: `/api/health` a través de Vercel sigue en `200`; el login sigue
+   funcionando; y una petición directa a Render con `X-Forwarded-For` forjado **no** obtiene un balde
+   propio. Si algo falla, el rollback de Vercel es inmediato: promover el deployment anterior.
 
-```ts
-import { rewrite } from '@vercel/edge';
+**Dos trampas encontradas al implementarlo, que valen más que el resultado:**
 
-export const config = { matcher: '/api/:path*' };
+`ExtraResponseInit.headers` de `@vercel/edge` son cabeceras de **respuesta al usuario** —"These
+headers will be sent to the user response"— y nunca llegan al origen. Las de petición van en
+`request.headers`. Escribir el campo equivocado habría producido un middleware que parece correcto,
+despliega sin error y no hace absolutamente nada.
 
-export default function middleware(request: Request) {
-  const url = new URL(request.url);
-  return rewrite(
-    `https://inventienda-api.onrender.com${url.pathname}${url.search}`,
-    {
-      headers: {
-        'x-inventienda-proxy': process.env.PROXY_SHARED_SECRET ?? '',
-      },
-    },
-  );
-}
-```
-
-4. Quitar de `vercel.json` el rewrite de `/api/:path*`, que el middleware reemplaza.
-5. Verificar tras el despliegue: `/api/health` a través de Vercel sigue en `200`, y una petición
-   directa a Render con `X-Forwarded-For` forjado **no** obtiene un balde propio.
+Y `request.headers` **reemplaza** las cabeceras entrantes, no las agrega: pasar sólo el secreto
+habría borrado el resto, **incluida la cookie de sesión**, rompiendo la autenticación de toda la
+aplicación. Por eso el middleware parte de `new Headers(request.headers)` y agrega la suya.
 
 Queda además abierto que la URL de Render siga siendo una puerta alternativa para todo lo demás: el
 secreto sólo decide a quién se le cree la cabecera, no cierra el origen.
