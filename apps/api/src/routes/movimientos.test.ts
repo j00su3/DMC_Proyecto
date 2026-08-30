@@ -175,7 +175,12 @@ describe('Role Gate — 401 unauthenticated on all four routes', () => {
       [
         'POST',
         routes.ajuste(),
-        { cantidad: 5, direccion: 'sumar', esDiscrepancia: false, motivo: 'conteo' },
+        {
+          cantidad: 5,
+          direccion: 'sumar',
+          esDiscrepancia: false,
+          motivo: 'conteo',
+        },
       ],
     ] as const) {
       const response = await app.inject({ method, url, payload });

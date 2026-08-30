@@ -3,8 +3,11 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { errorEnvelopeSchema } from '../lib/errors.js';
 import { pageQuerySchema, paginated } from '../lib/pagination.js';
-import { MOTIVO_MIN_LENGTH, registrarMovimiento } from '../movimientos/service.js';
 import type { Movimiento } from '../movimientos/repository.js';
+import {
+  MOTIVO_MIN_LENGTH,
+  registrarMovimiento,
+} from '../movimientos/service.js';
 import type { Producto } from '../productos/repository.js';
 import { requireActor } from '../productos/service.js';
 
