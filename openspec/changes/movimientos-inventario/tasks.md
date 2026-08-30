@@ -433,7 +433,7 @@ Per Product, Paginated**. Depends on S6 (queries) and S7b (modal complete).
 
 **Forecast: ~140 prod / ~150 test ≈ 290 raw diff. Under budget.**
 
-- [ ] 8.1 RED `apps/web/src/routes/productosDetalle.test.tsx` (extend, full `routeTree` +
+- [x] 8.1 RED `apps/web/src/routes/productosDetalle.test.tsx` (extend, full `routeTree` +
       `createMemoryHistory`, `await router.load()` before render per house rule) — `Registrar
       movimiento` trigger present and enabled for an active product, both roles; absent or disabled
       for an inactive product; opening it and completing a successful flow closes the modal and the
@@ -451,13 +451,61 @@ Per Product, Paginated**. Depends on S6 (queries) and S7b (modal complete).
       guards the key's shape, but shape is not behaviour: this assertion is the half that proves
       the screen actually updates. CLAUDE.md's "route-level coverage, not just hook-level" names
       this exact failure, and it has already shipped twice in this project.
-- [ ] 8.2 GREEN `apps/web/src/features/movimientos/MovimientosTable.tsx` (new) — renders `tipo`,
+      → 8 new tests (7 route-level + the file's existing 6 unaffected): active-product trigger
+      shown/enabled for both roles; inactive-product trigger hidden; full entrada flow closes the
+      modal and updates `Stock actual`; paginated history render; merma badge distinguishes a
+      merma row from an ordinary salida; the owed "gains the new row without reload" assertion; the
+      owed end-to-end 409 `INSUFFICIENT_STOCK` → readable-text-without-closing assertion. Confirmed
+      RED first: all 7 new tests failed (missing trigger/history/modal wiring in
+      `productosDetalle.tsx`) before any production code changed; the 6 pre-existing tests stayed
+      green throughout.
+- [x] 8.2 GREEN `apps/web/src/features/movimientos/MovimientosTable.tsx` (new) — renders `tipo`,
       `cantidad`, `stockResultante`, `motivo`, a merma badge/chip, `fecha`, `usuarioId`.
-- [ ] 8.3 GREEN `apps/web/src/routes/productosDetalle.tsx` (modify) — add the trigger button (hidden,
+      → Presentational, built on `DataTable` + `StatusChip` (`ProductosTable.tsx` precedent) — no
+      new chip component. `esMerma` renders a `StatusChip variant="warning" label="Merma"` beside
+      the type label.
+- [x] 8.3 GREEN `apps/web/src/routes/productosDetalle.tsx` (modify) — add the trigger button (hidden,
       not disabled, when `producto.activo === false`, per D10) and the paginated
       `MovimientosTable` below the existing form, using `useMovimientos` (S6) and the existing
       `Pagination` component.
-- [ ] 8.4 Verify S8: `pnpm --filter web test`, `pnpm typecheck`, `pnpm lint`.
+      → Route module owns `useRegistrarMovimiento` and `movimientosErrorMessage` (matching
+      `productosNuevo.tsx`'s `useCrearProducto`/`productosErrorMessage` ownership precedent, per
+      the task's own header note). Added a `Stock actual: N` paragraph (previously not rendered
+      anywhere on this route) so the "updated stock without reload" assertion has something visible
+      to check. Movement-history pagination is local `useState`, not a route search param — no
+      existing precedent makes it bookmarkable, and the task doesn't require it. All three
+      `useRegistrarMovimiento` wrappers share one visible error/pending surface, since the modal is
+      gated to exactly one choice per open (only one wrapper can ever be in flight).
+- [x] 8.4 Verify S8: `pnpm --filter web test`, `pnpm typecheck`, `pnpm lint`.
+      → All exit 0. web: 247/247 passing (239 baseline + 8 new). typecheck: api + web both "Done".
+      lint (biome ci .): 237 files checked, no fixes applied (one `biome check --write` pass was
+      needed mid-session for line-wrap formatting in the extended test file; final run is clean).
+      `pnpm contract:check`: byte-identical, exit 0 (no route touched, no `schema.d.ts` drift).
+      **Mutation-probe evidence (required, two probes, both performed)**:
+      (1) *List-key prefix nesting* (the task's own named risk) — temporarily changed
+      `movimientosKeys.list` in `queries.ts` from `[...movimientosKeys.lists(), productoId,
+      {page}]` to `[...movimientosKeys.all, 'listX', productoId, {page}]`, breaking the prefix
+      match `invalidateQueries({queryKey: movimientosKeys.lists()})` relies on. First run of the
+      "gains the new row" test still PASSED under this mutation — investigated rather than
+      accepted: the test's own fetch stub returned the *live* `rows` array reference in the
+      `GET .../movimientos` JSON body instead of a snapshot, so a later POST's `rows.unshift(...)`
+      silently mutated already-cached React Query data by reference, and an unrelated re-render
+      (triggered by the `productosKeys.detail(id)` invalidation, which *does* match) picked up the
+      mutated array — a decorative pass caused by a test-harness bug, not evidence the assertion
+      was sound. Fixed the stub to return `data: [...rows]` (a snapshot), re-ran under the same
+      mutation: the test now correctly FAILED (`tbody` empty, no new row), confirming the fetch log
+      showed zero second `GET .../movimientos` calls — the invalidation genuinely did not match.
+      Reverted `queries.ts`; `git diff --exit-code` on the file exits 0 (clean) — confirmed via
+      `git diff --stat` showing no changes before the final GREEN run.
+      (2) *Error-mapping wiring* — temporarily replaced `productosDetalle.tsx`'s
+      `movimientosErrorMessage(registrarError)` call with the literal string `'PROBE_BROKEN_MAPPING'`.
+      Result: "surfaces a 409 INSUFFICIENT_STOCK server error as readable text" failed —
+      `screen.findByText('Stock insuficiente: hay 5 disponibles.')` timed out, proving the
+      assertion exercises the real `useRegistrarMovimiento` → `movimientosErrorMessage` wiring, not
+      a hardcoded string. Reverted; `git diff` confirmed clean before the final GREEN run.
+      Neither probe is decorative — probe 1 caught and fixed a real test-harness defect (a false
+      GREEN) before it could ship as a false proof; probe 2 confirmed the second owed assertion is
+      load-bearing.
 
 ## Phase 9 — Bookkeeping
 
