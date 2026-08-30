@@ -195,7 +195,14 @@ setup. Flag for `size:exception` if it drifts further.**
 - [ ] 4.1 RED `apps/api/src/routes/movimientos.test.ts` (new, `app.inject` with injected fakes) —
       unauthenticated → 401 on all four routes; `deposito` → 201 on entrada/salida, **403
       `ADJUSTMENT_RESERVED_FOR_ENCARGADO`** on ajuste, table/stock unchanged (assert via the fake, not
-      just status); `encargado` → 201 on all three; `.strict()` body rejection on an unknown key;
+      just status); `encargado` → 201 on all three; `.strict()` body rejection on an unknown key —
+      **and specifically that `esMerma` on the entrada body, and `esDiscrepancia` on the
+      entrada/salida bodies, are rejected as unknown keys.** That rejection is what actually enforces
+      D7's literal columns (`entrada`: both `false`; `salida`: `esDiscrepancia: false`; `ajuste`:
+      `esMerma: false`): `registrarMovimiento` passes both flags through unchanged by design, so the
+      route body shape is the only thing standing between a contradicting combination and a raw
+      Postgres `23514` from `movimientos_merma_solo_salida` — which S3's hard constraint forbids as a
+      mechanism for user-facing errors. Assert it, do not assume it;
       `cantidad` coerced/validated as a positive integer ≥ 1 (D7 — magnitude only, zero unrepresentable
       on the wire); `GET .../movimientos?page&pageSize` returns `{ data, page, pageSize, total }` with
       `tipo`, `cantidad`, `stockResultante`, `motivo`, `esMerma`, `fecha`, `usuarioId` per row.
