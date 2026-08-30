@@ -1,16 +1,22 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { MovimientoModal, toWireSubmission } from './MovimientoModal.js';
+import {
+  MovimientoModal,
+  buildSummaryLine,
+  computeStockResultante,
+  toWireSubmission,
+} from './MovimientoModal.js';
 import { EMPTY_MOVIMIENTO_FORM } from './schemas.js';
 
 /**
- * S7a scope: step 1 only (choice cards, role hiding, shell wiring). Steps 2
- * and 3 are placeholders in this slice (generic cantidad/motivo controls),
- * completed with D9's full per-choice UI in S7b — this file's flow tests
- * drive through those placeholders only far enough to prove the step-1
- * mapping to the wire shape (movimientos-ui spec: "Step 1 Offers Four
- * Operator-Facing Choices Mapped To Three Wire Types").
+ * S7a covered step 1 only (choice cards, role hiding, shell wiring). S7b
+ * (this file, extended) adds D9's full steps 2-3: quantity variant by
+ * choice, the ajuste `Sumar/Restar` control + discrepancy checkbox, the
+ * motivo textarea and its conditional label, the summary line, and
+ * `serverError` surfacing (movimientos-ui spec: "Step 2 Refuses To Progress
+ * When Motivo Or Quantity Rules Are Violated", "Step 3 Confirms And
+ * Submits, Surfacing Server Refusals To Either Role").
  */
 describe('MovimientoModal', () => {
   it('renders exactly four choices for an encargado session, none disabled', () => {
@@ -87,7 +93,7 @@ describe('MovimientoModal', () => {
     await user.click(screen.getByRole('radio', { name: 'Salida por merma' }));
     await user.click(screen.getByRole('button', { name: 'Continuar' }));
 
-    await user.type(screen.getByLabelText('Cantidad'), '5');
+    await user.type(screen.getByLabelText('Cantidad a retirar'), '5');
     await user.click(screen.getByRole('button', { name: 'Continuar' }));
 
     await user.type(screen.getByLabelText('Motivo'), 'rotura');
@@ -115,7 +121,7 @@ describe('MovimientoModal', () => {
     await user.click(screen.getByRole('radio', { name: 'Ajuste' }));
     await user.click(screen.getByRole('button', { name: 'Continuar' }));
 
-    await user.type(screen.getByLabelText('Cantidad'), '3');
+    await user.type(screen.getByLabelText('Unidades'), '3');
     await user.click(screen.getByRole('button', { name: 'Continuar' }));
 
     await user.type(screen.getByLabelText('Motivo'), 'conteo físico');
@@ -144,6 +150,200 @@ describe('MovimientoModal', () => {
         'Este movimiento queda registrado con su usuario y la fecha. No puede editarse ni eliminarse.',
       ),
     ).toBeInTheDocument();
+  });
+
+  it('Ajuste with quantity 0 is refused before submit, no request sent', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    render(
+      <MovimientoModal
+        actorRol="encargado"
+        onClose={vi.fn()}
+        onSubmit={onSubmit}
+      />,
+    );
+
+    await user.click(screen.getByRole('radio', { name: 'Ajuste' }));
+    await user.click(screen.getByRole('button', { name: 'Continuar' }));
+
+    await user.type(screen.getByLabelText('Unidades'), '0');
+    await user.click(screen.getByRole('button', { name: 'Continuar' }));
+
+    // Still on step 2 — the "Unidades" field is still rendered, and a
+    // validation error is shown; the wizard never advanced to step 3.
+    expect(screen.getByLabelText('Unidades')).toBeInTheDocument();
+    expect(
+      screen.getByText('La cantidad debe ser al menos 1.'),
+    ).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('a merma salida with blank motivo is refused before submit', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    render(
+      <MovimientoModal
+        actorRol="encargado"
+        onClose={vi.fn()}
+        onSubmit={onSubmit}
+      />,
+    );
+
+    await user.click(screen.getByRole('radio', { name: 'Salida por merma' }));
+    await user.click(screen.getByRole('button', { name: 'Continuar' }));
+    await user.type(screen.getByLabelText('Cantidad a retirar'), '3');
+    await user.click(screen.getByRole('button', { name: 'Continuar' }));
+
+    await user.click(
+      screen.getByRole('button', { name: 'Registrar movimiento' }),
+    );
+
+    expect(
+      await screen.findByText('Ingrese un motivo (mínimo 3 caracteres).'),
+    ).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('an ordinary salida with blank motivo is allowed to progress to step 3', async () => {
+    const user = userEvent.setup();
+    render(
+      <MovimientoModal
+        actorRol="encargado"
+        onClose={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole('radio', { name: 'Salida' }));
+    await user.click(screen.getByRole('button', { name: 'Continuar' }));
+    await user.type(screen.getByLabelText('Cantidad a retirar'), '2');
+    await user.click(screen.getByRole('button', { name: 'Continuar' }));
+
+    expect(screen.getByLabelText('Motivo (opcional)')).toBeInTheDocument();
+  });
+
+  it('the discrepancy checkbox is present and functional on the ajuste step', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    render(
+      <MovimientoModal
+        actorRol="encargado"
+        onClose={vi.fn()}
+        onSubmit={onSubmit}
+      />,
+    );
+
+    await user.click(screen.getByRole('radio', { name: 'Ajuste' }));
+    await user.click(screen.getByRole('button', { name: 'Continuar' }));
+    await user.type(screen.getByLabelText('Unidades'), '4');
+    await user.click(
+      screen.getByRole('checkbox', {
+        name: 'Marcar como discrepancia de inventario',
+      }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Continuar' }));
+    await user.type(screen.getByLabelText('Motivo'), 'conteo físico');
+    await user.click(
+      screen.getByRole('button', { name: 'Registrar movimiento' }),
+    );
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    const [submission] = onSubmit.mock.calls.at(0) ?? [];
+    expect(submission?.body.esDiscrepancia).toBe(true);
+  });
+
+  it('step 3 renders a summary line derived from the entered movement', async () => {
+    const user = userEvent.setup();
+    render(
+      <MovimientoModal
+        actorRol="encargado"
+        onClose={vi.fn()}
+        onSubmit={vi.fn()}
+        stockActual={12}
+      />,
+    );
+
+    await user.click(screen.getByRole('radio', { name: 'Salida por merma' }));
+    await user.click(screen.getByRole('button', { name: 'Continuar' }));
+    await user.type(screen.getByLabelText('Cantidad a retirar'), '3');
+    await user.click(screen.getByRole('button', { name: 'Continuar' }));
+
+    expect(
+      screen.getByText('Salida por merma · 3 unidades · stock resultante 9'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Registrar movimiento' }),
+    ).toBeInTheDocument();
+  });
+
+  it('a stock preview shows Stock disponible and a live Stock resultante on step 2', async () => {
+    const user = userEvent.setup();
+    render(
+      <MovimientoModal
+        actorRol="encargado"
+        onClose={vi.fn()}
+        onSubmit={vi.fn()}
+        stockActual={10}
+      />,
+    );
+
+    await user.click(screen.getByRole('radio', { name: 'Salida' }));
+    await user.click(screen.getByRole('button', { name: 'Continuar' }));
+
+    expect(screen.getByText('Stock disponible: 10')).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Cantidad a retirar'), '4');
+
+    expect(screen.getByText('Stock resultante: 6')).toBeInTheDocument();
+  });
+
+  it('renders a serverError message without closing the modal', () => {
+    const onClose = vi.fn();
+    render(
+      <MovimientoModal
+        actorRol="encargado"
+        onClose={onClose}
+        onSubmit={vi.fn()}
+        serverError="Stock insuficiente, hay 5 disponibles"
+      />,
+    );
+
+    expect(screen.getByRole('alert')).toHaveTextContent('5');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe('computeStockResultante', () => {
+  it('adds the magnitude for an entrada', () => {
+    expect(computeStockResultante(10, 'entrada', '5', 'sumar')).toBe(15);
+  });
+
+  it('subtracts the magnitude for a salida', () => {
+    expect(computeStockResultante(10, 'salida', '5', 'sumar')).toBe(5);
+  });
+
+  it('subtracts the magnitude for a merma salida', () => {
+    expect(computeStockResultante(12, 'merma', '3', 'sumar')).toBe(9);
+  });
+
+  it('adds for ajuste sumar, subtracts for ajuste restar', () => {
+    expect(computeStockResultante(10, 'ajuste', '4', 'sumar')).toBe(14);
+    expect(computeStockResultante(10, 'ajuste', '4', 'restar')).toBe(6);
+  });
+});
+
+describe('buildSummaryLine', () => {
+  it('formats the merma summary example from D9', () => {
+    expect(buildSummaryLine('merma', '3', 9)).toBe(
+      'Salida por merma · 3 unidades · stock resultante 9',
+    );
+  });
+
+  it('formats an entrada summary with a different label and numbers', () => {
+    expect(buildSummaryLine('entrada', '10', 20)).toBe(
+      'Entrada · 10 unidades · stock resultante 20',
+    );
   });
 });
 
