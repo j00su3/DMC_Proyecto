@@ -520,6 +520,14 @@ is unrelated but the route tree convention is shared).
 the supplier-selector (active-suppliers-only fetch + its own test) into its own micro-PR ahead of
 this one, mirroring the `gestion-proveedores` S3a precedent.**
 
+**Split executed**: the forecast's own remedy was applied. The supplier selector shipped standalone
+on `feat/productos-s7a-selector` (211 raw diff: `features/productos/useProveedoresActivos.ts`,
+`ProveedorSelector.tsx` + its CSS module, `ProveedorSelector.test.tsx`) — active-suppliers-only,
+fetched from `GET /api/proveedores?page=1&pageSize=100` and filtered client-side by `activo: true`
+(the route supports only `page`/`pageSize`, no `activo` or `q` filter). 12.1–12.5 below cover the
+remaining create-form work on `feat/productos-s7a-form`, which imports `ProveedorSelector` rather
+than re-deriving it.
+
 - [ ] 12.1 RED `apps/web/src/routes/productosNuevo.test.tsx` (new) — a `deposito` session sees
       `stock_minimo` visible, disabled, with 🔒 (present, not hidden — the visible-locks convention
       from `usuarios-ui`); an `encargado` session can type into it; the initial-stock field is
