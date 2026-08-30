@@ -194,8 +194,10 @@ setup. Flag for `size:exception` if it drifts further.**
 
 - [x] 4.1 RED `apps/api/src/routes/movimientos.test.ts` (new, `app.inject` with injected fakes) —
       unauthenticated → 401 on all four routes; `deposito` → 201 on entrada/salida, **403
-      `ADJUSTMENT_RESERVED_FOR_ENCARGADO`** on ajuste, table/stock unchanged (assert via the fake, not
-      just status); `encargado` → 201 on all three; `.strict()` body rejection on an unknown key —
+      `FORBIDDEN`** on ajuste (corrected 2026-08-30 from `ADJUSTMENT_RESERVED_FOR_ENCARGADO`, which
+      `config.roles` never emits — see the spec's correction note), table/stock unchanged (assert
+      via the fake, not just status); `encargado` → 201 on all three; `.strict()` body rejection on
+      an unknown key —
       **and specifically that `esMerma` on the entrada body, and `esDiscrepancia` on the
       entrada/salida bodies, are rejected as unknown keys.** That rejection is what actually enforces
       D7's literal columns (`entrada`: both `false`; `salida`: `esDiscrepancia: false`; `ajuste`:
