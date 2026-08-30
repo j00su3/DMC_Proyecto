@@ -4,7 +4,9 @@ import type { AuditoriaRepo } from './repository.js';
 
 // `entidad` is keyed off the classification map, not off the pgEnum: an
 // entity with no classified columns does not compile (design.md D9 + D11).
-// v1: only 'usuarios' has an entry.
+// Entries today: 'usuarios', 'proveedores', 'productos'. Adding a fourth
+// entity means adding its entry here first, or its recordAudit call site
+// will not compile.
 export type AuditableEntidad = keyof typeof FIELD_CLASSIFICATION;
 
 export type AuditAccion =
