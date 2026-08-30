@@ -37,7 +37,7 @@ están promovidas a `openspec/specs/`.
 | 3.5 | Recuperación de contraseña por email | Flujo propio de reset por correo: tabla de tokens con hash, expiración y un solo uso; endpoint de pedido con rate-limit y respuesta idéntica exista o no el mail (para no filtrar qué cuentas existen); endpoint de confirmación; puerto de mailer con fake para tests; dos pantallas. **Bloqueado por infraestructura, no por esfuerzo**: enviar a una dirección arbitraria exige un dominio cuyo DNS pueda llevar SPF/DKIM, y hoy no hay uno (el `*.web.app` de Firebase Hosting tiene el DNS de Google). Descartado adoptar Firebase Authentication: reemplaza el modelo cookie + `sesiones` que fija el ADR-0007 y deja huérfana la FK `auditoria.usuario_id` | #3, dominio propio | ⬜ Pendiente — bloqueado |
 | 4 | Gestión de proveedores — backend | CRUD por el encargado, solo-lectura para depósito; baja lógica que preserva referencias e historial; **vista maestro-detalle diferida a 4.1** | #2, #2.1, #2.2 | ✅ Archivado |
 | 4.1 | Proveedores — vista maestro-detalle (UI) | Fast-follow de UI para el #4 backend: selector maestro/detalle de proveedores con selección stateful y deep-linking; debe sentarse bajo `shellLayout` con gates de RBAC por componente (no `encargadoLayout`, que cierra el árbol); se integra con `NAV_ITEMS` en `AppShell.tsx`. Sale aparte porque el #4 es CRUD de backend según la letra del backlog, porque no hay wireframe aprobado para esta pantalla (la letra del backlog nombraba CRUD + vista juntas, pero `design.md:94-95` cita la vista como bloque y admite diseño responsive pendiente), y porque es la única UI genuinamente nueva sin precedente en el codebase — el costo driver es implementar patrón maestro/detalle de cero, no agregar campos | #4, #2.1 | ⬜ Pendiente |
-| 5 | Productos + ledger base | Tablas Producto y Movimiento con CHECKs (signo↔tipo, `es_discrepancia` solo en ajustes); CRUD con SKU único; stock inicial vía movimiento `ajuste` en la misma transacción (C2); edición sin `stock_actual` en el schema; permiso por campo `stock_minimo` — 403 `campo_reservado_encargado` (A7); baja lógica reservada al encargado; chips quiebre/bajo derivados | #2, #2.2, #4 | ⬜ Pendiente |
+| 5 | Productos + ledger base | Tablas Producto y Movimiento con CHECKs (signo↔tipo, `es_discrepancia` solo en ajustes); CRUD con SKU único; stock inicial vía movimiento `ajuste` en la misma transacción (C2); edición sin `stock_actual` en el schema; permiso por campo `stock_minimo` — 403 `campo_reservado_encargado` (A7); baja lógica reservada al encargado; chips quiebre/bajo derivados | #2, #2.2, #4 | ✅ Archivado |
 | 6 | Movimientos de inventario | Entradas/salidas/ajustes con UPDATE atómico condicional (`stock >= :n AND activo = true`); motivo obligatorio en ajustes y mermas; marca `es_discrepancia` al registrar ajustes; `stock_resultante` en la misma transacción; historial auditable por producto; flujo de alta en ≤ 3 pasos (modal 3 pasos del design.md) | #5 | ⬜ Pendiente |
 | 7 | Punto de venta | Tablas Venta/ItemVenta/Pago (`NUMERIC(12,2)`); venta multi-ítem en una única transacción con orden determinístico por `producto_id`; `numero_correlativo` por secuencia (huecos documentados); validación de pago (medio obligatorio, monto ≥ total, cálculo de vuelto); carrito en `localStorage` que sobrevive recargas; layout POS del design.md (catálogo + carrito); venta típica ≤ 1 minuto | #6 | ⬜ Pendiente |
 | 8 | Recibo interno | Documento derivado on-demand de Venta+ItemVenta+Pago (sin tabla propia); imprimible/descargable en cualquier momento; hereda el estado `anulada`; sin validez fiscal | #7 | ⬜ Pendiente |
@@ -64,6 +64,13 @@ API de CRUD de proveedores está en `main` con cobertura completa (217 api + 157
 integration tests). Las specs (`supplier-management`) está promovida a `openspec/specs/`. La
 **vista maestro-detalle** fue diferida como ítem **4.1** (depende de #4 backend, no bloqueador
 del #5 de productos que solo requiere `proveedor_id` FK).
+
+Actualizado el 2026-08-30: el ítem **#5** (Productos + ledger base) queda archivado. Tablas
+`productos` y `movimientos` con CHECKs, CRUD con SKU único, stock inicial vía movimiento `ajuste`
+en transacción atómica (ADR-0003), permiso por campo `stock_minimo` (A7), baja lógica, UI completa
+con chips quiebre/bajo. API 275 unit + 117 integration, Web 194 unit tests, todos en verde. Specs
+(`product-management` y `productos-ui`) promovidas a `openspec/specs/`. Desplegado: SPA en Vercel,
+API en Render, Postgres en Neon; 12 productos de demo con 4 proveedores sembrados.
 
 ## Cómo usar este backlog
 
