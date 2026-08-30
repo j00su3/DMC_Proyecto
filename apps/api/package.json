@@ -12,7 +12,8 @@
     "openapi:generate": "tsx src/plugins/openapi.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "seed:encargado": "tsx scripts/seed-encargado.ts"
+    "seed:encargado": "tsx scripts/seed-encargado.ts",
+    "seed:demo": "tsx scripts/seed-demo.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",
