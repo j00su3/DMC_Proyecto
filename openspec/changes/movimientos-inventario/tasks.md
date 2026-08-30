@@ -242,7 +242,7 @@ assertion misses"). Depends on S4 (needs live routes).
 
 **Forecast: 0 prod / ~200 test ≈ 200 raw diff. Under budget.**
 
-- [ ] 5.1 RED `apps/api/src/routes/movimientos.integration.test.ts` (new, real app + Docker PG,
+- [x] 5.1 RED `apps/api/src/routes/movimientos.integration.test.ts` (new, real app + Docker PG,
       `failingUow` technique from `proveedores.integration.test.ts:526-543` — a real
       `createUnitOfWork(db)` with `movimientos` replaced by a thrower):
       1. **Ledger fails.** `movimientos.create` throws ⇒ `stock_actual` unchanged, zero new
@@ -257,12 +257,20 @@ assertion misses"). Depends on S4 (needs live routes).
       6. **Merma persists distinctly** — a merma salida's row has `es_merma = true`, an ordinary
          salida on the same product has `es_merma = false`, both readable via
          `GET .../movimientos`.
-- [ ] 5.2 GREEN whatever wiring gap 5.1 exposes (expected: none — S3/S4 already implement this path;
+- [x] 5.2 GREEN whatever wiring gap 5.1 exposes (expected: none — S3/S4 already implement this path;
       this is the real-Postgres proof).
-- [ ] 5.3 Mutate at least one assertion (e.g. temporarily expect `auditoria` count to increase) and
+      → Confirmed: zero wiring gaps. All 6 proofs passed on the first run against S3/S4's existing
+      production code, no production file touched.
+- [x] 5.3 Mutate at least one assertion (e.g. temporarily expect `auditoria` count to increase) and
       confirm it fails for the right reason, then revert — proving the audit-absence test is not
       vacuous, per CLAUDE.md's mutation-probing rule.
-- [ ] 5.4 Verify S5: `pnpm --filter api test:integration`, `pnpm typecheck`, `pnpm lint`.
+      → Flipped proof 5's entrada assertion to `expect(await countRows('auditoria')).toBe(before +
+      1)`. Failed with `AssertionError: expected +0 to be 1` — the real auditoria table stayed at 0
+      rows, proving the assertion was exercising real Postgres state, not a tautology. Reverted;
+      `git diff --exit-code` on the file exits 0 (clean).
+- [x] 5.4 Verify S5: `pnpm --filter api test:integration`, `pnpm typecheck`, `pnpm lint`.
+      → All exit 0. Integration: 135/135 passing (129 baseline + 6 new), 15 files. typecheck: api +
+      web both "Done". lint (biome ci .): 225 files checked, no fixes applied.
 
 ## Phase S6 — Web: Feature Scaffolding (queries, hooks, schemas, error messages)
 
