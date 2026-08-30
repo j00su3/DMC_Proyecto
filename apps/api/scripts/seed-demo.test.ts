@@ -3,6 +3,8 @@ import {
   DEMO_PRODUCTOS,
   DEMO_PROVEEDORES,
   type SeedDemoDeps,
+  formatError,
+  requireDatabaseUrl,
   seedDemo,
 } from './seed-demo.js';
 
@@ -116,6 +118,25 @@ describe('seedDemo', () => {
     for (const call of reused) {
       expect(call[0].proveedorId).toBe('existing-proveedor-id');
     }
+  });
+
+  // Regression: the first run of this script failed with only Drizzle's
+  // "Failed query" line and no cause at all, because DATABASE_URL was unset
+  // and the driver fell back to its own defaults. Both guards below exist so
+  // that failure names itself.
+  it('names DATABASE_URL when it is missing, instead of failing at the driver', () => {
+    expect(() => requireDatabaseUrl({})).toThrow(/DATABASE_URL is not set/);
+    expect(requireDatabaseUrl({ DATABASE_URL: 'postgres://x/y' })).toBe(
+      'postgres://x/y',
+    );
+  });
+
+  it('unwraps the cause chain a driver error is buried under', () => {
+    const wrapped = new Error('Failed query', {
+      cause: new Error('password authentication failed'),
+    });
+
+    expect(formatError(wrapped)).toContain('password authentication failed');
   });
 
   // Every write is attributed to a real actor in the audit trail, so there
