@@ -150,29 +150,29 @@ piece of logic in the change (D1's classification + D7's sign derivation + D8's 
 sub-unit out costs more reviewer context than it saves, mirroring `productos-ledger-base`'s own S3a
 call. Flag for `size:exception` if it drifts further during apply.**
 
-- [ ] 3.1 RED `apps/api/src/movimientos/service.test.ts` (new, fake repos + `{ run: (work) =>
+- [x] 3.1 RED `apps/api/src/movimientos/service.test.ts` (new, fake repos + `{ run: (work) =>
       work(stubs) }`, mirroring `productos/service.test.ts`) — classification precedence: `aplicarDelta`
       returns `undefined`, `productos.findById` returns `undefined` → `productNotFound()` (404), never
       calls `movimientos.create`; returns `{ activo: false }` → `productInactive()` (409); returns an
       active row → `insufficientStock(row.stockActual)` (409), carrying the read stock, not a
       recomputed value.
-- [ ] 3.2 RED (same file, extend) — motivo guard: fires for `ajuste` with blank/undefined `motivo`;
+- [x] 3.2 RED (same file, extend) — motivo guard: fires for `ajuste` with blank/undefined `motivo`;
       fires for a merma `salida` (`esMerma: true`) with blank/undefined `motivo`; does **not** fire for
       an ordinary `entrada`; does **not** fire for a non-merma `salida`; a 3-character trimmed `motivo`
       (`"robo"` is 4, also assert `"abc"` at exactly 3) is accepted; a 2-character motivo is refused.
-- [ ] 3.3 RED (same file, extend) — sign derivation: `entrada` produces `delta = +cantidad`; `salida`
+- [x] 3.3 RED (same file, extend) — sign derivation: `entrada` produces `delta = +cantidad`; `salida`
       (ordinary or merma) produces `delta = -cantidad`; `ajuste` with `direccion: 'sumar'` produces
       `+cantidad`, `'restar'` produces `-cantidad`; `stockResultante` on the created movement equals
       `aplicarDelta`'s stub return value verbatim, never independently recomputed by the test's own
       math nor by the service.
-- [ ] 3.4 RED (same file, extend) — **the audit-absence proof**: a spy/fake on `auditoria.record` (or
+- [x] 3.4 RED (same file, extend) — **the audit-absence proof**: a spy/fake on `auditoria.record` (or
       equivalent) records **zero calls** across every successful `entrada`/`salida`/`ajuste` path
       exercised in this file.
-- [ ] 3.5 RED (same file, extend) — transaction shape: exactly one `uow.run` invocation per call
+- [x] 3.5 RED (same file, extend) — transaction shape: exactly one `uow.run` invocation per call
       (spy-count it); `movimientos.create` is called with `esMerma`/`esDiscrepancia` set per D7's
       table (`entrada`: both `false`; `salida`: `esMerma` from input, `esDiscrepancia: false`;
       `ajuste`: `esMerma: false`, `esDiscrepancia` from input).
-- [ ] 3.6 GREEN `apps/api/src/movimientos/service.ts` (**new**) — `rechazarMovimiento` helper
+- [x] 3.6 GREEN `apps/api/src/movimientos/service.ts` (**new**) — `rechazarMovimiento` helper
       (`Promise<never>`, D1's exact precedence table); `TipoOperacion`, `RegistrarMovimientoInput`,
       `registrarMovimiento(uow, input)` per D7's interface (positive-magnitude `cantidad`, sign
       derived in-service); D8's motivo guard, run before `uow.run`; the D2 transaction tail
@@ -180,7 +180,7 @@ call. Flag for `size:exception` if it drifts further during apply.**
       `stockResultante` → `productos.findById` for the response → **explicit comment marking the #10
       SAVEPOINT seam, no code after it** → `return { movimiento, producto }`). No `try`/`catch`
       anywhere inside the callback. No `recordAudit` call anywhere in this file.
-- [ ] 3.7 Verify S3: `pnpm --filter api test`, `pnpm typecheck`, `pnpm lint`.
+- [x] 3.7 Verify S3: `pnpm --filter api test`, `pnpm typecheck`, `pnpm lint`.
 
 ## Phase S4 — Routes + App Registration + Contract
 
@@ -195,7 +195,14 @@ setup. Flag for `size:exception` if it drifts further.**
 - [ ] 4.1 RED `apps/api/src/routes/movimientos.test.ts` (new, `app.inject` with injected fakes) —
       unauthenticated → 401 on all four routes; `deposito` → 201 on entrada/salida, **403
       `ADJUSTMENT_RESERVED_FOR_ENCARGADO`** on ajuste, table/stock unchanged (assert via the fake, not
-      just status); `encargado` → 201 on all three; `.strict()` body rejection on an unknown key;
+      just status); `encargado` → 201 on all three; `.strict()` body rejection on an unknown key —
+      **and specifically that `esMerma` on the entrada body, and `esDiscrepancia` on the
+      entrada/salida bodies, are rejected as unknown keys.** That rejection is what actually enforces
+      D7's literal columns (`entrada`: both `false`; `salida`: `esDiscrepancia: false`; `ajuste`:
+      `esMerma: false`): `registrarMovimiento` passes both flags through unchanged by design, so the
+      route body shape is the only thing standing between a contradicting combination and a raw
+      Postgres `23514` from `movimientos_merma_solo_salida` — which S3's hard constraint forbids as a
+      mechanism for user-facing errors. Assert it, do not assume it;
       `cantidad` coerced/validated as a positive integer ≥ 1 (D7 — magnitude only, zero unrepresentable
       on the wire); `GET .../movimientos?page&pageSize` returns `{ data, page, pageSize, total }` with
       `tipo`, `cantidad`, `stockResultante`, `motivo`, `esMerma`, `fecha`, `usuarioId` per row.
