@@ -574,16 +574,16 @@ branch stacked on top, `feat/productos-s7b-estado`, adds `useEstadoProducto` and
 reactivate controls plus their two tests (~170 raw lines). Checkboxes below are ticked on the
 stacked branch once both land, since each task's own description bundles both concerns.
 
-- [ ] 13.1 RED `apps/web/src/routes/productosDetalle.test.tsx` (new) — the edit form renders with no
+- [x] 13.1 RED `apps/web/src/routes/productosDetalle.test.tsx` (new) — the edit form renders with no
       initial-stock input present; an `encargado` triggers deactivate and the row's chip updates
       from the response without a full reload; a `deposito` sees the deactivate/reactivate control
       visible, disabled, with 🔒
-- [ ] 13.2 GREEN `apps/web/src/features/productos/useActualizarProducto.ts`,
+- [x] 13.2 GREEN `apps/web/src/features/productos/useActualizarProducto.ts`,
       `useEstadoProducto.ts` (new)
-- [ ] 13.3 GREEN `ProductoForm.tsx` (extend) — edit mode omits the initial-stock field entirely
-- [ ] 13.4 GREEN `apps/web/src/routes/productosDetalle.tsx` (new) — `productosDetalleRoute` at
+- [x] 13.3 GREEN `ProductoForm.tsx` (extend) — edit mode omits the initial-stock field entirely
+- [x] 13.4 GREEN `apps/web/src/routes/productosDetalle.tsx` (new) — `productosDetalleRoute` at
       `/inventario/:id` under `shellLayout`, deactivate/reactivate controls per the 🔒 pattern
-- [ ] 13.5 Verify: `pnpm --filter web test`, `pnpm typecheck`, `pnpm lint`
+- [x] 13.5 Verify: `pnpm --filter web test`, `pnpm typecheck`, `pnpm lint`
 
 ## Phase 14: Bookkeeping
 

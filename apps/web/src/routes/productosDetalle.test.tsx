@@ -45,19 +45,32 @@ const PRODUCTO_DETAIL = {
 type FetchHandlers = {
   usuario: typeof depositoUsuario | typeof encargadoUsuario;
   onPatch?: (body: unknown) => { status: number; body: unknown };
+  onDeactivate?: () => { status: number; body: unknown };
 };
 
 function ok(status: number, body: unknown) {
   return Promise.resolve({ ok: status < 400, status, json: async () => body });
 }
 
-function stubFetch({ usuario, onPatch }: FetchHandlers) {
+function stubFetch({ usuario, onPatch, onDeactivate }: FetchHandlers) {
+  // Stateful `activo`, not a fixed stub: the deactivate mutation invalidates
+  // rather than `setQueryData`s (D9's uniform rule), so the "row's chip
+  // updates from the response" scenario is only provable if the refetch
+  // this test's `waitFor` observes actually reflects the mutation.
+  let activo = true;
   vi.stubGlobal(
     'fetch',
     vi.fn((input: string | URL | Request, init?: RequestInit) => {
       const url = String(input);
       if (url.includes('/api/auth/me')) return ok(200, { usuario });
       if (url.includes('/api/proveedores')) return ok(200, proveedoresResponse);
+      if (url.includes('/api/productos/prod-1/deactivate')) {
+        activo = false;
+        const result = onDeactivate
+          ? onDeactivate()
+          : { status: 200, body: { producto: { ...PRODUCTO_DETAIL, activo } } };
+        return ok(result.status, result.body);
+      }
       if (url.includes('/api/productos/prod-1') && init?.method === 'PATCH') {
         const body = init.body ? JSON.parse(String(init.body)) : undefined;
         const result = onPatch
@@ -66,7 +79,7 @@ function stubFetch({ usuario, onPatch }: FetchHandlers) {
         return ok(result.status, result.body);
       }
       if (url.includes('/api/productos/prod-1')) {
-        return ok(200, { producto: PRODUCTO_DETAIL });
+        return ok(200, { producto: { ...PRODUCTO_DETAIL, activo } });
       }
       throw new Error(`unexpected fetch: ${url}`);
     }),
@@ -90,11 +103,7 @@ async function loadAndRenderProductosDetalle() {
   return router;
 }
 
-/**
- * productos-ui / Create/Edit Form (edit half). Route-level, not just
- * hook-level. Deactivate/reactivate control tests land in the next stacked
- * slice (line-budget split, see tasks.md Phase 13).
- */
+/** productos-ui / Create/Edit Form (edit half) + Deactivate/Reactivate Controls. Route-level. */
 describe('productosDetalle route', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -106,6 +115,29 @@ describe('productosDetalle route', () => {
 
     await screen.findByDisplayValue('Martillo');
     expect(screen.queryByLabelText('Stock inicial')).not.toBeInTheDocument();
+  });
+
+  it('updates the status chip from the response when an encargado deactivates, without a full reload', async () => {
+    stubFetch({ usuario: encargadoUsuario });
+    const user = userEvent.setup();
+    await loadAndRenderProductosDetalle();
+
+    await screen.findByDisplayValue('Martillo');
+    expect(screen.getByText('Activo')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Desactivar' }));
+
+    expect(await screen.findByText('Inactivo')).toBeInTheDocument();
+    expect(screen.queryByText('Activo')).not.toBeInTheDocument();
+  });
+
+  it('shows the deactivate control visible, disabled, with a 🔒 indicator for a deposito session', async () => {
+    stubFetch({ usuario: depositoUsuario });
+    await loadAndRenderProductosDetalle();
+
+    const button = await screen.findByRole('button', { name: 'Desactivar' });
+    expect(button).toBeDisabled();
+    expect(button.nextElementSibling).toHaveTextContent('🔒');
   });
 
   /**
