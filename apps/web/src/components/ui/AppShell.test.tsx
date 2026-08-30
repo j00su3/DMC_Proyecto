@@ -127,4 +127,23 @@ describe('AppShell', () => {
       screen.queryByRole('link', { name: /Usuarios/ }),
     ).not.toBeInTheDocument();
   });
+
+  it.each([
+    ['encargado', encargado],
+    ['deposito', deposito],
+  ])(
+    'renders the Inventario nav item as a link to /inventario for a %s session — both roles read inventory',
+    async (_label, usuario) => {
+      renderShell({
+        usuario,
+        onLogout: vi.fn(),
+        isLoggingOut: false,
+        children: <p>content</p>,
+      });
+
+      expect(
+        await screen.findByRole('link', { name: 'Inventario' }),
+      ).toHaveAttribute('href', '/inventario');
+    },
+  );
 });

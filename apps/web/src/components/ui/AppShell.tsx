@@ -5,16 +5,16 @@ import { NavItem } from './NavItem.js';
 
 /**
  * Sidebar nav entries, labels verbatim from docs/design.md's "Sidebar"
- * table. Only "Usuarios" has a shipped destination in this change (D2) —
- * `to="/inventario"` etc. would be a type error against the registered
- * router until those screens exist, so the other six stay destination-less
- * and render as inert markers through the same `NavItem` component/class,
- * never a bare `<span>` (app-layout spec, "Sidebar Items Render As
- * Navigation Links").
+ * table. Only "Usuarios" and, from productos-ledger-base S6a on,
+ * "Inventario" have a shipped destination — `to="/inventario"` etc. would
+ * be a type error against the registered router until those screens exist,
+ * so the remaining five stay destination-less and render as inert markers
+ * through the same `NavItem` component/class, never a bare `<span>`
+ * (app-layout spec, "Sidebar Items Render As Navigation Links").
  */
 const NAV_ITEMS: { label: string; to?: string }[] = [
   { label: 'Panel general' },
-  { label: 'Inventario' },
+  { label: 'Inventario', to: '/inventario' },
   { label: 'Punto de venta' },
   { label: 'Movimientos' },
   { label: 'Proveedores' },
@@ -26,7 +26,9 @@ const NAV_ITEMS: { label: string; to?: string }[] = [
  * A `deposito` session cannot use any Usuarios route (the encargado-only
  * guard, D4). Per docs/design.md's "Permisos visibles" principle (D3), that
  * restriction is marked with 🔒 and a reason — never hidden without
- * explanation.
+ * explanation. Inventario carries no such restriction: both roles read
+ * (and mostly write) products, so it is never `locked` regardless of role
+ * (productos-ledger-base D9).
  */
 const LOCKED_REASON = 'Disponible solo para encargados.';
 
