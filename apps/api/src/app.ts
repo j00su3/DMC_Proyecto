@@ -19,6 +19,7 @@ import dbPlugin, { type DbLike } from './plugins/db.js';
 import reposPlugin, { type Repos } from './plugins/repos.js';
 import authRoutes from './routes/auth.js';
 import healthRoutes from './routes/health.js';
+import movimientosRoutes from './routes/movimientos.js';
 import productosRoutes from './routes/productos.js';
 import proveedoresRoutes from './routes/proveedores.js';
 import usuariosRoutes from './routes/usuarios.js';
@@ -125,6 +126,12 @@ export async function buildApp(
   app.register(usuariosRoutes, { prefix: '/api' });
   app.register(proveedoresRoutes, { prefix: '/api' });
   app.register(productosRoutes, { prefix: '/api' });
+  // design.md D5: shares the `/productos/*` prefix segment with
+  // productosRoutes above — the only place in the project where two
+  // plugins own paths under the same segment (`/productos/:id` vs.
+  // `/productos/:id/movimientos*`). Fastify resolves them as distinct
+  // paths, so the split ownership is legal.
+  app.register(movimientosRoutes, { prefix: '/api' });
 
   app.setErrorHandler((error, _request, reply) => {
     const { status, body } = toErrorEnvelope(error);
