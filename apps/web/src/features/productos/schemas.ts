@@ -71,28 +71,50 @@ export function toCrearProductoInput(
  * — no `stockInicial`, no `stockActual`, ever (S7b, edit path). Same key-presence
  * guard as `CrearProductoInput`: `stockMinimo` is omitted entirely for `deposito`. */
 export type ActualizarProductoInput = {
-  nombre: string;
-  sku: string;
+  nombre?: string;
+  sku?: string;
   categoria?: string | null;
   stockMinimo?: number | null;
-  precio: string;
-  proveedorId: string;
+  precio?: string;
+  proveedorId?: string;
 };
 
-/** Converts validated form strings into the PATCH body. Edit-mode only (S7b). */
+export type ProductoDirtyFields = Partial<
+  Record<keyof ProductoFormValues, boolean>
+>;
+
+/**
+ * Converts validated form strings into the PATCH body, carrying ONLY the
+ * fields the user actually touched — the `usuarios` D18 precedent
+ * (`UsuarioForm.tsx:65-69`), and here it is load-bearing rather than tidy.
+ *
+ * `actualizarProducto`'s inactive-supplier guard keys off key PRESENCE
+ * (`productos/service.ts:200`), and D8 states the reason verbatim: a guard
+ * written against the stored row would make "every edit of a product whose
+ * supplier was deactivated later start failing". Sending `proveedorId` on
+ * every PATCH reproduces exactly that failure from the client side — rename
+ * a product whose supplier has since been deactivated and the rename is
+ * refused with SUPPLIER_INACTIVE, for a supplier the user never chose.
+ *
+ * `stockMinimo` is additionally gated on the role: the same presence rule
+ * 403s a `deposito` for the mere key, whatever its value.
+ */
 export function toActualizarProductoInput(
   values: ProductoFormValues,
   actorRol: 'encargado' | 'deposito',
+  dirtyFields: ProductoDirtyFields,
 ): ActualizarProductoInput {
-  const input: ActualizarProductoInput = {
-    nombre: values.nombre,
-    sku: values.sku,
-    categoria: values.categoria.trim() === '' ? null : values.categoria,
-    precio: values.precio,
-    proveedorId: values.proveedorId,
-  };
+  const input: ActualizarProductoInput = {};
 
-  if (actorRol === 'encargado') {
+  if (dirtyFields.nombre) input.nombre = values.nombre;
+  if (dirtyFields.sku) input.sku = values.sku;
+  if (dirtyFields.categoria) {
+    input.categoria = values.categoria.trim() === '' ? null : values.categoria;
+  }
+  if (dirtyFields.precio) input.precio = values.precio;
+  if (dirtyFields.proveedorId) input.proveedorId = values.proveedorId;
+
+  if (dirtyFields.stockMinimo && actorRol === 'encargado') {
     input.stockMinimo =
       values.stockMinimo.trim() === '' ? null : Number(values.stockMinimo);
   }
