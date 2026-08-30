@@ -165,4 +165,34 @@ describe('productosDetalle route', () => {
     await waitFor(() => expect(capturedBody).toBeDefined());
     expect(Object.hasOwn(capturedBody ?? {}, 'stockMinimo')).toBe(false);
   });
+
+  /**
+   * D8, verbatim: a guard written against the stored row would make "every
+   * edit of a product whose supplier was deactivated later start failing".
+   * The server guard is written correctly — it keys off key PRESENCE in the
+   * payload (`productos/service.ts:200`) — so sending `proveedorId` on every
+   * PATCH reproduces that exact failure from the client instead. Renaming a
+   * product whose supplier has since been deactivated would be refused with
+   * SUPPLIER_INACTIVE, for a supplier the user never chose.
+   */
+  it('sends only the touched fields, omitting an untouched proveedorId', async () => {
+    let capturedBody: Record<string, unknown> | undefined;
+    stubFetch({
+      usuario: encargadoUsuario,
+      onPatch: (body) => {
+        capturedBody = body as Record<string, unknown>;
+        return { status: 200, body: { producto: PRODUCTO_DETAIL } };
+      },
+    });
+    const user = userEvent.setup();
+    await loadAndRenderProductosDetalle();
+
+    const nombre = await screen.findByDisplayValue('Martillo');
+    await user.clear(nombre);
+    await user.type(nombre, 'Martillo de carpintero');
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    await waitFor(() => expect(capturedBody).toBeDefined());
+    expect(capturedBody).toEqual({ nombre: 'Martillo de carpintero' });
+  });
 });

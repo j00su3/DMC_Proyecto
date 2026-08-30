@@ -50,7 +50,7 @@ export function ProductoForm<M extends 'create' | 'edit' = 'create'>({
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, dirtyFields },
   } = useForm<ProductoFormValues>({
     resolver: zodResolver(productoFormSchema),
     defaultValues: producto,
@@ -61,7 +61,7 @@ export function ProductoForm<M extends 'create' | 'edit' = 'create'>({
   const submit = handleSubmit((values) => {
     if (resolvedMode === 'edit') {
       (onSubmit as (values: ActualizarProductoInput) => void)(
-        toActualizarProductoInput(values, actorRol),
+        toActualizarProductoInput(values, actorRol, dirtyFields),
       );
     } else {
       (onSubmit as (values: CrearProductoInput) => void)(
