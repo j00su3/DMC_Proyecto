@@ -33,9 +33,9 @@ three MUST map one-to-one to their wire `tipo` value with `esMerma` omitted or `
 
 ### Requirement: Ajuste Option Hidden For Deposito Is UX Convenience, Not Access Control
 For a `deposito` session, the modal SHOULD hide or disable the "Ajuste" choice in step 1.
-This is UX convenience only, NOT the enforcement mechanism — the server's `403
-ADJUSTMENT_RESERVED_FOR_ENCARGADO` (see `inventory-movements` spec) is the actual boundary
-and MUST be enforced regardless of what the client shows or hides.
+This is UX convenience only, NOT the enforcement mechanism — the server's `403 FORBIDDEN`
+from `config.roles` (see `inventory-movements` spec, and its 2026-08-30 correction note) is
+the actual boundary and MUST be enforced regardless of what the client shows or hides.
 
 #### Scenario: Deposito does not see Ajuste as a selectable step-1 option
 - GIVEN a `deposito` session opens the modal

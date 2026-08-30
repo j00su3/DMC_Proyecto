@@ -20,9 +20,9 @@ read path for a product's own movement history. Builds on backlog #5's schema an
 | Failure | Status | Code |
 |---|---|---|
 | No session | 401 | `UNAUTHORIZED` |
-| `deposito` registers `ajuste` | 403 | `ADJUSTMENT_RESERVED_FOR_ENCARGADO` |
+| `deposito` registers `ajuste` | 403 | `FORBIDDEN` |
 | `motivo` missing/blank on `ajuste` or a merma `salida` | 400 | `MOVEMENT_REASON_REQUIRED` |
-| `cantidad = 0` on `ajuste` | 400 | `ADJUSTMENT_QUANTITY_ZERO` |
+| `cantidad = 0` on `ajuste` | 400 | `VALIDATION_ERROR` |
 | Target product id matches no product | 404 | `PRODUCT_NOT_FOUND` |
 | Target product `activo = false` | 409 | `PRODUCT_INACTIVE` |
 | `salida`/merma would drive stock below zero | 409 | `INSUFFICIENT_STOCK` (`details.available`) |
@@ -32,7 +32,21 @@ read path for a product's own movement history. Builds on backlog #5's schema an
 ### Requirement: Role Gate — Entrada/Salida Open To Both Roles, Ajuste Encargado-Only
 Registering `entrada` or `salida` (including a merma salida) MUST be permitted for sessions
 with `rol = encargado` or `rol = deposito`. Registering `ajuste` MUST be refused for
-`rol = deposito` with `403 ADJUSTMENT_RESERVED_FOR_ENCARGADO`, before any write. (PD-1)
+`rol = deposito` with `403 FORBIDDEN`, before any write. (PD-1)
+
+> **Corrected 2026-08-30 (was `ADJUSTMENT_RESERVED_FOR_ENCARGADO`).** This spec was written in
+> parallel with the design and named a code the system does not emit. D5 puts the ajuste
+> restriction in `config.roles`, so the refusal comes from the shared `preHandler` in
+> `apps/api/src/plugins/auth.ts:92-95`, which throws a plain `forbidden()` with no per-route
+> override — the same mechanism, and the same code, that already refuses `deposito` on
+> `POST /api/productos/:id/deactivate`.
+>
+> Emitting the specific code would require either an in-service role branch or a per-route error
+> override: both are exactly the anti-pattern D5's route-config approach was chosen to avoid, and
+> either one would move PD-1's server-side boundary out of route configuration, where a test can
+> prove it, into handler code, where it has to be re-proved per route. The generic code is the
+> honest description of the mechanism, and it is consistent with every other role refusal in the
+> application.
 
 #### Scenario: Deposito registers entrada and salida
 - GIVEN a session with `rol = deposito`
@@ -42,8 +56,8 @@ with `rol = encargado` or `rol = deposito`. Registering `ajuste` MUST be refused
 #### Scenario: Deposito is refused for ajuste
 - GIVEN a session with `rol = deposito`
 - WHEN a movement of `tipo = ajuste` is submitted
-- THEN the response is `403 { error: { code: "ADJUSTMENT_RESERVED_FOR_ENCARGADO" } }`, and
-  `stock_actual` and the movement count for that product are both unchanged
+- THEN the response is `403 { error: { code: "FORBIDDEN" } }`, and `stock_actual` and the
+  movement count for that product are both unchanged
 
 #### Scenario: Encargado registers ajuste
 - GIVEN a session with `rol = encargado`
@@ -102,11 +116,21 @@ An `ajuste` request with `cantidad = 0` MUST be refused with a validation error 
 write is attempted. As a backstop, the database schema MUST also reject any `ajuste` row
 with `cantidad = 0` via a CHECK constraint. (PD-4)
 
-#### Scenario: Zero-quantity ajuste is refused at the service layer
+#### Scenario: Zero quantity is unrepresentable on the wire
 - GIVEN an `ajuste` payload with `cantidad: 0`
 - WHEN the movement is submitted
-- THEN the response is `400 { error: { code: "ADJUSTMENT_QUANTITY_ZERO" } }` and no row is
-  written
+- THEN the response is `400 { error: { code: "VALIDATION_ERROR" } }` and no row is written
+
+> **Corrected 2026-08-30 (was `ADJUSTMENT_QUANTITY_ZERO`).** D7 makes `cantidad` a positive
+> magnitude (`z.number().int().min(1)`), with the sign derived in the service. Zero therefore
+> fails schema validation before any handler code runs, so no code path is left that could emit
+> a named domain code — and adding one would mean loosening the wire shape to admit the value
+> first, purely so the application could reject it a layer later.
+>
+> PD-4 is satisfied either way, and more strongly than the original wording described: zero is
+> not merely refused, it is **unrepresentable**. Three independent layers now hold the line — the
+> form refuses it before submit, the wire schema cannot express it, and the
+> `movimientos_ajuste_cantidad_no_cero` CHECK backstops a direct insert.
 
 #### Scenario: A direct zero-quantity ajuste insert is rejected by the database
 - GIVEN a `movimientos` insert with `tipo = 'ajuste'` and `cantidad = 0`

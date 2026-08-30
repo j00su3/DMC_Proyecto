@@ -270,10 +270,17 @@ on S4 (`schema.d.ts` must carry the `movimientos` paths).
 **Forecast: ~120 prod / ~90 test ≈ 210 raw diff. Under budget.**
 
 - [ ] 6.1 RED `apps/web/src/features/movimientos/errorMessages.test.ts` (new, mirrors
-      `productos/errorMessages.test.ts`) — each of `ADJUSTMENT_RESERVED_FOR_ENCARGADO`,
-      `MOVEMENT_REASON_REQUIRED`, `ADJUSTMENT_QUANTITY_ZERO`, `PRODUCT_NOT_FOUND`,
-      `PRODUCT_INACTIVE`, `INSUFFICIENT_STOCK` renders a distinct message; `INSUFFICIENT_STOCK`'s
-      message interpolates `details.available` (the "hay N" mechanism, ADR-0006).
+      `productos/errorMessages.test.ts`) — each of `FORBIDDEN`, `MOVEMENT_REASON_REQUIRED`,
+      `VALIDATION_ERROR`, `PRODUCT_NOT_FOUND`, `PRODUCT_INACTIVE`, `INSUFFICIENT_STOCK` renders a
+      distinct message; `INSUFFICIENT_STOCK`'s message interpolates `details.available` (the
+      "hay N" mechanism, ADR-0006).
+      **Corrected 2026-08-30**: was `ADJUSTMENT_RESERVED_FOR_ENCARGADO` and
+      `ADJUSTMENT_QUANTITY_ZERO`. Neither code is ever emitted — S4 proved the ajuste refusal is a
+      plain `FORBIDDEN` from `config.roles` (`plugins/auth.ts:92-95`, no per-route override) and
+      that `cantidad: 0` fails Zod's `min(1)` before any handler runs, yielding `VALIDATION_ERROR`.
+      Mapping the original two would have shipped dead branches while the codes users actually
+      receive fell through to the generic fallback — the exact failure this correction exists to
+      prevent. See both spec correction notes.
 - [ ] 6.2 GREEN `apps/web/src/features/movimientos/errorMessages.ts` (new) — switch on the six codes,
       narrowing `ApiError.details` (`apps/web/src/api/errors.ts:12-13`) for `INSUFFICIENT_STOCK` only.
 - [ ] 6.3 GREEN `apps/web/src/features/movimientos/queries.ts` (new) — key factory,
