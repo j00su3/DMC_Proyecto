@@ -382,7 +382,14 @@ hace.
 
 **Required change type**: `CODE FIX`
 
-**Parcialmente resuelto el 2026-08-30 — mitad de la API, hecha; mitad del despliegue, pendiente.**
+**RESUELTO el 2026-08-30 — ambas mitades, verificado contra producción.**
+
+Evidencia final, tras desplegar el `middleware.ts` y cargar `PROXY_SHARED_SECRET` en Render y Vercel:
+doce peticiones **directas a Render**, cada una con un `X-Forwarded-For` forjado distinto, caen en un
+**solo balde** — diez responden `401` y la undécima y duodécima `429 RATE_LIMITED`. Si la cabecera se
+creyera, las doce habrían pasado, cada IP inventada estrenando su propio cupo. El bypass está
+cerrado. El login a través de Vercel sigue funcionando, que es lo que prueba que la cookie de sesión
+sobrevivió al reescrito del middleware.
 
 Evidencia obtenida, no supuesta:
 
