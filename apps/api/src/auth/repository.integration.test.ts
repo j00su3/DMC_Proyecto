@@ -5,6 +5,7 @@ import { getDb, getPool } from '../db/pool.js';
 import { sesiones, usuarios } from '../db/schema.js';
 import { DrizzleUsuariosRepo } from '../usuarios/repository.js';
 import { DrizzleSesionesRepo } from './repository.js';
+import { createToken, hashToken } from './session.js';
 
 // Real Docker Postgres suite (see vitest.integration.config.ts). Verifies
 // the migrated schema (tables, FK, rol_usuario enum) and the atomic lockout
@@ -73,6 +74,56 @@ describe('auth repository (integration, real Postgres)', () => {
       .where(eq(usuarios.id, usuario.id));
     expect(row?.hashContrasena).toBe('new-hash-value');
     expect(row?.debeCambiarPassword).toBe(false);
+  });
+
+  // SEC-008. The cookie value used to BE the primary key, so a read of the
+  // sesiones table handed over live, usable credentials. Storing sha256(token)
+  // keeps the plaintext in the cookie only: the same read now yields hashes,
+  // which authenticate nothing. ADR-0007 § Actualizado 2026-08-29 keeps the
+  // original justification intact — there is still no second secret to
+  // synchronise, because a hash is not a secret.
+  it('stores sha256(token) as the primary key, never the cookie value, and still resolves the session', async () => {
+    const usuario = await insertUsuario();
+    const token = createToken();
+
+    await sesionesRepo.create({
+      id: token,
+      usuarioId: usuario.id,
+      expiraEn: new Date(Date.now() + 60_000),
+    });
+
+    const rows = await db.select().from(sesiones);
+    expect(rows).toHaveLength(1);
+    const stored = rows[0]?.id;
+    // The row a database reader would see is NOT the cookie.
+    expect(stored).not.toBe(token);
+    expect(stored).toBe(hashToken(token));
+    expect(stored).toMatch(/^[0-9a-f]{64}$/);
+
+    // And the plaintext cookie still authenticates.
+    const resolved = await sesionesRepo.findValid(token, new Date());
+    expect(resolved?.id).toBe(usuario.id);
+
+    // A reader who copied the stored value out of the table cannot use it.
+    const stolenFromTheTable = await sesionesRepo.findValid(
+      stored ?? '',
+      new Date(),
+    );
+    expect(stolenFromTheTable).toBeUndefined();
+  });
+
+  it('deletes by the hashed key, so logout with the plaintext cookie removes the row', async () => {
+    const usuario = await insertUsuario();
+    const token = createToken();
+    await sesionesRepo.create({
+      id: token,
+      usuarioId: usuario.id,
+      expiraEn: new Date(Date.now() + 60_000),
+    });
+
+    await sesionesRepo.delete(token);
+
+    expect(await db.select().from(sesiones)).toHaveLength(0);
   });
 
   it('deleteOthers removes only the other sessions and the current cookie session still resolves via findValid', async () => {
@@ -164,11 +215,12 @@ describe('auth repository (integration, real Postgres)', () => {
 
     await sesionesRepo.purgeExpired(usuario.id);
 
+    // Rows are keyed by sha256 now (SEC-008), so identify the survivors by
+    // the hash of their token rather than by the token itself.
     const remaining = await db.select({ id: sesiones.id }).from(sesiones);
-    expect(remaining.map((row) => row.id).sort()).toEqual([
-      'expired-other',
-      'valid-own',
-    ]);
+    expect(remaining.map((row) => row.id).sort()).toEqual(
+      [hashToken('expired-other'), hashToken('valid-own')].sort(),
+    );
   });
 
   // D10. Unlike deleteOthers, this keeps nothing: on an admin action the
@@ -197,7 +249,7 @@ describe('auth repository (integration, real Postgres)', () => {
     await sesionesRepo.deleteAllForUser(usuario.id);
 
     const remaining = await db.select({ id: sesiones.id }).from(sesiones);
-    expect(remaining.map((row) => row.id)).toEqual(['valid-other']);
+    expect(remaining.map((row) => row.id)).toEqual([hashToken('valid-other')]);
   });
 
   // D12's reset audit needs the PRIOR lockout values, and UsuarioResumen

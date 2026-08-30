@@ -2,6 +2,7 @@ import { and, eq, gt, lte, ne } from 'drizzle-orm';
 import type { DbExecutor } from '../db/client.js';
 import { sesiones, usuarios } from '../db/schema.js';
 import type { Usuario } from '../usuarios/repository.js';
+import { hashToken } from './session.js';
 
 export interface NuevaSesion {
   id: string;
@@ -19,12 +20,19 @@ export interface SesionesRepo {
   deleteAllForUser(usuarioId: string): Promise<void>;
 }
 
+/**
+ * Every method here takes the PLAINTEXT token — the value that lives in the
+ * cookie — and hashes it before touching the table (SEC-008). Hashing lives in
+ * the adapter, not at the call sites, so no caller can forget it and no future
+ * caller has to remember: the port's contract is "hand me the cookie value".
+ * `sesiones.id` therefore never holds a usable credential.
+ */
 export class DrizzleSesionesRepo implements SesionesRepo {
   constructor(private readonly db: DbExecutor) {}
 
   async create(sesion: NuevaSesion): Promise<void> {
     await this.db.insert(sesiones).values({
-      id: sesion.id,
+      id: hashToken(sesion.id),
       usuarioId: sesion.usuarioId,
       expiraEn: sesion.expiraEn,
     });
@@ -37,7 +45,7 @@ export class DrizzleSesionesRepo implements SesionesRepo {
       .innerJoin(usuarios, eq(sesiones.usuarioId, usuarios.id))
       .where(
         and(
-          eq(sesiones.id, id),
+          eq(sesiones.id, hashToken(id)),
           gt(sesiones.expiraEn, now),
           eq(usuarios.activo, true),
         ),
@@ -47,7 +55,7 @@ export class DrizzleSesionesRepo implements SesionesRepo {
   }
 
   async delete(id: string): Promise<void> {
-    await this.db.delete(sesiones).where(eq(sesiones.id, id));
+    await this.db.delete(sesiones).where(eq(sesiones.id, hashToken(id)));
   }
 
   async purgeExpired(usuarioId: string): Promise<void> {
@@ -66,7 +74,12 @@ export class DrizzleSesionesRepo implements SesionesRepo {
   async deleteOthers(usuarioId: string, exceptId: string): Promise<void> {
     await this.db
       .delete(sesiones)
-      .where(and(eq(sesiones.usuarioId, usuarioId), ne(sesiones.id, exceptId)));
+      .where(
+        and(
+          eq(sesiones.usuarioId, usuarioId),
+          ne(sesiones.id, hashToken(exceptId)),
+        ),
+      );
   }
 
   // Revokes EVERY session, the caller's included (design.md D10). The

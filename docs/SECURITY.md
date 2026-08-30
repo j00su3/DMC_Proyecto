@@ -769,6 +769,33 @@ coincide con el valor de la cookie emitida, y que la sesión sigue resolviendo c
 
 **Required change type**: `DESIGN / ADR CHANGE`
 
+**Resuelto el 2026-08-30.** `sesiones.id` almacena `sha256(token)`; el token en claro existe
+únicamente en la cookie del navegador. La justificación que el ADR-0007 dio el 2026-08-24 —"no hay
+un segundo secreto de sesión que mantener sincronizado con la fila"— **se conserva íntegra**, porque
+un hash no es un secreto: no hay nada que custodiar ni que rotar.
+
+El hash vive en el adaptador Drizzle (`apps/api/src/auth/repository.ts`), no en los call sites:
+`create`, `findValid`, `delete` y `deleteOthers` reciben el valor de la cookie y lo hashean antes de
+tocar la tabla. Esa decisión es deliberada — si el hasheo viviera en el servicio, cada llamador
+futuro tendría que acordarse, y el que se olvide escribe un token en claro sin que nada se lo
+impida. Mismo criterio que hace de `aplicarDelta` el único camino al stock.
+
+Sin sal y sin estiramiento de clave, también a propósito: la entrada son 32 bytes de `randomBytes`,
+así que no hay diccionario que precomputar ni nada que un factor de trabajo pueda frenar. argon2 va
+en las contraseñas, que son adivinables; no en un valor con 256 bits de entropía.
+
+Verificación (`auth/repository.integration.test.ts`, contra Postgres real): tras `create`, la fila
+almacenada **no** coincide con el token, coincide con `sha256(token)` y matchea `^[0-9a-f]{64}$`; la
+cookie en claro sigue resolviendo la sesión; y —lo que da sentido al hallazgo— **un valor copiado de
+la tabla no autentica**. Un test aparte cubre que `delete` con la cookie en claro borra la fila.
+
+**Efecto colateral aceptado, ya previsto en el ADR:** el despliegue invalida todas las sesiones
+activas. Las filas viejas guardan tokens en claro, que ya no pueden coincidir con el hash de ninguna
+cookie entrante, así que dejan de autenticar de inmediato y se van venciendo dentro de la ventana de
+12 h. Todo el mundo vuelve a loguearse una vez. No se agregó una migración de borrado: esas filas no
+autentican nada y expiran solas.
+
+
 ---
 
 **ID**: SEC-009
