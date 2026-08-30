@@ -79,18 +79,35 @@ Timed immediately before the PR carrying S1 merges, per the same convention #5's
 **Deployment reality**: migrations are applied manually from a PowerShell session; `DATABASE_URL` is
 not persisted on that machine and must be set per session.
 
-- [ ] 1.10 Confirm the migration is additive-with-risk in the PR description: new column + two new
+**COMPLETED 2026-08-30.** Evidence recorded per task below. `main` is at `64c5123`.
+
+- [x] 1.10 Confirm the migration is additive-with-risk in the PR description: new column + two new
       CHECKs on an existing table, no `NOT NULL` retrofit without a default. Flag explicitly that,
       unlike #5's migration, `movimientos_ajuste_cantidad_no_cero` **can fail** against existing data
       (D3) — this is the one migration in this project's history so far that is not risk-free additive.
-- [ ] 1.11 Owner sets `DATABASE_URL` for the session (never pasted into chat/issue/log/this doc), runs
+      → PR #90's body carries the "MIGRATION — do not merge before applying it to Neon" section.
+- [x] 1.11 Owner sets `DATABASE_URL` for the session (never pasted into chat/issue/log/this doc), runs
       the 1.4 pre-flight query against Neon directly, confirms `0`, then runs `pnpm db:migrate`.
-- [ ] 1.12 If the pre-flight is nonzero: STOP. Do not run the migration. Escalate to the owner as a
+      → Pre-flight returned `0` in the Neon SQL Editor (branch `production`, database `neondb`).
+      `pnpm db:migrate` reported `[✓] migrations applied successfully!`. The `pg-connection-string`
+      SSL notice in that output is a deprecation warning about future `sslmode` semantics, not an
+      error.
+- [x] 1.12 If the pre-flight is nonzero: STOP. Do not run the migration. Escalate to the owner as a
       product decision (what to do with the offending rows), never silently fixed by the migration.
-- [ ] 1.13 Confirm in the Neon console `movimientos` now has `es_merma` and both new constraints.
-- [ ] 1.14 Confirm the currently-deployed (old) API is still healthy: `curl -sS
+      → Not triggered: the pre-flight returned `0`, so this branch never applied.
+- [x] 1.13 Confirm in the Neon console `movimientos` now has `es_merma` and both new constraints.
+      → Five rows returned as expected: `COLUMNA es_merma`, `movimientos_ajuste_cantidad_no_cero`,
+      `movimientos_discrepancia_solo_ajuste`, `movimientos_merma_solo_salida`,
+      `movimientos_signo_tipo`.
+- [x] 1.14 Confirm the currently-deployed (old) API is still healthy: `curl -sS
       https://dmc-proyecto.vercel.app/api/health` → `{"status":"ok",...,"db":"up"}`.
-- [ ] 1.15 Only then merge the PR carrying S1.
+      → `{"status":"ok","uptime":182.03,"db":"up"}`, HTTP 200. This is the proof the migration is
+      backward compatible: `es_merma` carries `DEFAULT false`, so the code deployed at the time kept
+      inserting without knowing the column existed.
+- [x] 1.15 Only then merge the PR carrying S1.
+      → PR #90 merged (CI `CLEAN`, both `test` checks green). Merged `main` re-verified: api unit
+      293/293, api integration 125/125 on real Docker Postgres, web 194/194, `typecheck` / `lint` /
+      `contract:check` all exit 0, deployed API `{"status":"ok","db":"up"}`.
 
 ## Phase S2 — `MovimientosRepo` Extension + Forced Ripple
 
