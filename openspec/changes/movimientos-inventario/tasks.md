@@ -46,31 +46,31 @@ by any endpoint until S3/S4. Depends on nothing beyond #5's shipped schema.
 
 **Forecast: ~130 prod / ~260 test ≈ 390 raw diff. Under budget.**
 
-- [ ] 1.1 RED `apps/api/src/db/schema.integration.test.ts` (extend, Docker PG) — direct insert
+- [x] 1.1 RED `apps/api/src/db/schema.integration.test.ts` (extend, Docker PG) — direct insert
       `es_merma = true` with `tipo = 'entrada'`/`'ajuste'` → CHECK `movimientos_merma_solo_salida`
       rejects; `es_merma = true` with `tipo = 'salida'` → accepted; `tipo = 'ajuste'`,
       `cantidad = 0` → CHECK `movimientos_ajuste_cantidad_no_cero` rejects (23514); `tipo = 'ajuste'`,
       `cantidad <> 0` → accepted; `pnpm db:generate` run twice emits no second migration file.
-- [ ] 1.2 GREEN `apps/api/src/db/schema.ts` (modify, `movimientos` table) — add
+- [x] 1.2 GREEN `apps/api/src/db/schema.ts` (modify, `movimientos` table) — add
       `esMerma: boolean('es_merma').notNull().default(false)` beside `esDiscrepancia`; add
       `check('movimientos_merma_solo_salida', ...)` and `check('movimientos_ajuste_cantidad_no_cero',
       ...)` exactly as `design.md` D3 specifies.
-- [ ] 1.3 GREEN generate the migration: `pnpm db:generate` → `apps/api/drizzle/0005_*.sql` +
+- [x] 1.3 GREEN generate the migration: `pnpm db:generate` → `apps/api/drizzle/0005_*.sql` +
       `meta/0005_snapshot.json`. Confirm the emitted SQL matches D3's three statements
       (`ADD COLUMN`, two `ADD CONSTRAINT`).
-- [ ] 1.4 **Mandatory pre-flight, own step, not a footnote**: before applying anywhere, run
+- [x] 1.4 **Mandatory pre-flight, own step, not a footnote**: before applying anywhere, run
       `SELECT count(*) FROM movimientos WHERE tipo = 'ajuste' AND cantidad = 0;` against the target
       database. Must return `0` or the migration is expected to abort (Postgres 23514).
-- [ ] 1.5 GREEN apply the migration to local Docker Postgres: `pnpm db:migrate`; re-run 1.1 → green.
-- [ ] 1.6 Verify round-trip: `pnpm db:generate` a second time emits no new migration file.
-- [ ] 1.7 RED `apps/api/src/lib/errors.test.ts` (extend) — against factories that do not exist:
+- [x] 1.5 GREEN apply the migration to local Docker Postgres: `pnpm db:migrate`; re-run 1.1 → green.
+- [x] 1.6 Verify round-trip: `pnpm db:generate` a second time emits no new migration file.
+- [x] 1.7 RED `apps/api/src/lib/errors.test.ts` (extend) — against factories that do not exist:
       `insufficientStock(5)` → 409 `INSUFFICIENT_STOCK`, `details: { available: 5 }` (English key,
       per RECONCILE-1); `productInactive()` → 409 `PRODUCT_INACTIVE`; `movementReasonRequired()` →
       400 `MOVEMENT_REASON_REQUIRED` (per RECONCILE-5, not bare `REASON_REQUIRED`); all three map
       through `toErrorEnvelope`.
-- [ ] 1.8 GREEN `apps/api/src/lib/errors.ts` (extend) — add the three factories from 1.7, matching
+- [x] 1.8 GREEN `apps/api/src/lib/errors.ts` (extend) — add the three factories from 1.7, matching
       the shape of `supplierInactive()`/`accountLocked()` (the `details` precedent) exactly.
-- [ ] 1.9 Verify S1: `pnpm --filter api test`, `pnpm --filter api test:integration`, `pnpm typecheck`,
+- [x] 1.9 Verify S1: `pnpm --filter api test`, `pnpm --filter api test:integration`, `pnpm typecheck`,
       `pnpm lint`, `pnpm contract:check` (byte-identical — no route touched).
 
 ## Phase S1c — Neon Deploy Gate (owner action, not code)
