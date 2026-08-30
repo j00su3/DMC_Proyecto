@@ -143,6 +143,52 @@ describe('productosNuevo route', () => {
     );
   });
 
+  /**
+   * The whole reason `toCrearProductoInput` branches on the role. The server's
+   * guard is `Object.hasOwn(input, 'stockMinimo')` — key PRESENCE, not value —
+   * so a deposito body carrying `stockMinimo: null` is refused just as hard as
+   * one carrying a number, and every deposito product creation would 403 in
+   * production. Dropping the branch keeps every other test in this file green,
+   * which is exactly why this one has to exist.
+   */
+  it('omits the stockMinimo key entirely from a deposito POST body', async () => {
+    let capturedBody: Record<string, unknown> | undefined;
+    stubFetch({
+      usuario: depositoUsuario,
+      onPost: (body) => {
+        capturedBody = body as Record<string, unknown>;
+        return { status: 201, body: { producto: PRODUCTO_STUB } };
+      },
+    });
+    const user = userEvent.setup();
+    await loadAndRenderProductosNuevo();
+
+    await fillRequiredFields(user);
+    await user.click(screen.getByRole('button', { name: 'Crear producto' }));
+
+    await waitFor(() => expect(capturedBody).toBeDefined());
+    expect(Object.hasOwn(capturedBody ?? {}, 'stockMinimo')).toBe(false);
+  });
+
+  it('shows the validation message for an invalid field instead of failing silently', async () => {
+    stubFetch({ usuario: encargadoUsuario });
+    const user = userEvent.setup();
+    await loadAndRenderProductosNuevo();
+
+    await user.type(await screen.findByLabelText('Nombre'), 'Martillo');
+    await user.type(screen.getByLabelText('SKU'), 'SKU-001');
+    await user.type(screen.getByLabelText('Precio'), 'diez pesos');
+    await user.click(screen.getByRole('button', { name: 'Crear producto' }));
+
+    expect(
+      await screen.findByText('Ingrese un precio válido, ej. "10.00".'),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Precio')).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
+  });
+
   it('renders the SKU_ALREADY_IN_USE mapped message inline, not a generic error', async () => {
     stubFetch({
       usuario: encargadoUsuario,
