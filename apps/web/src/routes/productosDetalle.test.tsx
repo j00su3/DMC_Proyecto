@@ -1,0 +1,136 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  RouterProvider,
+  createMemoryHistory,
+  createRouter,
+} from '@tanstack/react-router';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { routeTree } from './routeTree.js';
+
+const depositoUsuario = {
+  id: '2',
+  nombre: 'Beto Ruiz',
+  email: 'beto@test.com',
+  rol: 'deposito' as const,
+  debeCambiarPassword: false,
+};
+const encargadoUsuario = {
+  id: '1',
+  nombre: 'Ana Lopez',
+  email: 'ana@test.com',
+  rol: 'encargado' as const,
+  debeCambiarPassword: false,
+};
+const proveedoresResponse = {
+  data: [{ id: 'prov-1', nombre: 'Proveedor Activo', activo: true }],
+  page: 1,
+  pageSize: 100,
+  total: 1,
+};
+const PRODUCTO_DETAIL = {
+  id: 'prod-1',
+  nombre: 'Martillo',
+  sku: 'SKU-1',
+  categoria: 'Herramientas',
+  stockActual: 10,
+  stockMinimo: 3,
+  precio: '10.00',
+  proveedorId: 'prov-1',
+  activo: true,
+  creadoEn: '2024-01-01T00:00:00.000Z',
+};
+
+type FetchHandlers = {
+  usuario: typeof depositoUsuario | typeof encargadoUsuario;
+  onPatch?: (body: unknown) => { status: number; body: unknown };
+};
+
+function ok(status: number, body: unknown) {
+  return Promise.resolve({ ok: status < 400, status, json: async () => body });
+}
+
+function stubFetch({ usuario, onPatch }: FetchHandlers) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/api/auth/me')) return ok(200, { usuario });
+      if (url.includes('/api/proveedores')) return ok(200, proveedoresResponse);
+      if (url.includes('/api/productos/prod-1') && init?.method === 'PATCH') {
+        const body = init.body ? JSON.parse(String(init.body)) : undefined;
+        const result = onPatch
+          ? onPatch(body)
+          : { status: 200, body: { producto: PRODUCTO_DETAIL } };
+        return ok(result.status, result.body);
+      }
+      if (url.includes('/api/productos/prod-1')) {
+        return ok(200, { producto: PRODUCTO_DETAIL });
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    }),
+  );
+}
+
+async function loadAndRenderProductosDetalle() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  const history = createMemoryHistory({
+    initialEntries: ['/inventario/prod-1'],
+  });
+  const router = createRouter({ routeTree, context: { queryClient }, history });
+  await router.load();
+  render(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
+  return router;
+}
+
+/**
+ * productos-ui / Create/Edit Form (edit half). Route-level, not just
+ * hook-level. Deactivate/reactivate control tests land in the next stacked
+ * slice (line-budget split, see tasks.md Phase 13).
+ */
+describe('productosDetalle route', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('renders the edit form with no initial-stock input present', async () => {
+    stubFetch({ usuario: encargadoUsuario });
+    await loadAndRenderProductosDetalle();
+
+    await screen.findByDisplayValue('Martillo');
+    expect(screen.queryByLabelText('Stock inicial')).not.toBeInTheDocument();
+  });
+
+  /**
+   * Same reasoning as `productosNuevo.test.tsx`'s equivalent test: the
+   * server's guard on `stockMinimo` is key PRESENCE, not value, so a
+   * deposito PATCH carrying `stockMinimo: null` 403s exactly as hard as
+   * one carrying a number. Losing this branch would 403 every deposito
+   * product edit in production while every other test here stayed green.
+   */
+  it('omits the stockMinimo key entirely from a deposito PATCH body', async () => {
+    let capturedBody: Record<string, unknown> | undefined;
+    stubFetch({
+      usuario: depositoUsuario,
+      onPatch: (body) => {
+        capturedBody = body as Record<string, unknown>;
+        return { status: 200, body: { producto: PRODUCTO_DETAIL } };
+      },
+    });
+    const user = userEvent.setup();
+    await loadAndRenderProductosDetalle();
+
+    await screen.findByDisplayValue('Martillo');
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    await waitFor(() => expect(capturedBody).toBeDefined());
+    expect(Object.hasOwn(capturedBody ?? {}, 'stockMinimo')).toBe(false);
+  });
+});
