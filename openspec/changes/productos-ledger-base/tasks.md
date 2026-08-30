@@ -453,24 +453,26 @@ Depends on S4b (`schema.d.ts` must carry the `productos` paths — regeneration 
 
 **Forecast: ~200 prod / ~180 test = ~380 raw diff. Under budget.**
 
-- [ ] 10.1 RED `apps/web/src/routes/productos.test.tsx` (new, full `routeTree` +
+- [x] 10.1 RED `apps/web/src/routes/productos.test.tsx` (new, full `routeTree` +
       `createMemoryHistory`, `await router.load()` before render, per house rule) — against a route
       that does not exist: `/inventario` renders for a `deposito` session with no redirect; the list
       renders `DataTable` rows from `GET /api/productos`'s `data`; `Pagination` reflects `page`/
-      `pageSize`/`total`
-- [ ] 10.2 GREEN `apps/web/src/features/productos/queries.ts` (new) — key factory,
+      `pageSize`/`total`. **Apply note**: confirmed RED for the right reason (unresolved import).
+- [x] 10.2 GREEN `apps/web/src/features/productos/queries.ts` (new) — key factory,
       `productosListQueryOptions(page, q)`, `PAGE_SIZE = 20`, mirroring
       `features/usuarios/queries.ts:5-18`'s invalidate-never-`setQueryData` rule
-- [ ] 10.3 GREEN `apps/web/src/features/productos/useProductos.ts`,
+- [x] 10.3 GREEN `apps/web/src/features/productos/useProductos.ts`,
       `apps/web/src/features/productos/ProductosTable.tsx` (new)
-- [ ] 10.4 GREEN `apps/web/src/routes/productos.tsx`, `apps/web/src/routes/routeTree.ts` (new/modify)
+- [x] 10.4 GREEN `apps/web/src/routes/productos.tsx`, `apps/web/src/routes/routeTree.ts` (new/modify)
       — `productosListRoute` at `/inventario` under `shellLayout`, `validateSearch` carries `page`
-- [ ] 10.5 GREEN `apps/web/src/components/ui/AppShell.tsx` (modify) — the inert
+- [x] 10.5 GREEN `apps/web/src/components/ui/AppShell.tsx` (modify) — the inert
       `{ label: 'Inventario' }` (`:15-23`) gains `to: '/inventario'`; **must land in the same commit
       as 10.4** — the docblock at `:6-14` makes a `to` a type error until the route is registered
-- [ ] 10.6 GREEN `apps/web/src/components/ui/AppShell.test.tsx` (modify) — move the Inventario
-      inert-marker expectation to the linked-item expectation, same commit as 10.5
-- [ ] 10.7 Verify: `pnpm --filter web test`, `pnpm typecheck`, `pnpm lint`
+- [x] 10.6 GREEN `apps/web/src/components/ui/AppShell.test.tsx` (modify) — move the Inventario
+      inert-marker expectation to the linked-item expectation, same commit as 10.5. **Apply note**:
+      no such prior test existed for Inventario specifically (only Usuarios had a linked/locked pair);
+      added a parameterized linked-item test for both roles instead of "moving" anything.
+- [x] 10.7 Verify: `pnpm --filter web test`, `pnpm typecheck`, `pnpm lint`
 
 ## Phase 11: S6b — Web: Search + Derived Chips + Errors
 
