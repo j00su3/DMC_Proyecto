@@ -7,11 +7,14 @@ import {
   emailAlreadyInUse,
   fieldReservedForEncargado,
   forbidden,
+  insufficientStock,
   invalidCredentials,
   invalidCurrentPassword,
   lastActiveEncargado,
+  movementReasonRequired,
   notFoundEnvelope,
   passwordChangeRequired,
+  productInactive,
   productNotFound,
   skuAlreadyInUse,
   supplierInactive,
@@ -312,6 +315,69 @@ describe('product-management error factories (tasks.md 1.5, backlog #5, S1a)', (
     expect(result.status).toBe(409);
     expect(result.body).toEqual({
       error: { code: 'SUPPLIER_INACTIVE', message: expect.any(String) },
+    });
+  });
+});
+
+// backlog #6 (movimientos-inventario), S1, task 1.7. design.md D6, per
+// RECONCILE-1/RECONCILE-5: English `available` key, MOVEMENT_REASON_REQUIRED
+// (not bare REASON_REQUIRED).
+describe('movimientos error factories (design.md D6)', () => {
+  it('insufficientStock(available) is a 409 AppError with code INSUFFICIENT_STOCK and details: { available }', () => {
+    const error = insufficientStock(5);
+
+    expect(error).toBeInstanceOf(AppError);
+    expect(error.status).toBe(409);
+    expect(error.code).toBe('INSUFFICIENT_STOCK');
+    expect(error.details).toEqual({ available: 5 });
+  });
+
+  it('toErrorEnvelope() maps insufficientStock(5) to a 409 envelope with details: { available: 5 }', () => {
+    const result = toErrorEnvelope(insufficientStock(5));
+
+    expect(result.status).toBe(409);
+    expect(result.body).toEqual({
+      error: {
+        code: 'INSUFFICIENT_STOCK',
+        message: expect.any(String),
+        details: { available: 5 },
+      },
+    });
+  });
+
+  it('productInactive() is a 409 AppError with code PRODUCT_INACTIVE and no details', () => {
+    const error = productInactive();
+
+    expect(error).toBeInstanceOf(AppError);
+    expect(error.status).toBe(409);
+    expect(error.code).toBe('PRODUCT_INACTIVE');
+    expect(error.details).toBeUndefined();
+  });
+
+  it('toErrorEnvelope() maps productInactive() to a 409 { error: { code: "PRODUCT_INACTIVE" } } envelope', () => {
+    const result = toErrorEnvelope(productInactive());
+
+    expect(result.status).toBe(409);
+    expect(result.body).toEqual({
+      error: { code: 'PRODUCT_INACTIVE', message: expect.any(String) },
+    });
+  });
+
+  it('movementReasonRequired() is a 400 AppError with code MOVEMENT_REASON_REQUIRED and no details', () => {
+    const error = movementReasonRequired();
+
+    expect(error).toBeInstanceOf(AppError);
+    expect(error.status).toBe(400);
+    expect(error.code).toBe('MOVEMENT_REASON_REQUIRED');
+    expect(error.details).toBeUndefined();
+  });
+
+  it('toErrorEnvelope() maps movementReasonRequired() to a 400 { error: { code: "MOVEMENT_REASON_REQUIRED" } } envelope', () => {
+    const result = toErrorEnvelope(movementReasonRequired());
+
+    expect(result.status).toBe(400);
+    expect(result.body).toEqual({
+      error: { code: 'MOVEMENT_REASON_REQUIRED', message: expect.any(String) },
     });
   });
 });
