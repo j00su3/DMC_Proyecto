@@ -104,8 +104,25 @@ On each failed login, the system MUST increment `usuarios.intentos_fallidos` for
 
 #### Scenario: Lockout survives restart
 - GIVEN a user is currently locked (`bloqueado_hasta` in the future)
-- WHEN the API process restarts and the same user attempts to log in before `bloqueado_hasta` elapses
+- WHEN the API process restarts and someone attempts to log in **with a wrong password** before `bloqueado_hasta` elapses
 - THEN the login still returns `423 ACCOUNT_LOCKED`
+
+#### Scenario: The account holder is never locked out of their own account
+- GIVEN a user is currently locked (`bloqueado_hasta` in the future)
+- WHEN that user logs in with the **correct** password
+- THEN the login succeeds, `intentos_fallidos` returns to 0 and `bloqueado_hasta` is cleared
+
+Amended 2026-08-30, closing **SEC-001** (HIGH) per ADR-0007 § *Actualizado 2026-08-29*. The
+password MUST be verified **before** the lockout is evaluated. The previous wording said only
+that "the same user attempts to log in", which the implementation read as *any* attempt — so a
+correct password was refused too, and since the counter cleared only on a successful login, the
+holder had no way out: unlocking required logging in, and logging in required being unlocked.
+Anyone who knew the sole `encargado`'s email could hold the system's only administrative account
+shut with five requests every five minutes.
+
+Accepted cost, recorded in the ADR: `argon2.verify` now also runs for locked accounts, so the
+lockout no longer throttles guessing — the login route's rate limit does. That makes SEC-003
+(`trustProxy`, so the rate limit sees real client IPs) load-bearing rather than cosmetic.
 
 #### Scenario: Successful login resets counter
 - GIVEN a user with `intentos_fallidos = 3` and no active lockout

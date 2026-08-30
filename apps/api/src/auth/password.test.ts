@@ -16,6 +16,18 @@ describe('hashPassword / verifyPassword', () => {
     await expect(verifyPassword(hash, 'wrong password')).resolves.toBe(false);
   });
 
+  // `argon2.verify` throws on a hash it cannot parse rather than returning
+  // false, which surfaced as a 500 on login. SEC-001's reorder put this on
+  // the path for locked accounts too, and a 500 for one specific email is
+  // itself a signal an attacker can read. An unverifiable hash is a failed
+  // verification.
+  it('fails closed on an unparseable stored hash instead of throwing', async () => {
+    await expect(
+      verifyPassword('not-an-argon2-hash', 'any-password'),
+    ).resolves.toBe(false);
+    await expect(verifyPassword('', 'any-password')).resolves.toBe(false);
+  });
+
   it('never stores the plaintext password inside the produced hash', async () => {
     const plaintext = 'super-secret-value-123';
     const hash = await hashPassword(plaintext);

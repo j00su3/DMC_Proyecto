@@ -12,11 +12,21 @@ export function hashPassword(plaintext: string): Promise<string> {
   return argon2.hash(plaintext, ARGON2_OPTIONS);
 }
 
-export function verifyPassword(
+// `argon2.verify` THROWS on a hash it cannot parse rather than returning
+// false, so an unreadable stored hash used to surface as a 500 on login. Fail
+// closed instead: an unverifiable hash is a failed verification, never a
+// server error. SEC-001's reorder made this reachable for locked accounts too
+// — the lockout check no longer short-circuits ahead of it — and a 500 on a
+// specific email is itself a signal an attacker can read.
+export async function verifyPassword(
   hash: string,
   plaintext: string,
 ): Promise<boolean> {
-  return argon2.verify(hash, plaintext);
+  try {
+    return await argon2.verify(hash, plaintext);
+  } catch {
+    return false;
+  }
 }
 
 // Fixed dummy hash verified on unknown-email login attempts so the timing
