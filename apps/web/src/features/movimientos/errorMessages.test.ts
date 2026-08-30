@@ -5,16 +5,10 @@ import { movimientosErrorMessage } from './errorMessages.js';
 describe('movimientosErrorMessage', () => {
   it.each([
     ['FORBIDDEN', 'No tiene permiso para realizar esta acción.'],
-    [
-      'MOVEMENT_REASON_REQUIRED',
-      'Ingrese un motivo para este movimiento.',
-    ],
+    ['MOVEMENT_REASON_REQUIRED', 'Ingrese un motivo para este movimiento.'],
     ['VALIDATION_ERROR', 'Revise los datos ingresados e intente de nuevo.'],
     ['PRODUCT_NOT_FOUND', 'No se encontró el producto solicitado.'],
-    [
-      'PRODUCT_INACTIVE',
-      'El producto está inactivo y no admite movimientos.',
-    ],
+    ['PRODUCT_INACTIVE', 'El producto está inactivo y no admite movimientos.'],
   ])('returns a distinct message for %s', (code, expected) => {
     expect(movimientosErrorMessage(new ApiError(400, code, 'x'))).toBe(
       expected,
