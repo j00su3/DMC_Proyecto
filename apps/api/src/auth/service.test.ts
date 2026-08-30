@@ -136,19 +136,64 @@ describe('login', () => {
     expect(registerFailedAttempt).not.toHaveBeenCalled();
   });
 
-  it('rejects a locked account without evaluating the password hash', async () => {
+  // SEC-001. The lockout is evaluated AFTER the password, per ADR-0007
+  // § Actualizado 2026-08-29. Checking it first turned a guessing defence
+  // into a denial of service: anyone who knew the only encargado's email
+  // could keep them out indefinitely with five requests every five minutes,
+  // well under the route's 10/min limit, and the counter only cleared on a
+  // successful login the owner was being prevented from performing.
+  it('rejects a locked account whose password is also wrong (ACCOUNT_LOCKED)', async () => {
+    const hash = await hashPassword('correct-horse-battery-staple');
     const usuario = makeUsuario({
+      hashContrasena: hash,
       bloqueadoHasta: new Date(Date.now() + 120_000),
     });
-    const findByEmail = vi.fn(async () => usuario);
-    const repos = fakeRepos({ findByEmail });
+    const registerFailedAttempt = vi.fn(async () => ({
+      intentosFallidos: 6,
+      bloqueadoHasta: new Date(Date.now() + 120_000),
+    }));
+    const repos = fakeRepos({
+      findByEmail: async () => usuario,
+      registerFailedAttempt,
+    });
 
     await expect(
-      login(repos, { email: 'test@example.com', password: 'irrelevant' }),
+      login(repos, { email: 'test@example.com', password: 'wrong-password' }),
     ).rejects.toMatchObject({
       code: 'ACCOUNT_LOCKED',
       details: { retryAfter: expect.any(Number) },
     });
+    // Already locked: the window is not extended by an attempt it already
+    // refuses, so the owner's wait never grows while an attacker keeps trying.
+    expect(registerFailedAttempt).not.toHaveBeenCalled();
+  });
+
+  // The whole point of SEC-001's fix: knowing your own password always gets
+  // you in. Whoever guesses wrong stays locked; the legitimate holder never
+  // does.
+  it('lets the legitimate holder in while locked, clearing the lock (SEC-001)', async () => {
+    const hash = await hashPassword('correct-horse-battery-staple');
+    const usuario = makeUsuario({
+      hashContrasena: hash,
+      intentosFallidos: 5,
+      bloqueadoHasta: new Date(Date.now() + 120_000),
+    });
+    const resetAttempts = vi.fn(async () => {});
+    const repos = fakeRepos({
+      findByEmail: async () => usuario,
+      resetAttempts,
+    });
+
+    const result = await login(repos, {
+      email: 'test@example.com',
+      password: 'correct-horse-battery-staple',
+    });
+
+    expect(result.usuario.id).toBe(usuario.id);
+    // resetAttempts clears intentos_fallidos AND bloqueado_hasta
+    // (usuarios/repository.ts:151-156), so the lock does not outlive the
+    // successful login that disproved it.
+    expect(resetAttempts).toHaveBeenCalledWith(usuario.id);
   });
 });
 

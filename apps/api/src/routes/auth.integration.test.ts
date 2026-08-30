@@ -139,14 +139,60 @@ describe('auth routes (integration, real Postgres, real argon2)', () => {
     await app.close();
     app = await buildApp({ cookieSecret: COOKIE_SECRET });
 
-    const lockedResponse = await app.inject({
+    // A WRONG password is what proves the counter survived the restart.
+    // This assertion used to be made with the CORRECT password, which meant
+    // the test was asserting SEC-001 itself: the legitimate holder locked out
+    // of their own account. Verifying the password first (ADR-0007
+    // § Actualizado 2026-08-29) makes that case a success, so the persistence
+    // claim has to be proven by someone who is actually still guessing.
+    const stillLocked = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email: usuario.email, password: 'wrong-password' },
+    });
+
+    expect(stillLocked.statusCode).toBe(423);
+    expect(stillLocked.json().error.code).toBe('ACCOUNT_LOCKED');
+  });
+
+  // SEC-001, end to end against real Postgres and real argon2. This is the
+  // test docs/BACKLOG.md row 2.3 names: "tras cinco fallos, el titular con la
+  // contraseña correcta entra".
+  it('lets the legitimate holder log in after five failed attempts, clearing the lock (SEC-001)', async () => {
+    const usuario = await insertUsuario();
+    app = await buildApp({ cookieSecret: COOKIE_SECRET });
+
+    for (let i = 0; i < 5; i += 1) {
+      await app.inject({
+        method: 'POST',
+        url: '/api/auth/login',
+        payload: { email: usuario.email, password: 'wrong-password' },
+      });
+    }
+
+    const [locked] = await db
+      .select()
+      .from(usuarios)
+      .where(eq(usuarios.id, usuario.id));
+    expect(locked?.bloqueadoHasta).not.toBeNull();
+
+    const response = await app.inject({
       method: 'POST',
       url: '/api/auth/login',
       payload: { email: usuario.email, password: PASSWORD },
     });
 
-    expect(lockedResponse.statusCode).toBe(423);
-    expect(lockedResponse.json().error.code).toBe('ACCOUNT_LOCKED');
+    expect(response.statusCode).toBe(200);
+
+    // Assert the database after the success, not just the status code: the
+    // lock must be gone, or the next attempt would be refused again and the
+    // denial of service would simply be one login longer.
+    const [after] = await db
+      .select()
+      .from(usuarios)
+      .where(eq(usuarios.id, usuario.id));
+    expect(after?.bloqueadoHasta).toBeNull();
+    expect(after?.intentosFallidos).toBe(0);
   });
 
   it('changes the password, revokes other sessions, and keeps the current session valid', async () => {

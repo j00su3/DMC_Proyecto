@@ -52,18 +52,36 @@ export async function login(
     throw invalidCredentials();
   }
 
-  if (usuario.bloqueadoHasta && usuario.bloqueadoHasta.getTime() > Date.now()) {
-    const retryAfter = Math.ceil(
-      (usuario.bloqueadoHasta.getTime() - Date.now()) / 1000,
-    );
-    throw accountLocked(retryAfter);
-  }
-
+  // SEC-001 / ADR-0007 § Actualizado 2026-08-29: the lockout is evaluated
+  // AFTER the password, never before. Checking it first made the control a
+  // denial of service against its own beneficiary — anyone who knew the only
+  // encargado's email could hold the account shut with five requests every
+  // five minutes, far under the route's 10/min limit, while the counter's
+  // only reset was a successful login they were being prevented from making.
+  //
+  // Verifying first makes the lockout what it was meant to be: a defence
+  // against guessing. Whoever guesses wrong stays locked; whoever knows their
+  // own password is never locked out. Accepted cost, on the record in the
+  // ADR: argon2.verify now also runs for locked accounts, bounded by the
+  // login route's rate limit (SEC-004).
   const passwordOk = await verifyPassword(
     usuario.hashContrasena,
     input.password,
   );
+
   if (!passwordOk) {
+    // `bloqueadoHasta` is the pre-attempt state read above, so an account
+    // already locked is refused without extending its own window: the
+    // owner's remaining wait never grows because an attacker kept trying.
+    if (
+      usuario.bloqueadoHasta &&
+      usuario.bloqueadoHasta.getTime() > Date.now()
+    ) {
+      const retryAfter = Math.ceil(
+        (usuario.bloqueadoHasta.getTime() - Date.now()) / 1000,
+      );
+      throw accountLocked(retryAfter);
+    }
     await repos.usuarios.registerFailedAttempt(usuario.id);
     throw invalidCredentials();
   }

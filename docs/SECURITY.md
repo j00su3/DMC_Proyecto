@@ -213,6 +213,35 @@ el mismo efecto que fallos distribuidos, si se adopta la opción 1.
 
 **Required change type**: `DESIGN / ADR CHANGE`
 
+**Resuelto el 2026-08-30 — opción 3.** Se verifica la contraseña **antes** de evaluar el bloqueo
+(`apps/api/src/auth/service.ts:55-82`), según la resolución ya ratificada en el ADR-0007
+§ *Actualizado 2026-08-29*. Una credencial correcta concede acceso aunque la cuenta esté bloqueada y
+limpia el contador; quien adivina mal sigue recibiendo `423`. La opción 1 (bloqueo por IP) queda
+descartada mientras no exista `trustProxy` (SEC-003), porque hoy todos los clientes legítimos
+comparten la IP del proxy de Vercel.
+
+Dos tests afirmaban la vulnerabilidad y fueron reescritos, no adaptados:
+`auth/service.test.ts` decía *"rejects a locked account without evaluating the password hash"*, y
+`routes/auth.integration.test.ts` hacía cinco fallos, reiniciaba la app y esperaba `423` usando la
+contraseña **correcta**. El segundo ahora prueba la persistencia del contador con una contraseña
+incorrecta, que es lo que realmente la demuestra.
+
+Verificación, la que este mismo informe pedía: `routes/auth.integration.test.ts` — tras cinco fallos
+contra Postgres real, el titular con la contraseña correcta entra, y la fila queda con
+`bloqueado_hasta = null` e `intentos_fallidos = 0`. Se afirma la base después del éxito, no solo el
+código de estado.
+
+**Costo asumido, en el registro.** `argon2.verify` pasa a ejecutarse también sobre cuentas
+bloqueadas, así que el bloqueo por cuenta **ya no limita el ritmo de adivinación**: el único freno
+que queda es el rate-limit de la ruta. Eso convierte a **SEC-003** en carga estructural y no en
+cosmética — hoy, sin `trustProxy`, ese límite agrupa a todos los usuarios legítimos en un solo balde
+mientras un atacante que pegue directo a Render obtiene el suyo propio.
+
+Efecto colateral corregido de paso: `argon2.verify` **lanza** ante un hash ilegible y
+`verifyPassword` no lo capturaba, de modo que una fila con hash corrupto devolvía `500` en el login
+— y un `500` para un correo concreto es en sí mismo una señal legible. Ahora falla cerrado
+(`apps/api/src/auth/password.ts:15-30`).
+
 ---
 
 ### MEDIUM
