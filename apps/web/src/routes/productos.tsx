@@ -1,8 +1,11 @@
 import { createRoute } from '@tanstack/react-router';
 import { z } from 'zod';
+import { isApiError } from '../api/errors.js';
 import { FormError } from '../components/ui/FormError.js';
 import { Pagination } from '../components/ui/Pagination.js';
+import { TextField } from '../components/ui/TextField.js';
 import { ProductosTable } from '../features/productos/ProductosTable.js';
+import { productosErrorMessage } from '../features/productos/errorMessages.js';
 import {
   PAGE_SIZE,
   productosListQueryOptions,
@@ -13,7 +16,9 @@ import { shellLayout } from './shellLayout.js';
 /**
  * Clamps rather than throws, same style as `routes/usuarios.tsx:24-30`
  * (`.catch()`, never throw): `?page` is one hand-edit away from a malformed
- * value, and a route that throws on it is a blank screen.
+ * value, and a route that throws on it is a blank screen. `q` is
+ * bookmarkable (D9) — it lives here, not in component state, so the loader
+ * participates in it.
  */
 const productosSearchSchema = z.object({
   page: z.coerce
@@ -21,6 +26,7 @@ const productosSearchSchema = z.object({
     .int()
     .catch(1)
     .transform((n) => Math.max(1, n)),
+  q: z.string().catch(''),
 });
 
 /**
@@ -34,25 +40,38 @@ export const productosListRoute = createRoute({
   getParentRoute: () => shellLayout,
   path: '/inventario',
   validateSearch: productosSearchSchema,
-  loaderDeps: ({ search }) => ({ page: search.page }),
+  loaderDeps: ({ search }) => ({ page: search.page, q: search.q }),
   loader: async ({ context, deps }) => {
-    await context.queryClient.ensureQueryData(
-      productosListQueryOptions(deps.page, ''),
-    );
+    // Swallowed deliberately: a thrown loader error hits the router's
+    // generic `CatchBoundary`, not this screen. The component's own
+    // `useProductos` query re-reads the same now-errored cache entry and
+    // surfaces it through `query.isError`, mapped by `productosErrorMessage`.
+    await context.queryClient
+      .ensureQueryData(productosListQueryOptions(deps.page, deps.q))
+      .catch(() => undefined);
   },
   component: ProductosListScreen,
 });
 
 function ProductosListScreen() {
-  const { page } = productosListRoute.useSearch();
+  const { page, q } = productosListRoute.useSearch();
   const navigate = productosListRoute.useNavigate();
-  const query = useProductos(page, '');
+  const query = useProductos(page, q);
+
+  // Changing the search term resets page to 1 (D9) — otherwise a filtered
+  // result of two pages is viewed at page 7 and renders empty.
+  function handleSearchChange(nextQ: string) {
+    navigate({ search: { page: 1, q: nextQ }, replace: true });
+  }
 
   if (query.isError) {
+    const message = isApiError(query.error)
+      ? productosErrorMessage(query.error)
+      : 'Ocurrió un error inesperado. Intente de nuevo.';
     return (
       <div>
         <h1>Inventario</h1>
-        <FormError message="Ocurrió un error inesperado. Intente de nuevo." />
+        <FormError message={message} />
       </div>
     );
   }
@@ -63,6 +82,12 @@ function ProductosListScreen() {
   return (
     <div>
       <h1>Inventario</h1>
+      <TextField
+        id="productos-search"
+        label="Buscar por nombre o SKU"
+        value={q}
+        onChange={(event) => handleSearchChange(event.target.value)}
+      />
       <ProductosTable
         productos={data?.data ?? []}
         aria-busy={query.isPlaceholderData}
@@ -71,7 +96,7 @@ function ProductosListScreen() {
         page={page}
         totalPages={totalPages}
         isBusy={query.isPlaceholderData}
-        onPageChange={(nextPage) => navigate({ search: { page: nextPage } })}
+        onPageChange={(nextPage) => navigate({ search: { page: nextPage, q } })}
       />
     </div>
   );

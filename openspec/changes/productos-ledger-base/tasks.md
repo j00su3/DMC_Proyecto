@@ -481,23 +481,34 @@ Satisfies spec: **List With Pagination, Search, And Derived Status Chips** (sear
 
 **Forecast: ~180 prod / ~150 test = ~330 raw diff. Under budget.**
 
-- [ ] 11.1 RED `apps/web/src/routes/productos.test.tsx` (extend) — typing into the search input
+- [x] 11.1 RED `apps/web/src/routes/productos.test.tsx` (extend) — typing into the search input
       makes the list request include `?q=<term>`, showing only matching rows; changing `q` resets
       `page` to 1 (same clamping style as `routes/usuarios.tsx:24-30`, `.catch()`, never throw); a
       product with `stock_minimo = null` and any `stock_actual` shows no chip; `stock_minimo = 10,
       stock_actual = 8` shows `bajo`; `stock_actual <= 0` shows `quiebre` regardless of
       `stock_minimo`; each of `PRODUCT_NOT_FOUND`, `SKU_ALREADY_IN_USE`,
       `FIELD_RESERVED_FOR_ENCARGADO`, `SUPPLIER_INACTIVE`, `VALIDATION_ERROR`, `FORBIDDEN` renders a
-      distinct message, not a generic fallback
-- [ ] 11.2 GREEN `apps/web/src/features/productos/format.ts` (new) — pure `estadoStock(stockActual,
+      distinct message, not a generic fallback. **Apply note**: the six-code mapping is proven at the
+      unit level in new `errorMessages.test.ts` (mirrors `usuarios/errorMessages.test.ts`'s own
+      precedent, which this task's prose asked to follow); `productos.test.tsx` carries one
+      route-level wiring proof (one code) instead of all six, since re-testing the same pure switch
+      six times at the route level would only prove routing, not the mapping, twice as expensively.
+      Also confirmed RED for the right reason across all four new/touched spec files before any
+      production code existed.
+- [x] 11.2 GREEN `apps/web/src/features/productos/format.ts` (new) — pure `estadoStock(stockActual,
       stockMinimo)` function per D9's exact branching (`stockActual <= 0` → `'quiebre'`;
       `stockMinimo !== null && stockActual <= stockMinimo` → `'bajo'`; else `'ok'`), rendered through
-      the existing `components/ui/StatusChip.tsx`. No server-computed status field anywhere
-- [ ] 11.3 GREEN `apps/web/src/features/productos/errorMessages.ts` (new) — switch on the six codes
+      the existing `components/ui/StatusChip.tsx`. No server-computed status field anywhere.
+      **Apply note**: `StatusChip.tsx` only accepted `activo`/`debeCambiarPassword` — extended its
+      prop type to a discriminated union adding a generic `variant`/`label` shape (plus a `.danger`
+      CSS class) so productos reuses the same pill component/styling instead of a second one, per
+      instruction #9 ("reuse existing UI primitives"). Existing `activo`/`debeCambiarPassword`
+      call sites and their type contract are unchanged.
+- [x] 11.3 GREEN `apps/web/src/features/productos/errorMessages.ts` (new) — switch on the six codes
       above, following the `usuarios`/`proveedores` `errorMessages.ts` convention
-- [ ] 11.4 GREEN search input wired into `productos.tsx`'s `validateSearch` (`q` param, bookmarkable,
+- [x] 11.4 GREEN search input wired into `productos.tsx`'s `validateSearch` (`q` param, bookmarkable,
       loader participates)
-- [ ] 11.5 Verify: `pnpm --filter web test`, `pnpm typecheck`, `pnpm lint`
+- [x] 11.5 Verify: `pnpm --filter web test`, `pnpm typecheck`, `pnpm lint`
 
 ## Phase 12: S7a — Web: Create Form (stretch, last item to drop within S7)
 

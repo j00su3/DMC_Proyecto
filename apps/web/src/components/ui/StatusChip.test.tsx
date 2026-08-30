@@ -17,4 +17,14 @@ describe('StatusChip', () => {
     render(<StatusChip activo={true} debeCambiarPassword />);
     expect(screen.getByText('Debe cambiar contraseña')).toBeInTheDocument();
   });
+
+  it('renders a generic danger-variant chip with the given label', () => {
+    render(<StatusChip variant="danger" label="Quiebre" />);
+    expect(screen.getByText('Quiebre')).toBeInTheDocument();
+  });
+
+  it('renders a generic warning-variant chip with the given label', () => {
+    render(<StatusChip variant="warning" label="Bajo" />);
+    expect(screen.getByText('Bajo')).toBeInTheDocument();
+  });
 });

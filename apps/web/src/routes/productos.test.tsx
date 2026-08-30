@@ -4,7 +4,8 @@ import {
   createMemoryHistory,
   createRouter,
 } from '@tanstack/react-router';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PAGE_SIZE } from '../features/productos/queries.js';
 import { routeTree } from './routeTree.js';
@@ -32,10 +33,17 @@ async function loadAndRenderProductos(initialPath: string) {
   return router;
 }
 
-function productoRow(id: string, nombre = `Producto ${id}`) {
+function productoRow(
+  id: string,
+  overrides: {
+    nombre?: string;
+    stockActual?: number;
+    stockMinimo?: number | null;
+  } = {},
+) {
   return {
     id,
-    nombre,
+    nombre: `Producto ${id}`,
     sku: `SKU-${id}`,
     categoria: 'General',
     stockActual: 10,
@@ -44,6 +52,7 @@ function productoRow(id: string, nombre = `Producto ${id}`) {
     proveedorId: 'prov-1',
     activo: true,
     creadoEn: '2026-01-01T12:00:00.000Z',
+    ...overrides,
   };
 }
 
@@ -102,7 +111,7 @@ describe('productos routes', () => {
 
   it("renders DataTable rows from GET /api/productos's data", async () => {
     stubFetchAsDepositoWithList({
-      data: [productoRow('1'), productoRow('2', 'Producto 2')],
+      data: [productoRow('1'), productoRow('2', { nombre: 'Producto 2' })],
       page: 1,
       pageSize: PAGE_SIZE,
       total: 2,
@@ -135,5 +144,136 @@ describe('productos routes', () => {
       within(footer).getByRole('button', { name: '3' }),
     ).toBeInTheDocument();
     expect(within(footer).queryByRole('button', { name: '4' })).toBeNull();
+  });
+
+  /** productos-ui / List With Pagination, Search... (search half). */
+  it('search input filters the list by ?q=, matching only the searched name', async () => {
+    const all = [
+      productoRow('1', { nombre: 'Martillo' }),
+      productoRow('2', { nombre: 'Taladro' }),
+    ];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string | URL | Request) => {
+        const url = String(input);
+        if (url.includes('/api/auth/me')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({ usuario: depositoUsuario }),
+          });
+        }
+        if (url.includes('/api/productos')) {
+          const q = new URL(url, 'http://x').searchParams.get('q') ?? '';
+          const data = q
+            ? all.filter((p) =>
+                p.nombre.toLowerCase().includes(q.toLowerCase()),
+              )
+            : all;
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              data,
+              page: 1,
+              pageSize: PAGE_SIZE,
+              total: data.length,
+            }),
+          });
+        }
+        throw new Error(`unexpected fetch: ${url}`);
+      }),
+    );
+    await loadAndRenderProductos('/inventario');
+    await screen.findByText('Martillo');
+
+    await userEvent.type(
+      screen.getByLabelText('Buscar por nombre o SKU'),
+      'Tal',
+    );
+
+    await waitFor(() =>
+      expect(screen.queryByText('Martillo')).not.toBeInTheDocument(),
+    );
+    expect(screen.getByText('Taladro')).toBeInTheDocument();
+  });
+
+  it('resets ?page to 1 when the search term changes', async () => {
+    stubFetchAsDepositoWithList({
+      data: [productoRow('1')],
+      page: 2,
+      pageSize: PAGE_SIZE,
+      total: 1,
+    });
+    const router = await loadAndRenderProductos('/inventario?page=2');
+
+    await userEvent.type(screen.getByLabelText('Buscar por nombre o SKU'), 'x');
+
+    await waitFor(() =>
+      expect(router.state.location.search).toMatchObject({ page: 1 }),
+    );
+  });
+
+  /** productos-ui / List With Pagination... (derived status chip half, D9). */
+  it.each([
+    [{ stockMinimo: null, stockActual: 3 }, null],
+    [{ stockMinimo: 10, stockActual: 8 }, 'Bajo'],
+    [{ stockMinimo: 10, stockActual: 0 }, 'Quiebre'],
+  ])('derives the status chip for %o', async (overrides, expectedLabel) => {
+    stubFetchAsDepositoWithList({
+      data: [productoRow('1', overrides)],
+      page: 1,
+      pageSize: PAGE_SIZE,
+      total: 1,
+    });
+    await loadAndRenderProductos('/inventario');
+    await screen.findByText('Producto 1');
+
+    if (expectedLabel) {
+      expect(screen.getByText(expectedLabel)).toBeInTheDocument();
+    } else {
+      expect(screen.queryByText('Bajo')).not.toBeInTheDocument();
+      expect(screen.queryByText('Quiebre')).not.toBeInTheDocument();
+    }
+  });
+
+  /**
+   * productos-ui / Error Surfacing By Code. The full six-code mapping is
+   * proven at the unit level in `errorMessages.test.ts` (mirrors
+   * `usuarios/errorMessages.test.ts`'s precedent); this is the one
+   * route-level proof that the mapper is actually wired into the screen,
+   * not a generic fallback.
+   */
+  it('surfaces the mapped error message for a failed list request, not a generic fallback', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string | URL | Request) => {
+        const url = String(input);
+        if (url.includes('/api/auth/me')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({ usuario: depositoUsuario }),
+          });
+        }
+        if (url.includes('/api/productos')) {
+          return Promise.resolve({
+            ok: false,
+            status: 400,
+            json: async () => ({
+              error: { code: 'VALIDATION_ERROR', message: 'bad request' },
+            }),
+          });
+        }
+        throw new Error(`unexpected fetch: ${url}`);
+      }),
+    );
+    await loadAndRenderProductos('/inventario');
+
+    expect(
+      await screen.findByText(
+        'Revise los datos ingresados e intente de nuevo.',
+      ),
+    ).toBeInTheDocument();
   });
 });
