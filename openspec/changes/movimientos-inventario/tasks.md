@@ -318,17 +318,40 @@ Types**, **Ajuste Option Hidden For Deposito Is UX Convenience, Not Access Contr
 
 **Forecast: ~150 prod / ~150 test ≈ 300 raw diff. Under budget.**
 
-- [ ] 7.1 RED `apps/web/src/features/movimientos/MovimientoModal.test.tsx` (new, RTL + user-event) —
+- [x] 7.1 RED `apps/web/src/features/movimientos/MovimientoModal.test.tsx` (new, RTL + user-event) —
       step 1 renders exactly four choices for `encargado`, three for `deposito` (Ajuste absent or
       disabled with 🔒, per D9); selecting "Salida por merma" and completing the flow (stubbed steps
       2-3) produces `tipo: 'salida', esMerma: true` on submit; selecting "Ajuste" produces `tipo:
       'ajuste'` with no merma indicator; Continue is disabled until a choice is made.
-- [ ] 7.2 GREEN `apps/web/src/features/movimientos/MovimientoModal.tsx` (new) + CSS module — step 1
+      → 10 tests: 6 component-level (RTL + user-event) + 4 pure-function unit tests on the exported
+      `toWireSubmission` mapper. Confirmed RED first — `npx vitest run
+      MovimientoModal.test.tsx` failed with "Failed to resolve import ./MovimientoModal.js" before
+      the production file existed.
+- [x] 7.2 GREEN `apps/web/src/features/movimientos/MovimientoModal.tsx` (new) + CSS module — step 1
       only in this slice: header/divider/✕/numbered-label chrome per `docs/design.md` tokens (radius
       18, 12px muted centred audit note), four radio cards, `useForm` + `zodResolver(schemas.ts)`,
-      built on `components/ui/Modal.tsx` with `closePolicy="casual"`. Steps 2-3 render a placeholder
-      in this slice, completed in S7b.
-- [ ] 7.3 Verify S7a: `pnpm --filter web test`, `pnpm typecheck`, `pnpm lint`.
+      built on `components/ui/Modal.tsx` with `closePolicy="casual"`. Steps 2-3 render a generic
+      cantidad/motivo placeholder in this slice (not D9's full per-choice variant UI — that is S7b),
+      just enough to drive the flow to submit and prove the step-1→wire mapping end to end. Also adds
+      `position: relative` to `Modal.module.css`'s `.modal` so the new circular ✕ close button can
+      anchor to it (Modal.tsx itself untouched — no second modal primitive written).
+      **Deviation from task wording, documented not silently taken**: `MovimientoModal` is
+      presentational — it takes `onSubmit: (submission) => void` and does not call
+      `useRegistrarMovimiento` itself, matching `ProductoForm.tsx`'s "route-module boundary"
+      precedent; S8 wires the real mutation call at the route.
+- [x] 7.3 Verify S7a: `pnpm --filter web test`, `pnpm typecheck`, `pnpm lint`.
+      → All exit 0. web: 226/226 passing (216 baseline + 10 new). typecheck: api + web both "Done".
+      lint (biome ci .): 236 files checked, no fixes applied (one `biome format --write` pass was
+      needed mid-session for two long-line wraps; final run is clean). `pnpm contract:check`:
+      byte-identical, exit 0 (no route touched, no schema.d.ts drift).
+      **Mutation-probe evidence (required and performed)**: (1) deposito role hiding — changed
+      `const disabled = isAjuste && isDeposito` to `const disabled = false && isAjuste &&
+      isDeposito`; the "renders Ajuste disabled..." test failed with `expected element not to be
+      disabled` against the real rendered radio. Reverted. (2) merma→wire mapping — changed
+      `esMerma: values.eleccion === 'merma'` to `esMerma: false` in `toWireSubmission`; both the
+      component-flow test and the pure-function unit test for `merma` failed with a clear diff
+      (`esMerma: true` expected, `false` received). Reverted; `git diff --exit-code` on the file
+      exits 0 (clean) after each revert.
 
 ## Phase S7b — Web: Modal Steps 2-3 (validation, discrepancy checkbox, submit, error surfacing)
 
@@ -448,7 +471,7 @@ that requires chaining — a single-PR delivery would blow both the 400-line pro
 800-line session ceiling by a wide margin.
 
 Chained PRs recommended: Yes
-Chain strategy: pending
+Chain strategy: stacked-to-main (resolved by the orchestrator; S6 = PR 6, S7a = PR 7 of the chain)
 400-line budget risk: High
 Decision needed before apply: Yes
 
