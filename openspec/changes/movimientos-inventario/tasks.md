@@ -366,6 +366,17 @@ Per Product, Paginated**. Depends on S6 (queries) and S7b (modal complete).
       displayed `stock_actual` reflects the response's updated product; the history list below the
       form renders rows from `GET .../movimientos`, paginated, and a merma row is visually
       distinguishable from an ordinary salida.
+      **Added 2026-08-30 — required, not optional**: after a successful registration, assert the
+      history list **gains the new row without a manual reload**. `useRegistrarMovimiento`
+      refreshes it by invalidating `movimientosKeys.lists()`, and TanStack Query matches
+      invalidations by key PREFIX, so a `list()` key that stops nesting under `lists()` is never
+      matched: every registration succeeds, the ledger is written correctly, and the table on
+      screen silently keeps showing stale rows with no error anywhere. That exact mutation was run
+      against S6 on 2026-08-30 and the entire web suite stayed green, `typecheck` passed, and only
+      the formatter complained — about line length. `features/movimientos/queries.test.ts` now
+      guards the key's shape, but shape is not behaviour: this assertion is the half that proves
+      the screen actually updates. CLAUDE.md's "route-level coverage, not just hook-level" names
+      this exact failure, and it has already shipped twice in this project.
 - [ ] 8.2 GREEN `apps/web/src/features/movimientos/MovimientosTable.tsx` (new) — renders `tipo`,
       `cantidad`, `stockResultante`, `motivo`, a merma badge/chip, `fecha`, `usuarioId`.
 - [ ] 8.3 GREEN `apps/web/src/routes/productosDetalle.tsx` (modify) — add the trigger button (hidden,
