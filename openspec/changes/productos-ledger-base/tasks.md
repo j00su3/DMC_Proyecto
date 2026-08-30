@@ -180,17 +180,17 @@ before deciding.
 **Not a code change. Owner action, timed to land immediately before the PR carrying 1.1–1.10
 merges**, per `docs/DEPLOY-PLAN.md` Fase 2 (additive migration ⇒ migrate before merge).
 
-- [ ] 1.11 Confirm the migration is classified **additive** in the PR description (new tables only,
+- [x] 1.11 Confirm the migration is classified **additive** in the PR description (new tables only,
       no `NOT NULL` added to an existing table, no destructive change to `proveedores` or any other
       existing table) — true for 1.2/1.3 as written
-- [ ] 1.12 Owner runs, from a machine with Neon's `DATABASE_URL` loaded (never pasted into a chat,
+- [x] 1.12 Owner runs, from a machine with Neon's `DATABASE_URL` loaded (never pasted into a chat,
       issue, log, or this document): confirm in the Neon console which project/branch is targeted,
       then `pnpm db:migrate`
-- [ ] 1.13 Confirm in the Neon console that `productos` and `movimientos` now exist
-- [ ] 1.14 Confirm the **currently deployed** (old) API is still healthy after the migration:
+- [x] 1.13 Confirm in the Neon console that `productos` and `movimientos` now exist
+- [x] 1.14 Confirm the **currently deployed** (old) API is still healthy after the migration:
       `curl -sS https://dmc-proyecto.vercel.app/api/health` → `{"status":"ok",...,"db":"up"}`. Old
       code does not reference the new tables, so this window is inert by construction
-- [ ] 1.15 Only then merge the PR carrying S1a + S1b
+- [x] 1.15 Only then merge the PR carrying S1a + S1b
 
 ## Phase 2: S2a — `ProductosRepo` (Port + Drizzle Adapter)
 
@@ -587,15 +587,27 @@ stacked branch once both land, since each task's own description bundles both co
 
 ## Phase 14: Bookkeeping
 
-- [ ] 14.1 Confirm no `.env*` file was touched or referenced by any task above, and no new
+- [x] 14.1 Confirm no `.env*` file was touched or referenced by any task above, and no new
       environment variable was introduced — `DATABASE_URL` is the only input and already exists
-- [ ] 14.2 If PRs are chained/stacked, retarget each PR to `main` as its predecessor merges
+- [x] 14.2 If PRs are chained/stacked, retarget each PR to `main` as its predecessor merges
       (`gh pr edit <n> --base main`) — GitHub does not auto-retarget, per the `gestion-proveedores`
       precedent (#36→#37→#38)
-- [ ] 14.3 Before archiving the change, confirm both flagged owner decisions (R1 — `stockActual`
+- [x] 14.3 Before archiving the change, confirm both flagged owner decisions (R1 — `stockActual`
       audit visibility, R3 — `proveedor_id` nullability) are recorded as **resolved with an
       explicit owner answer**, not silently left on the design's default, in the same place
       `gestion-proveedores`'s task 8.3 confirmed its own open questions stayed visible after merge
+**Evidence for 1.11–1.15 and 14.1–14.3**, checked rather than recalled (2026-08-30):
+
+| Task | How it was verified |
+|---|---|
+| 1.11 | PR #58's body classifies the migration additive; confirmed against the SQL — `0004` has three `ALTER TABLE` statements and all three add FK constraints to the new `productos`/`movimientos` tables. No existing table is altered. |
+| 1.12–1.13 | Owner ran `pnpm db:migrate` with Neon's `DATABASE_URL`, then confirmed `productos` and `movimientos` in the Neon console. The `sslmode` deprecation warning is the discriminator: it fires only for a connection string carrying `sslmode`, which Neon requires and localhost does not. |
+| 1.14 | `GET /api/health` → `{"status":"ok","db":"up"}` after the migration and again after every merge since. |
+| 1.15 | PRs #58/#60 merged only after the above. |
+| 14.1 | Every `process.env` read in the repo is `DATABASE_URL`, `NODE_ENV`, `LOG_LEVEL` or `COOKIE_SECRET` — all pre-existing. No `.env*` file was read, written or referenced; `git ls-files` shows only `.env.example` tracked, and `.gitignore` covers `.env`. |
+| 14.2 | Every stacked PR was retargeted with `gh pr edit <n> --base main` before merging. The lower PR is merged **without** `--delete-branch`: that flag irrecoverably auto-closes the stacked PR above it (PR #59, lost this way; `gh pr reopen` and `gh pr edit --base` both refuse a closed PR). |
+| 14.3 | `design.md:510` and `:519` carry `[RECONCILE-1]` and `[RECONCILE-3]` ticked with the owner's explicit answers, not design defaults. |
+
 - [ ] 14.4 Confirm the claims-gate report (`openspec/changes/productos-ledger-base/claims-report.md`)
       is produced before this cycle reaches verify/archive, per `CLAUDE.md`'s claims gate section —
       out of scope for this tasks document to produce, in scope to not forget
