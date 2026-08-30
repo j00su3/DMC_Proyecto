@@ -299,7 +299,35 @@ export function buildSeedDemoDeps(db: Db): SeedDemoDeps {
   };
 }
 
+// Without this the driver silently falls back to its own defaults (localhost,
+// the OS username, no password) and the first query fails with a connection
+// error that says nothing about the real cause. Naming the missing variable is
+// the difference between a two-minute fix and a hunt.
+export function requireDatabaseUrl(env: NodeJS.ProcessEnv): string {
+  const url = env.DATABASE_URL;
+  if (!url) {
+    throw new Error(
+      'DATABASE_URL is not set in this shell. Set it to the target database before running this script — it is not persisted between terminal sessions.',
+    );
+  }
+  return url;
+}
+
+// Drizzle wraps a driver failure, so the useful part (authentication, host
+// resolution, SSL) lives in `cause`, not in the top-level message. Printing
+// only the message hides exactly the line that explains the failure.
+export function formatError(error: unknown): string {
+  const parts: string[] = [];
+  let current: unknown = error;
+  while (current instanceof Error) {
+    parts.push(current.message);
+    current = current.cause;
+  }
+  return parts.length > 0 ? parts.join('\n  caused by: ') : String(error);
+}
+
 async function main() {
+  requireDatabaseUrl(process.env);
   const result = await seedDemo(buildSeedDemoDeps(getDb()));
 
   console.log(
@@ -320,7 +348,7 @@ if (
   main()
     .then(() => process.exit(0))
     .catch((err) => {
-      console.error(err instanceof Error ? err.message : err);
+      console.error(formatError(err));
       process.exit(1);
     });
 }
