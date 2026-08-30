@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { DrizzleSesionesRepo } from '../auth/repository.js';
+import { hashToken } from '../auth/session.js';
 import { buildRepos } from '../plugins/repos.js';
 import { getDb, getPool } from './pool.js';
 import { sesiones, usuarios } from './schema.js';
@@ -61,7 +62,7 @@ describe('createUnitOfWork (integration, real Postgres)', () => {
     const rows = await db
       .select()
       .from(sesiones)
-      .where(eq(sesiones.id, sesionId));
+      .where(eq(sesiones.id, hashToken(sesionId)));
     expect(rows).toHaveLength(0);
   });
 
@@ -98,7 +99,7 @@ describe('createUnitOfWork (integration, real Postgres)', () => {
     const insideRows = await db
       .select()
       .from(sesiones)
-      .where(eq(sesiones.id, insideSesionId));
+      .where(eq(sesiones.id, hashToken(insideSesionId)));
     expect(insideRows).toHaveLength(0);
 
     // The out-of-band write did NOT roll back — it is the silent-bug
@@ -107,7 +108,7 @@ describe('createUnitOfWork (integration, real Postgres)', () => {
     const outsideRows = await db
       .select()
       .from(sesiones)
-      .where(eq(sesiones.id, outsideSesionId));
+      .where(eq(sesiones.id, hashToken(outsideSesionId)));
     expect(outsideRows).toHaveLength(1);
   });
 });
