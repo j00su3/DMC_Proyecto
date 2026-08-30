@@ -13,6 +13,7 @@ import {
 import type { UnitOfWork } from './db/uow.js';
 import { notFoundEnvelope, toErrorEnvelope } from './lib/errors.js';
 import authPlugin from './plugins/auth.js';
+import { resolveRateLimitKey } from './plugins/clientIp.js';
 import cookiePlugin from './plugins/cookie.js';
 import dbPlugin, { type DbLike } from './plugins/db.js';
 import reposPlugin, { type Repos } from './plugins/repos.js';
@@ -97,7 +98,23 @@ export async function buildApp(
   await app.register(authPlugin);
   // global: false — rate limiting only applies to routes that opt in via
   // config.rateLimit (currently only POST /api/auth/login).
-  await app.register(rateLimit, { global: false });
+  // SEC-003. `trustProxy` stays OFF deliberately: the Render origin is
+  // publicly reachable, so X-Forwarded-For is attacker-controlled, and after
+  // SEC-001's fix this rate limit is the only brake left on password
+  // guessing — a spoofable key would be worse than the shared bucket it
+  // replaces. The forwarded address is trusted only alongside the shared
+  // secret, and falls back to the socket address in every other case, so a
+  // missing or misconfigured secret degrades to today's behaviour instead of
+  // rejecting traffic. See plugins/clientIp.ts.
+  await app.register(rateLimit, {
+    global: false,
+    keyGenerator: (request) =>
+      resolveRateLimitKey(
+        request.headers,
+        request.ip,
+        process.env.PROXY_SHARED_SECRET,
+      ),
+  });
   app.decorate('rateLimitMax', opts.rateLimitMax ?? 10);
 
   app.register(healthRoutes, { prefix: '/api' });
