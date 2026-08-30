@@ -1,0 +1,3 @@
+ALTER TABLE "movimientos" ADD COLUMN "es_merma" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "movimientos" ADD CONSTRAINT "movimientos_merma_solo_salida" CHECK ("movimientos"."es_merma" = false OR "movimientos"."tipo" = 'salida'::movimiento_tipo);--> statement-breakpoint
+ALTER TABLE "movimientos" ADD CONSTRAINT "movimientos_ajuste_cantidad_no_cero" CHECK ("movimientos"."tipo" <> 'ajuste'::movimiento_tipo OR "movimientos"."cantidad" <> 0);

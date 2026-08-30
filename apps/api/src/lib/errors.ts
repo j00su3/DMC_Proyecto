@@ -224,6 +224,40 @@ export function supplierInactive(): AppError {
   );
 }
 
+// design.md D6, backlog #6 (movimientos-inventario). RECONCILE-1 (resolved):
+// the `details` key is `available`, English camelCase — the error envelope
+// belongs to the English family (accountLocked's `retryAfter` precedent),
+// unlike the domain wire field `esMerma` which is Spanish-domain camelCase.
+// 409: the request is valid, the current stock conflicts with it, same
+// reasoning as supplierInactive()/emailAlreadyInUse().
+export function insufficientStock(available: number): AppError {
+  return new AppError('INSUFFICIENT_STOCK', 'Insufficient stock', 409, {
+    available,
+  });
+}
+
+// design.md D6 — the deliberate sibling of the shipped supplierInactive().
+export function productInactive(): AppError {
+  return new AppError(
+    'PRODUCT_INACTIVE',
+    'Product is inactive and cannot receive new movements',
+    409,
+  );
+}
+
+// design.md D8, RECONCILE-5 (resolved): MOVEMENT_REASON_REQUIRED, not the
+// spec's bare REASON_REQUIRED — backlog #9's anulación will need its own
+// reason code, so an unprefixed name would collide. 400 because a
+// conditionally-required field is a request-validity problem, not a state
+// conflict — invalidCurrentPassword() is the 400 precedent.
+export function movementReasonRequired(): AppError {
+  return new AppError(
+    'MOVEMENT_REASON_REQUIRED',
+    'A reason is required for this movement',
+    400,
+  );
+}
+
 export function toErrorEnvelope(error: unknown): MappedError {
   if (hasValidationErrors(error)) {
     return {

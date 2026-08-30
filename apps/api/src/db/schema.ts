@@ -198,6 +198,10 @@ export const movimientos = pgTable(
     cantidad: integer('cantidad').notNull(),
     motivo: text('motivo'),
     esDiscrepancia: boolean('es_discrepancia').notNull().default(false),
+    // backlog #6 (movimientos-inventario) D3 — beside esDiscrepancia,
+    // required at the port (movimientos/repository.ts), defaulted here only
+    // so the migration is additive against existing rows.
+    esMerma: boolean('es_merma').notNull().default(false),
     // No FK to a `usuarios` row is omitted here — the actor who performed
     // the movement. Nullable would hide who made a stock change; kept
     // required and referencing usuarios, mirroring auditoria.usuarioId.
@@ -228,6 +232,17 @@ export const movimientos = pgTable(
     check(
       'movimientos_discrepancia_solo_ajuste',
       sql`${table.esDiscrepancia} = false OR ${table.tipo} = 'ajuste'::movimiento_tipo`,
+    ),
+    // backlog #6 (movimientos-inventario) D3 — structural mirror of
+    // movimientos_discrepancia_solo_ajuste above: same `flag = false OR
+    // tipo = …` spelling, same Spanish constraint-name family.
+    check(
+      'movimientos_merma_solo_salida',
+      sql`${table.esMerma} = false OR ${table.tipo} = 'salida'::movimiento_tipo`,
+    ),
+    check(
+      'movimientos_ajuste_cantidad_no_cero',
+      sql`${table.tipo} <> 'ajuste'::movimiento_tipo OR ${table.cantidad} <> 0`,
     ),
   ],
 );
