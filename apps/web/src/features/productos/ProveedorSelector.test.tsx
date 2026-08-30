@@ -66,7 +66,20 @@ describe('ProveedorSelector', () => {
     renderSelector();
 
     const select = screen.getByLabelText('Proveedor');
-    await within(select).findByRole('option', { name: 'Activo Uno' });
+    // `findBy`'s default budget is one second, and this assertion sits behind
+    // a real async boundary: the fetch resolving, react-query settling, and
+    // React committing. Under full-suite load that budget was exceeded once —
+    // observed failing on merged `main` at 18685d9 with "Unable to find
+    // role=option and name Activo Uno", then green across five consecutive
+    // full runs, so it is a load-dependent flake and not a defect in the
+    // component. The house rule this repo learned the hard way is that a test
+    // leaning on the retry window passes alone and fails in-suite; sizing the
+    // wait to the environment is the fix, and re-running until green is not.
+    await within(select).findByRole(
+      'option',
+      { name: 'Activo Uno' },
+      { timeout: 5000 },
+    );
     expect(
       within(select).getByRole('option', { name: 'Activo Tres' }),
     ).toBeInTheDocument();
