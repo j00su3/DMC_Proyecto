@@ -289,6 +289,125 @@ describe('productos/movimientos schema (integration, real Postgres)', () => {
     });
   });
 
+  // backlog #6 (movimientos-inventario), S1, task 1.1. D3's two new CHECKs —
+  // proven at the database, unreachable by any endpoint until S3/S4.
+  describe('movimientos_merma_solo_salida CHECK', () => {
+    it('rejects es_merma = true with tipo = entrada', async () => {
+      const proveedor = await insertProveedorRow('Proveedor Uno');
+      const [producto] = await insertProducto({
+        nombre: 'Producto Uno',
+        sku: 'SKU-001',
+        precio: '10.00',
+        proveedorId: proveedor.id,
+      });
+      if (!producto) throw new Error('failed to insert fixture producto');
+      const usuario = await insertUsuarioRow();
+
+      await expect(
+        db.insert(movimientos).values({
+          productoId: producto.id,
+          usuarioId: usuario.id,
+          tipo: 'entrada',
+          cantidad: 5,
+          stockResultante: 5,
+          esMerma: true,
+        }),
+      ).rejects.toMatchObject({ cause: { code: '23514' } });
+    });
+
+    it('rejects es_merma = true with tipo = ajuste', async () => {
+      const proveedor = await insertProveedorRow('Proveedor Uno');
+      const [producto] = await insertProducto({
+        nombre: 'Producto Uno',
+        sku: 'SKU-001',
+        precio: '10.00',
+        proveedorId: proveedor.id,
+      });
+      if (!producto) throw new Error('failed to insert fixture producto');
+      const usuario = await insertUsuarioRow();
+
+      await expect(
+        db.insert(movimientos).values({
+          productoId: producto.id,
+          usuarioId: usuario.id,
+          tipo: 'ajuste',
+          cantidad: 5,
+          stockResultante: 5,
+          esMerma: true,
+        }),
+      ).rejects.toMatchObject({ cause: { code: '23514' } });
+    });
+
+    it('accepts es_merma = true with tipo = salida', async () => {
+      const proveedor = await insertProveedorRow('Proveedor Uno');
+      const [producto] = await insertProducto({
+        nombre: 'Producto Uno',
+        sku: 'SKU-001',
+        precio: '10.00',
+        proveedorId: proveedor.id,
+      });
+      if (!producto) throw new Error('failed to insert fixture producto');
+      const usuario = await insertUsuarioRow();
+
+      await expect(
+        db.insert(movimientos).values({
+          productoId: producto.id,
+          usuarioId: usuario.id,
+          tipo: 'salida',
+          cantidad: -5,
+          stockResultante: 0,
+          esMerma: true,
+        }),
+      ).resolves.not.toThrow();
+    });
+  });
+
+  describe('movimientos_ajuste_cantidad_no_cero CHECK', () => {
+    it('rejects tipo = ajuste with cantidad = 0 (23514)', async () => {
+      const proveedor = await insertProveedorRow('Proveedor Uno');
+      const [producto] = await insertProducto({
+        nombre: 'Producto Uno',
+        sku: 'SKU-001',
+        precio: '10.00',
+        proveedorId: proveedor.id,
+      });
+      if (!producto) throw new Error('failed to insert fixture producto');
+      const usuario = await insertUsuarioRow();
+
+      await expect(
+        db.insert(movimientos).values({
+          productoId: producto.id,
+          usuarioId: usuario.id,
+          tipo: 'ajuste',
+          cantidad: 0,
+          stockResultante: 5,
+        }),
+      ).rejects.toMatchObject({ cause: { code: '23514' } });
+    });
+
+    it('accepts tipo = ajuste with a nonzero cantidad', async () => {
+      const proveedor = await insertProveedorRow('Proveedor Uno');
+      const [producto] = await insertProducto({
+        nombre: 'Producto Uno',
+        sku: 'SKU-001',
+        precio: '10.00',
+        proveedorId: proveedor.id,
+      });
+      if (!producto) throw new Error('failed to insert fixture producto');
+      const usuario = await insertUsuarioRow();
+
+      await expect(
+        db.insert(movimientos).values({
+          productoId: producto.id,
+          usuarioId: usuario.id,
+          tipo: 'ajuste',
+          cantidad: 3,
+          stockResultante: 3,
+        }),
+      ).resolves.not.toThrow();
+    });
+  });
+
   describe('productos_sku_lower_unique', () => {
     it('collides on SKUs differing only by case, keeping the surviving row original casing', async () => {
       const proveedor = await insertProveedorRow('Proveedor Uno');
