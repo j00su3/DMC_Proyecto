@@ -438,12 +438,21 @@ above; drop it under schedule pressure before touching S1–S4 or S5-core.
 **Forecast: ~0 prod / ~350 test = ~350 raw diff. Under budget alone, but this is exactly the
 breadth `design.md` names as safe to cut first.**
 
-- [ ] 9.1 RED/GREEN `apps/api/src/routes/productos.integration.test.ts` (extend) — real `deposito`
+- [x] 9.1 RED/GREEN `apps/api/src/routes/productos.integration.test.ts` (extend) — real `deposito`
       session refused on deactivate/reactivate, table unchanged afterward; real `deposito` session
       with `stock_minimo` in the payload refused, no row written; exactly one `auditoria` row per
       mutation type (`crear`/`actualizar`/`baja_logica`/`reactivar`) with `entidad = 'productos'`;
-      search (`?q=`) and pagination against a real seeded table, asserting both `data` and `total`
-- [ ] 9.2 Verify: `pnpm --filter api test:integration`, `pnpm typecheck`, `pnpm lint`
+      search (`?q=`) and pagination against a real seeded table, asserting both `data` and `total`.
+      All four passed on first run against already-shipped production code (same shape as 8.1 — no
+      RED-from-missing-implementation was possible). Two mutation probes confirmed the tests are not
+      vacuous: (1) removing `roles: ['encargado']` from the deactivate/reactivate route config made
+      the RBAC test fail with "expected 403 to be 200"; (2) dropping the search predicate from the
+      count-only query in `DrizzleProductosRepo.list` (repository.ts:109-112) made the search test
+      fail with "expected 4 to be 3" (`total` reverting to the whole-table count). Both mutations
+      reverted; `git diff` clean before commit. `stockMinimo` re-proof covers only the create route
+      (not PATCH) to keep the diff small — the PATCH-side guard is already proven against fakes in
+      `productos/service.test.ts`, and this integration slice's only job is the real-DB wiring proof.
+- [x] 9.2 Verify: `pnpm --filter api test:integration`, `pnpm typecheck`, `pnpm lint`
 
 ## Phase 10: S6a — Web: List Screen + Pagination
 
