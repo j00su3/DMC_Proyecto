@@ -112,6 +112,10 @@ function harness(
       id: 'mov-1',
       ...(input as object),
     })),
+    listByProducto: spy('movimientos.listByProducto', async () => ({
+      rows: [],
+      total: 0,
+    })),
   };
 
   const auditoria = { record: spy('auditoria.record', async () => {}) };
@@ -184,6 +188,7 @@ describe('crearProducto', () => {
       cantidad: 50,
       motivo: 'stock inicial (alta de producto)',
       esDiscrepancia: false,
+      esMerma: false,
       usuarioId: ACTOR_ENCARGADO_ID,
       stockResultante: 999,
     });
