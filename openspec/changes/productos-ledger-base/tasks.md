@@ -528,20 +528,30 @@ fetched from `GET /api/proveedores?page=1&pageSize=100` and filtered client-side
 remaining create-form work on `feat/productos-s7a-form`, which imports `ProveedorSelector` rather
 than re-deriving it.
 
-- [ ] 12.1 RED `apps/web/src/routes/productosNuevo.test.tsx` (new) — a `deposito` session sees
+- [x] 12.1 RED `apps/web/src/routes/productosNuevo.test.tsx` (new) — a `deposito` session sees
       `stock_minimo` visible, disabled, with 🔒 (present, not hidden — the visible-locks convention
       from `usuarios-ui`); an `encargado` session can type into it; the initial-stock field is
       present and, on submit with a value `> 0`, reaches `POST /api/productos` as `stockInicial`;
       the supplier selector offers only suppliers with `activo: true` (fetched via
       `GET /api/proveedores`, filtered client-side or via query param per whatever
       `proveedores`'s list route already supports); a `SKU_ALREADY_IN_USE` response renders its
-      mapped message inline, not a toast-only generic error
-- [ ] 12.2 GREEN `apps/web/src/features/productos/schemas.ts`, `useCrearProducto.ts` (new)
-- [ ] 12.3 GREEN `apps/web/src/features/productos/ProductoForm.tsx` (new, create mode) —
-      `react-hook-form` + Zod resolver, mirroring `UsuarioForm.tsx`'s shape
-- [ ] 12.4 GREEN `apps/web/src/routes/productosNuevo.tsx` (new) — `productosNuevoRoute` at
+      mapped message inline, not a toast-only generic error. **Apply note**: `GET /api/proveedores`
+      supports only `page`/`pageSize` (confirmed against `routes/proveedores.ts`), so filtering is
+      client-side (shipped on `feat/productos-s7a-selector`). "Allows an encargado to type" and
+      "offers only active suppliers" were combined into one test (same session, no conflict) to
+      stay under budget — all five assertions from this task's prose are still proven.
+- [x] 12.2 GREEN `apps/web/src/features/productos/schemas.ts`, `useCrearProducto.ts` (new)
+- [x] 12.3 GREEN `apps/web/src/features/productos/ProductoForm.tsx` (new, create mode) —
+      `react-hook-form` + Zod resolver, mirroring `UsuarioForm.tsx`'s shape. **Apply note**: no
+      `<select>` primitive exists in `components/ui/` — `ProveedorSelector.tsx` (shipped on
+      `feat/productos-s7a-selector`) is the explicit exception per instruction #5, styled to match
+      `UsuarioForm.tsx`'s inline `rol` select. `ProductoForm`'s own layout uses inline styles, not a
+      CSS module, to stay under the 400-line budget on `feat/productos-s7a-form`.
+- [x] 12.4 GREEN `apps/web/src/routes/productosNuevo.tsx` (new) — `productosNuevoRoute` at
       `/inventario/nuevo` under `shellLayout`
-- [ ] 12.5 Verify: `pnpm --filter web test`, `pnpm typecheck`, `pnpm lint`
+- [x] 12.5 Verify: `pnpm --filter web test` (187/187), `pnpm typecheck`, `pnpm lint`, all green on
+      `feat/productos-s7a-form` (399 raw diff lines) and `feat/productos-s7a-selector` (219 raw diff
+      lines, includes this doc note) — both under the 400-line budget.
 
 ## Phase 13: S7b — Web: Edit Form + Deactivate/Reactivate Controls (stretch, first two items to drop
 within S7)
