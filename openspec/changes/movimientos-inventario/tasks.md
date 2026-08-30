@@ -279,7 +279,7 @@ on S4 (`schema.d.ts` must carry the `movimientos` paths).
 
 **Forecast: ~120 prod / ~90 test ≈ 210 raw diff. Under budget.**
 
-- [ ] 6.1 RED `apps/web/src/features/movimientos/errorMessages.test.ts` (new, mirrors
+- [x] 6.1 RED `apps/web/src/features/movimientos/errorMessages.test.ts` (new, mirrors
       `productos/errorMessages.test.ts`) — each of `FORBIDDEN`, `MOVEMENT_REASON_REQUIRED`,
       `VALIDATION_ERROR`, `PRODUCT_NOT_FOUND`, `PRODUCT_INACTIVE`, `INSUFFICIENT_STOCK` renders a
       distinct message; `INSUFFICIENT_STOCK`'s message interpolates `details.available` (the
@@ -291,19 +291,25 @@ on S4 (`schema.d.ts` must carry the `movimientos` paths).
       Mapping the original two would have shipped dead branches while the codes users actually
       receive fell through to the generic fallback — the exact failure this correction exists to
       prevent. See both spec correction notes.
-- [ ] 6.2 GREEN `apps/web/src/features/movimientos/errorMessages.ts` (new) — switch on the six codes,
+- [x] 6.2 GREEN `apps/web/src/features/movimientos/errorMessages.ts` (new) — switch on the six codes,
       narrowing `ApiError.details` (`apps/web/src/api/errors.ts:12-13`) for `INSUFFICIENT_STOCK` only.
-- [ ] 6.3 GREEN `apps/web/src/features/movimientos/queries.ts` (new) — key factory,
+- [x] 6.3 GREEN `apps/web/src/features/movimientos/queries.ts` (new) — key factory,
       `movimientosListQueryOptions(productoId, page)`, mirroring `features/productos/queries.ts`'s
       invalidate-never-`setQueryData` rule.
-- [ ] 6.4 GREEN `apps/web/src/features/movimientos/useMovimientos.ts`,
+- [x] 6.4 GREEN `apps/web/src/features/movimientos/useMovimientos.ts`,
       `useRegistrarMovimiento.ts` (new) — the latter has three thin wrappers
       (`entrada`/`salida`/`ajuste`) or one mutation parameterized by `operacion`, matching whichever
       shape `routes/movimientos.ts` (S4) actually exposes.
-- [ ] 6.5 GREEN `apps/web/src/features/movimientos/schemas.ts` (new) — `movimientoFormSchema` per D9's
+      → Implemented as three thin wrappers (`entrada`/`salida`/`ajuste`), one per distinct request
+      body shape in `routes/movimientos.ts` (D7's table). All three invalidate
+      `movimientosKeys.lists()` and `productosKeys.detail(productoId)` on success.
+- [x] 6.5 GREEN `apps/web/src/features/movimientos/schemas.ts` (new) — `movimientoFormSchema` per D9's
       exact shape (`eleccion`, `cantidad`, `direccion`, `esDiscrepancia`, `motivo`, `superRefine`
       keyed on `eleccion === 'ajuste' || eleccion === 'merma'` and `MOTIVO_MIN_LENGTH = 3`).
-- [ ] 6.6 Verify S6: `pnpm --filter web test`, `pnpm typecheck`, `pnpm lint`.
+- [x] 6.6 Verify S6: `pnpm --filter web test`, `pnpm typecheck`, `pnpm lint`.
+      → All exit 0. web: 212/212 passing (194 baseline + 18 new). typecheck: api + web both "Done".
+      lint (biome ci .): 232 files checked, no fixes applied. `pnpm contract:check`: byte-identical
+      (no route touched, no schema.d.ts drift).
 
 ## Phase S7a — Web: Modal Step 1 (choice cards, role hiding, shell wiring)
 
@@ -360,6 +366,17 @@ Per Product, Paginated**. Depends on S6 (queries) and S7b (modal complete).
       displayed `stock_actual` reflects the response's updated product; the history list below the
       form renders rows from `GET .../movimientos`, paginated, and a merma row is visually
       distinguishable from an ordinary salida.
+      **Added 2026-08-30 — required, not optional**: after a successful registration, assert the
+      history list **gains the new row without a manual reload**. `useRegistrarMovimiento`
+      refreshes it by invalidating `movimientosKeys.lists()`, and TanStack Query matches
+      invalidations by key PREFIX, so a `list()` key that stops nesting under `lists()` is never
+      matched: every registration succeeds, the ledger is written correctly, and the table on
+      screen silently keeps showing stale rows with no error anywhere. That exact mutation was run
+      against S6 on 2026-08-30 and the entire web suite stayed green, `typecheck` passed, and only
+      the formatter complained — about line length. `features/movimientos/queries.test.ts` now
+      guards the key's shape, but shape is not behaviour: this assertion is the half that proves
+      the screen actually updates. CLAUDE.md's "route-level coverage, not just hook-level" names
+      this exact failure, and it has already shipped twice in this project.
 - [ ] 8.2 GREEN `apps/web/src/features/movimientos/MovimientosTable.tsx` (new) — renders `tipo`,
       `cantidad`, `stockResultante`, `motivo`, a merma badge/chip, `fecha`, `usuarioId`.
 - [ ] 8.3 GREEN `apps/web/src/routes/productosDetalle.tsx` (modify) — add the trigger button (hidden,
