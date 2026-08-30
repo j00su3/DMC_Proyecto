@@ -613,11 +613,11 @@ stacked branch once both land, since each task's own description bundles both co
 | 1.12–1.13 | Owner ran `pnpm db:migrate` with Neon's `DATABASE_URL`, then confirmed `productos` and `movimientos` in the Neon console. The `sslmode` deprecation warning is the discriminator: it fires only for a connection string carrying `sslmode`, which Neon requires and localhost does not. |
 | 1.14 | `GET /api/health` → `{"status":"ok","db":"up"}` after the migration and again after every merge since. |
 | 1.15 | PRs #58/#60 merged only after the above. |
-| 14.1 | Every `process.env` read in the repo is `DATABASE_URL`, `NODE_ENV`, `LOG_LEVEL` or `COOKIE_SECRET` — all pre-existing. No `.env*` file was read, written or referenced; `git ls-files` shows only `.env.example` tracked, and `.gitignore` covers `.env`. |
+| 14.1 | **No file this cycle created or changed reads any environment variable** — `productos/service.ts`, `productos/repository.ts`, `movimientos/repository.ts`, `routes/productos.ts`, `auditoria/fields.ts` and the whole `features/productos` UI return zero matches for `env.[A-Z_]+`. No `.env*` file was read, written or referenced; `git ls-files` shows only `.env.example` tracked, and `.gitignore` covers `.env`. **Corrected 2026-08-30:** an earlier version of this row claimed the repo's only env reads were `DATABASE_URL`, `NODE_ENV`, `LOG_LEVEL` and `COOKIE_SECRET`. That was false — `server.ts:8` reads `PORT` and `scripts/seed-encargado.ts:56-58` reads three `SEED_ENCARGADO_*` variables. All four are pre-existing and none is this cycle's, but the sentence overreached, and the grep behind it (`process.env.X`) structurally could not see reads made through a passed-in `env` parameter. Refuted by the independent claims-verifier pass. |
 | 14.2 | Every stacked PR was retargeted with `gh pr edit <n> --base main` before merging. The lower PR is merged **without** `--delete-branch`: that flag irrecoverably auto-closes the stacked PR above it (PR #59, lost this way; `gh pr reopen` and `gh pr edit --base` both refuse a closed PR). |
 | 14.3 | `design.md:510` and `:519` carry `[RECONCILE-1]` and `[RECONCILE-3]` ticked with the owner's explicit answers, not design defaults. |
 
-- [ ] 14.4 Confirm the claims-gate report (`openspec/changes/productos-ledger-base/claims-report.md`)
+- [x] 14.4 Confirm the claims-gate report (`openspec/changes/productos-ledger-base/claims-report.md`)
       is produced before this cycle reaches verify/archive, per `CLAUDE.md`'s claims gate section —
       out of scope for this tasks document to produce, in scope to not forget
 
