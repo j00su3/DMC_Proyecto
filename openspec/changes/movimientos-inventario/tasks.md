@@ -365,13 +365,27 @@ S7a (extends the same modal/form).
       request sent; merma salida with blank `motivo` refused before submit; ordinary salida with blank
       `motivo` allowed to progress; the `es_discrepancia` checkbox is present and functional on the
       ajuste step (RECONCILE-4); step 3 renders a summary line and the `Registrar movimiento` button;
-      a `409 INSUFFICIENT_STOCK { details: { available: 5 } }` response keeps the modal open and shows
-      a message containing `"5"`; a successful submit closes the modal.
+      given a `serverError` message containing `"5"`, the modal renders it and does **not** close;
+      a successful submit calls `onSubmit` with the wire payload.
 - [ ] 7.5 GREEN `MovimientoModal.tsx` (extend) — steps 2 and 3 per D9's table (quantity field variant
       by choice with `Stock disponible`/`Stock resultante` preview; `Sumar/Restar` segmented control
       + discrepancy checkbox for ajuste; motivo textarea labelled per requirement; summary line;
-      `trigger(['cantidad'])`/`trigger(['motivo'])` step gating); wire `useRegistrarMovimiento` (S6)
-      for submit; render server errors via `errorMessages.ts` (S6) without closing the modal.
+      `trigger(['cantidad'])`/`trigger(['motivo'])` step gating); accept a `serverError?: string`
+      prop and render it without closing the modal.
+
+> **Ownership resolved 2026-08-30.** As originally written, 7.4 and 7.5 had the modal own
+> `useRegistrarMovimiento` and map its own server errors. That contradicts this codebase: the
+> precedent is **presentational**. `features/productos/ProductoForm.tsx` takes only `isPending`
+> and form-level errors, while the route module `routes/productosNuevo.tsx` owns
+> `useCrearProducto` and `productosErrorMessage`. S7a already followed that precedent, and
+> breaking it here would leave two different ownership patterns for the same kind of form in the
+> same application.
+>
+> So the modal takes a `serverError?: string` prop carrying an already-mapped message and stays a
+> pure component. The end-to-end proof — a real `409 INSUFFICIENT_STOCK { details: { available: 5 } }`
+> becoming the text a user reads, with the modal still open — moves to **S8's route test**, where
+> `useRegistrarMovimiento` and `movimientosErrorMessage` actually live. Neither half is dropped:
+> each lands in the slice that owns the code it exercises.
 - [ ] 7.6 Verify S7b: `pnpm --filter web test`, `pnpm typecheck`, `pnpm lint`.
 
 ## Phase S8 — Web: Trigger + History List on `productosDetalle`
