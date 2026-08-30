@@ -5,32 +5,43 @@ import { TextField } from '../../components/ui/TextField.js';
 import styles from './ProductoForm.module.css';
 import { ProveedorSelector } from './ProveedorSelector.js';
 import {
+  type ActualizarProductoInput,
   type CrearProductoInput,
   type ProductoFormValues,
   productoFormSchema,
+  toActualizarProductoInput,
   toCrearProductoInput,
 } from './schemas.js';
 
-type ProductoFormProps = {
+/**
+ * `onSubmit`'s value type tracks `M`: `mode="edit"` narrows it to
+ * `ActualizarProductoInput` (no `stockInicial`, ever — S7b), the default
+ * `'create'` keeps `CrearProductoInput`. Avoids a second component per
+ * instruction #3 ("extend, don't duplicate").
+ */
+type ProductoFormProps<M extends 'create' | 'edit' = 'create'> = {
   producto: ProductoFormValues;
   /** Gates `stock_minimo` (D6) — UX affordance only, server 403 is the boundary. */
   actorRol: 'encargado' | 'deposito';
-  /** `'create'` (default): renders initial-stock. S7b adds `'edit'` instead of duplicating this. */
-  mode?: 'create' | 'edit';
-  onSubmit: (values: CrearProductoInput) => void;
+  /** `'create'` (default): renders initial-stock. `'edit'` (S7b) omits it entirely. */
+  mode?: M;
+  onSubmit: (
+    values: M extends 'edit' ? ActualizarProductoInput : CrearProductoInput,
+  ) => void;
   isPending?: boolean;
 };
 const STOCK_MINIMO_LOCK_REASON =
   'Solo un encargado puede modificar el stock mínimo. El servidor rechaza este campo si lo envía un usuario de depósito.';
 
 /** Presentational (route-module boundary, `UsuarioForm.tsx` precedent). */
-export function ProductoForm({
+export function ProductoForm<M extends 'create' | 'edit' = 'create'>({
   producto,
   actorRol,
-  mode = 'create',
+  mode,
   onSubmit,
   isPending,
-}: ProductoFormProps) {
+}: ProductoFormProps<M>) {
+  const resolvedMode = mode ?? 'create';
   // `formState.errors` is what makes productoFormSchema's messages reachable.
   // Without it the resolver still blocks submit, but silently: the user gets a
   // button that does nothing and no field is marked invalid. `TextField` and
@@ -48,7 +59,15 @@ export function ProductoForm({
   const isDeposito = actorRol === 'deposito';
 
   const submit = handleSubmit((values) => {
-    onSubmit(toCrearProductoInput(values, actorRol));
+    if (resolvedMode === 'edit') {
+      (onSubmit as (values: ActualizarProductoInput) => void)(
+        toActualizarProductoInput(values, actorRol),
+      );
+    } else {
+      (onSubmit as (values: CrearProductoInput) => void)(
+        toCrearProductoInput(values, actorRol),
+      );
+    }
   });
 
   return (
@@ -100,7 +119,7 @@ export function ProductoForm({
           )}
         </div>
 
-        {mode === 'create' && (
+        {resolvedMode === 'create' && (
           <TextField
             id="stockInicial"
             label="Stock inicial"
@@ -110,7 +129,7 @@ export function ProductoForm({
         )}
 
         <Button type="submit" variant="primary" isPending={isPending}>
-          Crear producto
+          {resolvedMode === 'edit' ? 'Guardar cambios' : 'Crear producto'}
         </Button>
       </div>
     </form>

@@ -565,6 +565,15 @@ duplicated).
 short, drop in this order per the top-level drop order: deactivate/reactivate controls first, the
 edit route second.
 
+**Apply-time split**: the combined S7b diff measured ~476 raw lines (including this doc), over the
+400-line budget. Per this cycle's own instruction ("split into two stacked branches rather than
+trim quality"), it is split exactly along the slice's own drop order: `feat/productos-s7b-edit`
+carries the edit route/form only (schemas, `useProducto`, `useActualizarProducto`, `ProductoForm`
+extension, `productosDetalleRoute`, and the two edit-half tests — ~310 raw lines), and a second
+branch stacked on top, `feat/productos-s7b-estado`, adds `useEstadoProducto` and the deactivate/
+reactivate controls plus their two tests (~170 raw lines). Checkboxes below are ticked on the
+stacked branch once both land, since each task's own description bundles both concerns.
+
 - [ ] 13.1 RED `apps/web/src/routes/productosDetalle.test.tsx` (new) — the edit form renders with no
       initial-stock input present; an `encargado` triggers deactivate and the row's chip updates
       from the response without a full reload; a `deposito` sees the deactivate/reactivate control

@@ -5,6 +5,7 @@ import { encargadoLayout } from './encargadoLayout.js';
 import { indexRoute } from './index.js';
 import { ingresarRoute } from './ingresar.js';
 import { productosListRoute } from './productos.js';
+import { productosDetalleRoute } from './productosDetalle.js';
 import { productosNuevoRoute } from './productosNuevo.js';
 import { publicLayout } from './publicLayout.js';
 import { shellLayout } from './shellLayout.js';
@@ -30,6 +31,7 @@ export const routeTree = rootRoute.addChildren([
       indexRoute,
       productosListRoute,
       productosNuevoRoute,
+      productosDetalleRoute,
       encargadoLayout.addChildren([
         usuariosListRoute,
         usuariosNuevoRoute,
