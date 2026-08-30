@@ -382,6 +382,74 @@ hace.
 
 **Required change type**: `CODE FIX`
 
+**Parcialmente resuelto el 2026-08-30 — mitad de la API, hecha; mitad del despliegue, pendiente.**
+
+Evidencia obtenida, no supuesta:
+
+```
+GET  https://inventienda-api.onrender.com/api/health          → 200
+POST https://inventienda-api.onrender.com/api/auth/login
+     con X-Forwarded-For: 203.0.113.99 forjado                → 401
+```
+
+El origen de Render responde directo, sin pasar por Vercel, y procesa una cabecera reenviada que el
+llamante inventó. Eso confirma lo que esta misma remediación advertía: **activar `trustProxy` a
+secas empeoraría el sistema**, porque convertiría un valor que el atacante controla en la clave del
+rate-limit — y tras cerrar SEC-001 ese límite es el único freno que queda contra la adivinación de
+contraseñas.
+
+*Hecho* (`apps/api/src/plugins/clientIp.ts`). `trustProxy` queda **apagado**. El rate-limit usa un
+`keyGenerator` que toma `X-Forwarded-For` **solo si** la petición trae además el secreto compartido
+`PROXY_SHARED_SECRET` en la cabecera `x-inventienda-proxy`, comparado en tiempo constante. En
+cualquier otro caso —sin secreto configurado, sin cabecera, con secreto incorrecto, sin
+`X-Forwarded-For`— cae a la dirección del socket, que es el comportamiento actual. **El cambio no
+puede tirar el sitio**: si el secreto nunca se configura, o Vercel deja de mandarlo, el límite sigue
+funcionando como hoy en lugar de rechazar tráfico.
+
+Verificación, la que este informe pedía textualmente: `routes/auth.test.ts` inyecta dos peticiones
+con `X-Forwarded-For` distintos sobre el mismo socket y afirma que **caen en un solo balde** (la
+segunda recibe `429`); otro test afirma que, con el secreto presentado, cada cliente reenviado
+obtiene el suyo. `plugins/clientIp.test.ts` cubre además el secreto incorrecto de la misma longitud.
+
+*Pendiente — decisión y acción del propietario.* Mientras Vercel no presente el secreto, el
+`keyGenerator` cae siempre al socket y los usuarios legítimos siguen compartiendo un balde. Cerrarlo
+requiere dos pasos que no son código de este repo y **no se hicieron aquí a propósito**: un
+`middleware.ts` en Vercel es la única vía para agregar una cabecera de petición (`rewrites` no lo
+permite y `headers` es para respuestas), y un archivo con ese nombre en la raíz lo toma el despliegue
+automáticamente — mal configurado, `/api/*` deja de rutear. Eso es una caída, no una degradación, y
+merece un despliegue que alguien pueda mirar.
+
+Pasos, cuando haya ventana para verificarlos:
+
+1. Generar un secreto (`openssl rand -base64 32`).
+2. Cargarlo como `PROXY_SHARED_SECRET` en Render, y como variable de entorno del proyecto en Vercel.
+3. Crear `middleware.ts` en la raíz del repo:
+
+```ts
+import { rewrite } from '@vercel/edge';
+
+export const config = { matcher: '/api/:path*' };
+
+export default function middleware(request: Request) {
+  const url = new URL(request.url);
+  return rewrite(
+    `https://inventienda-api.onrender.com${url.pathname}${url.search}`,
+    {
+      headers: {
+        'x-inventienda-proxy': process.env.PROXY_SHARED_SECRET ?? '',
+      },
+    },
+  );
+}
+```
+
+4. Quitar de `vercel.json` el rewrite de `/api/:path*`, que el middleware reemplaza.
+5. Verificar tras el despliegue: `/api/health` a través de Vercel sigue en `200`, y una petición
+   directa a Render con `X-Forwarded-For` forjado **no** obtiene un balde propio.
+
+Queda además abierto que la URL de Render siga siendo una puerta alternativa para todo lo demás: el
+secreto sólo decide a quién se le cree la cabecera, no cierra el origen.
+
 ---
 
 **ID**: SEC-004

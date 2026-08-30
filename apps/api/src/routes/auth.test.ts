@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../app.js';
 import type { AuditoriaRepo } from '../auditoria/repository.js';
 import { hashPassword } from '../auth/password.js';
 import type { SesionesRepo } from '../auth/repository.js';
 import type { MovimientosRepo } from '../movimientos/repository.js';
+import { PROXY_SECRET_HEADER } from '../plugins/clientIp.js';
 import type { ProductosRepo } from '../productos/repository.js';
 import type { ProveedoresRepo } from '../proveedores/repository.js';
 import type { Usuario, UsuariosRepo } from '../usuarios/repository.js';
@@ -200,6 +201,76 @@ describe('POST /api/auth/login', () => {
 
     expect(second.statusCode).toBe(429);
     expect(second.json().error.code).toBe('RATE_LIMITED');
+  });
+
+  // SEC-003's own "Suggested verification", verbatim: two requests with
+  // different X-Forwarded-For values over the same socket, asserting what the
+  // counting key actually is. The Render origin answers directly, so this is
+  // the shape of a real bypass attempt — and without the shared secret the two
+  // forged values must land in ONE bucket, not two.
+  it('counts two forged X-Forwarded-For values against a single bucket (SEC-003)', async () => {
+    app = await buildApp({
+      repos: fakeRepos({ findByEmail: async () => undefined }),
+      cookieSecret: COOKIE_SECRET,
+      rateLimitMax: 1,
+    });
+
+    const first = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      headers: { 'x-forwarded-for': '203.0.113.1' },
+      payload: { email: 'unknown@example.com', password: 'anything' },
+    });
+    expect(first.statusCode).toBe(401);
+
+    const second = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      headers: { 'x-forwarded-for': '203.0.113.2' },
+      payload: { email: 'unknown@example.com', password: 'anything' },
+    });
+
+    expect(second.statusCode).toBe(429);
+    expect(second.json().error.code).toBe('RATE_LIMITED');
+  });
+
+  it('gives each forwarded client its own bucket once the proxy secret is presented (SEC-003)', async () => {
+    vi.stubEnv('PROXY_SHARED_SECRET', 'test-shared-secret');
+    app = await buildApp({
+      repos: fakeRepos({ findByEmail: async () => undefined }),
+      cookieSecret: COOKIE_SECRET,
+      rateLimitMax: 1,
+    });
+    const proxied = (ip: string) => ({
+      'x-forwarded-for': ip,
+      [PROXY_SECRET_HEADER]: 'test-shared-secret',
+    });
+
+    const first = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      headers: proxied('203.0.113.1'),
+      payload: { email: 'unknown@example.com', password: 'anything' },
+    });
+    const otherClient = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      headers: proxied('203.0.113.2'),
+      payload: { email: 'unknown@example.com', password: 'anything' },
+    });
+    const sameClientAgain = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      headers: proxied('203.0.113.1'),
+      payload: { email: 'unknown@example.com', password: 'anything' },
+    });
+
+    // A real second client is not punished for the first one's traffic...
+    expect(first.statusCode).toBe(401);
+    expect(otherClient.statusCode).toBe(401);
+    // ...and the first client is still counted.
+    expect(sameClientAgain.statusCode).toBe(429);
+    vi.unstubAllEnvs();
   });
 });
 
