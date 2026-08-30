@@ -17,6 +17,13 @@ import {
 // POST /api/productos/:id/{deactivate,reactivate} below and registers this
 // plugin in app.ts (task 7.2), so `apps/api/openapi.json` now carries all
 // six `productos` paths (`pnpm contract:check` proves it post-regeneration).
+//
+// design.md D5 (backlog #6): routes/movimientos.ts also owns paths under
+// this same `/productos/*` prefix segment (`/productos/:id/movimientos*`),
+// registered separately in app.ts. Fastify resolves `/productos/:id` and
+// `/productos/:id/movimientos` as distinct paths, so the split ownership
+// is legal — this is the only place in the project where two route
+// plugins share a prefix segment.
 
 const productoDto = z.object({
   id: z.string(),

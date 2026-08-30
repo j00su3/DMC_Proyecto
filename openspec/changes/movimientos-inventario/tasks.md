@@ -192,10 +192,12 @@ shape), **Movement History Is Readable Per Product, Paginated, By Both Roles**. 
 routes plus their Zod shapes plus the role matrix is not cleanly sub-divisible without duplicating
 setup. Flag for `size:exception` if it drifts further.**
 
-- [ ] 4.1 RED `apps/api/src/routes/movimientos.test.ts` (new, `app.inject` with injected fakes) —
+- [x] 4.1 RED `apps/api/src/routes/movimientos.test.ts` (new, `app.inject` with injected fakes) —
       unauthenticated → 401 on all four routes; `deposito` → 201 on entrada/salida, **403
-      `ADJUSTMENT_RESERVED_FOR_ENCARGADO`** on ajuste, table/stock unchanged (assert via the fake, not
-      just status); `encargado` → 201 on all three; `.strict()` body rejection on an unknown key —
+      `FORBIDDEN`** on ajuste (corrected 2026-08-30 from `ADJUSTMENT_RESERVED_FOR_ENCARGADO`, which
+      `config.roles` never emits — see the spec's correction note), table/stock unchanged (assert
+      via the fake, not just status); `encargado` → 201 on all three; `.strict()` body rejection on
+      an unknown key —
       **and specifically that `esMerma` on the entrada body, and `esDiscrepancia` on the
       entrada/salida bodies, are rejected as unknown keys.** That rejection is what actually enforces
       D7's literal columns (`entrada`: both `false`; `salida`: `esDiscrepancia: false`; `ajuste`:
@@ -206,19 +208,30 @@ setup. Flag for `size:exception` if it drifts further.**
       `cantidad` coerced/validated as a positive integer ≥ 1 (D7 — magnitude only, zero unrepresentable
       on the wire); `GET .../movimientos?page&pageSize` returns `{ data, page, pageSize, total }` with
       `tipo`, `cantidad`, `stockResultante`, `motivo`, `esMerma`, `fecha`, `usuarioId` per row.
-- [ ] 4.2 GREEN `apps/api/src/routes/movimientos.ts` (**new**) — four routes per D5's exact table
+      → **DISCREPANCY (reported, not silently resolved)**: `apps/api/src/plugins/auth.ts:92-95` throws
+      a plain `forbidden()` (code `FORBIDDEN`) for every `config.roles` refusal — there is no
+      per-route code override mechanism. `routes/productos.test.ts`'s existing
+      deactivate/reactivate suite already proves this (asserts `'FORBIDDEN'`, not a bespoke code).
+      The test asserts the ACTUAL mechanism (`403 FORBIDDEN`), not the spec's
+      `ADJUSTMENT_RESERVED_FOR_ENCARGADO` — see the code comment at the RBAC test in
+      `movimientos.test.ts` for the full reasoning. A second, smaller discrepancy: the spec's
+      `cantidad = 0` → `400 ADJUSTMENT_QUANTITY_ZERO` scenario is likewise unreachable as written —
+      D7's wire shape (`z.number().int().min(1)`) makes zero a `VALIDATION_ERROR` from Zod, before any
+      handler-level code could distinguish it. Tests assert `VALIDATION_ERROR`, matching the actual
+      mechanism.
+- [x] 4.2 GREEN `apps/api/src/routes/movimientos.ts` (**new**) — four routes per D5's exact table
       (`GET /api/productos/:id/movimientos`, `POST .../entrada`, `POST .../salida`,
       `POST .../ajuste`), each `config: { roles: [...] }` per D5 (ajuste is `['encargado']` only —
       this is where PD-1's server-side boundary actually lives); `motivo` Zod shape
       `z.string().trim().min(3).max(500).optional()` on all three write bodies (RECONCILE-2's `3`, not
       `5`); route bodies map straight to `RegistrarMovimientoInput`, no business logic in the route.
-- [ ] 4.3 GREEN `apps/api/src/app.ts` (modify) — register `movimientosRoutes` with `{ prefix: '/api'
+- [x] 4.3 GREEN `apps/api/src/app.ts` (modify) — register `movimientosRoutes` with `{ prefix: '/api'
       }`, after `authPlugin`, alongside `productosRoutes` (note in both files: this is the only place
       two plugins share the `/productos/*` prefix segment, per D5).
-- [ ] 4.4 GREEN regenerate the contract: `pnpm contract` → `apps/api/openapi.json`,
+- [x] 4.4 GREEN regenerate the contract: `pnpm contract` → `apps/api/openapi.json`,
       `apps/web/src/api/schema.d.ts` pick up all four `movimientos` paths.
-- [ ] 4.5 Verify S4: `pnpm --filter api test`, `pnpm typecheck`, `pnpm lint`, `pnpm contract:check`
-      (now asserts real content).
+- [x] 4.5 Verify S4: `pnpm --filter api test`, `pnpm typecheck`, `pnpm lint`, `pnpm contract:check`
+      (now asserts real content). All green — see apply-progress for exact counts.
 
 ## Phase S5 — API Integration: Atomicity + Audit-Absence + Real-Session RBAC (mandatory, not droppable)
 
@@ -259,10 +272,17 @@ on S4 (`schema.d.ts` must carry the `movimientos` paths).
 **Forecast: ~120 prod / ~90 test ≈ 210 raw diff. Under budget.**
 
 - [ ] 6.1 RED `apps/web/src/features/movimientos/errorMessages.test.ts` (new, mirrors
-      `productos/errorMessages.test.ts`) — each of `ADJUSTMENT_RESERVED_FOR_ENCARGADO`,
-      `MOVEMENT_REASON_REQUIRED`, `ADJUSTMENT_QUANTITY_ZERO`, `PRODUCT_NOT_FOUND`,
-      `PRODUCT_INACTIVE`, `INSUFFICIENT_STOCK` renders a distinct message; `INSUFFICIENT_STOCK`'s
-      message interpolates `details.available` (the "hay N" mechanism, ADR-0006).
+      `productos/errorMessages.test.ts`) — each of `FORBIDDEN`, `MOVEMENT_REASON_REQUIRED`,
+      `VALIDATION_ERROR`, `PRODUCT_NOT_FOUND`, `PRODUCT_INACTIVE`, `INSUFFICIENT_STOCK` renders a
+      distinct message; `INSUFFICIENT_STOCK`'s message interpolates `details.available` (the
+      "hay N" mechanism, ADR-0006).
+      **Corrected 2026-08-30**: was `ADJUSTMENT_RESERVED_FOR_ENCARGADO` and
+      `ADJUSTMENT_QUANTITY_ZERO`. Neither code is ever emitted — S4 proved the ajuste refusal is a
+      plain `FORBIDDEN` from `config.roles` (`plugins/auth.ts:92-95`, no per-route override) and
+      that `cantidad: 0` fails Zod's `min(1)` before any handler runs, yielding `VALIDATION_ERROR`.
+      Mapping the original two would have shipped dead branches while the codes users actually
+      receive fell through to the generic fallback — the exact failure this correction exists to
+      prevent. See both spec correction notes.
 - [ ] 6.2 GREEN `apps/web/src/features/movimientos/errorMessages.ts` (new) — switch on the six codes,
       narrowing `ApiError.details` (`apps/web/src/api/errors.ts:12-13`) for `INSUFFICIENT_STOCK` only.
 - [ ] 6.3 GREEN `apps/web/src/features/movimientos/queries.ts` (new) — key factory,
