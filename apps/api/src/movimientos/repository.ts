@@ -1,3 +1,4 @@
+import { desc, eq, sql } from 'drizzle-orm';
 import type { DbExecutor } from '../db/client.js';
 import { movimientos } from '../db/schema.js';
 
@@ -8,6 +9,7 @@ export interface Movimiento {
   cantidad: number;
   motivo: string | null;
   esDiscrepancia: boolean;
+  esMerma: boolean;
   usuarioId: string;
   fecha: Date;
   ventaId: string | null;
@@ -20,17 +22,22 @@ export interface NuevoMovimiento {
   cantidad: number;
   motivo?: string | null;
   esDiscrepancia: boolean;
+  esMerma: boolean;
   usuarioId: string;
   ventaId?: string | null;
   stockResultante: number;
 }
 
-// `create` only, deliberately (tasks.md task 3.2, backlog #5 S2b). No other
-// method exists on this port yet — #6 extends it. This narrow port is what
-// makes the forced-failure fake in the Phase 6 atomicity test an honest full
-// replacement.
+// Two methods, deliberately narrow. `create` is from #5 (S2b). `listByProducto`
+// is from #6 (S2). The port is still narrow enough for a fake to be a full
+// replacement — every future writer (#7, #9) is forced to state `esMerma`.
 export interface MovimientosRepo {
   create(input: NuevoMovimiento): Promise<Movimiento>;
+  listByProducto(
+    productoId: string,
+    page: number,
+    pageSize: number,
+  ): Promise<{ rows: Movimiento[]; total: number }>;
 }
 
 // Mirrors proveedores/repository.ts's expectOneRow precedent.
@@ -57,11 +64,35 @@ export class DrizzleMovimientosRepo implements MovimientosRepo {
         cantidad: input.cantidad,
         motivo: input.motivo ?? null,
         esDiscrepancia: input.esDiscrepancia,
+        esMerma: input.esMerma,
         usuarioId: input.usuarioId,
         ventaId: input.ventaId ?? null,
         stockResultante: input.stockResultante,
       })
       .returning();
     return expectOneRow(rows, 'create');
+  }
+
+  async listByProducto(
+    productoId: string,
+    page: number,
+    pageSize: number,
+  ): Promise<{ rows: Movimiento[]; total: number }> {
+    const condition = eq(movimientos.productoId, productoId);
+
+    const rows = await this.db
+      .select()
+      .from(movimientos)
+      .where(condition)
+      .orderBy(desc(movimientos.fecha), desc(movimientos.id))
+      .limit(pageSize)
+      .offset((page - 1) * pageSize);
+
+    const totalRows = await this.db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(movimientos)
+      .where(condition);
+
+    return { rows, total: totalRows[0]?.total ?? 0 };
   }
 }

@@ -116,24 +116,24 @@ Satisfies spec (partially): **Merma Salida Is Persisted Distinctly** (repo half)
 
 **Forecast: ~90 prod / ~190 test ≈ 280 raw diff. Under budget.**
 
-- [ ] 2.1 RED `apps/api/src/movimientos/repository.integration.test.ts` (extend) — `create` persists
+- [x] 2.1 RED `apps/api/src/movimientos/repository.integration.test.ts` (extend) — `create` persists
       `esMerma` verbatim; `listByProducto(productoId, page, pageSize)` filters **and** counts by
       product (assert `total` directly, not `rows.length` — the D7 trap from #5); ordering is
       `desc(fecha), desc(id)`, newest first; a second product's rows never leak into the first's page.
-- [ ] 2.2 GREEN `apps/api/src/movimientos/repository.ts` (modify) — `Movimiento.esMerma: boolean`;
+- [x] 2.2 GREEN `apps/api/src/movimientos/repository.ts` (modify) — `Movimiento.esMerma: boolean`;
       `NuevoMovimiento.esMerma: boolean` **required** (mirrors `esDiscrepancia`, per D3); `create`
       writes `esMerma`; add `listByProducto` to `MovimientosRepo` port and `DrizzleMovimientosRepo`,
       per D4's exact signature (`{ rows, total }`, same shape as `ProductosRepo.list`).
-- [ ] 2.3 GREEN fix the compile break at `apps/api/src/productos/service.ts:110-118`
+- [x] 2.3 GREEN fix the compile break at `apps/api/src/productos/service.ts:110-118`
       (`crearProducto`'s `movimientos.create` call) — add `esMerma: false`.
-- [ ] 2.4 GREEN fix every existing `NuevoMovimiento` fixture/fake broken by the required field: search
+- [x] 2.4 GREEN fix every existing `NuevoMovimiento` fixture/fake broken by the required field: search
       `esDiscrepancia:` across `apps/api/src/**/*.test.ts` for co-located `NuevoMovimiento` literals
       (expected: `productos/service.test.ts`, `movimientos/repository.integration.test.ts`,
       `routes/productos.integration.test.ts` if any build one directly) and add `esMerma: false` to
       each. Confirm the actual break list against `pnpm typecheck` output before committing — do not
       assume the predicted list is complete (#5's task 3.5 already found the prediction incomplete
       once).
-- [ ] 2.5 Verify S2: `pnpm --filter api test`, `pnpm --filter api test:integration`, `pnpm typecheck`,
+- [x] 2.5 Verify S2: `pnpm --filter api test`, `pnpm --filter api test:integration`, `pnpm typecheck`,
       `pnpm lint`.
 
 ## Phase S3 — `movimientos/service.ts` (the core logic: D1, D2, D7, D8)

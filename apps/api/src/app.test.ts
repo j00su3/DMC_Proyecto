@@ -93,6 +93,7 @@ function fakeRepos() {
     } satisfies ProductosRepo,
     movimientos: {
       create: unusedRepoMethod,
+      listByProducto: unusedRepoMethod,
     } satisfies MovimientosRepo,
   };
 }

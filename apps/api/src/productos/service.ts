@@ -113,6 +113,7 @@ export async function crearProducto(
         cantidad: input.stockInicial,
         motivo: 'stock inicial (alta de producto)',
         esDiscrepancia: false,
+        esMerma: false,
         usuarioId: input.actor.id,
         stockResultante: stockActual,
       });

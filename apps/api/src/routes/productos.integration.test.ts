@@ -184,6 +184,7 @@ describe('POST /api/productos — atomicity proof (integration, real app + real 
               create: async () => {
                 throw new Error('forced movimientos failure');
               },
+              listByProducto: async () => ({ rows: [], total: 0 }),
             },
           }),
         ),
