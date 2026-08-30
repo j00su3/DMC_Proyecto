@@ -985,6 +985,37 @@ al horizonte de retención dejan de contener datos personales.
 
 **Required change type**: `PRODUCT / REQUIREMENT CHANGE`
 
+**Hallazgo del 2026-08-30 — un borde que la decisión del PRD no contempla. NO implementado.**
+
+Se evaluó aplicar la seudonimización y se frenó al encontrar la consecuencia. Queda registrada para
+que la decisión se tome sabiéndola, no descubriéndola después.
+
+`email` no puede simplemente quitarse de `auditableFields`: `auditoria/fields.test.ts` exige que toda
+columna de `usuarios` esté clasificada, así que el campo tiene que **moverse** a `excludedFields`. Eso
+es correcto y es lo que "seudonimizar" significa aquí.
+
+El problema aparece con un cambio que toque **únicamente** el correo. `usuarios/service.ts:206` arma
+el diff y solo escribe cuando hay algo distinto, de modo que la fila de auditoría sí se crea; después
+`recordAudit` aplica el filtro y le quita `email` a ambas instantáneas. Queda una fila
+`accion: 'actualizar'` con `datosPrevios` y `datosPosteriores` **vacíos**: un registro que afirma que
+algo cambió sin poder decir qué. Para quien lo lea dentro de un año eso parece un defecto del
+sistema, no una decisión de privacidad.
+
+Conviene separar dos cosas que se confunden fácil: **el correo actual nunca se pierde** —vive en
+`usuarios` y las bajas son lógicas, así que la fila permanece—. Lo que se pierde es el **historial
+del cambio**: se conserva quién y cuándo, no de qué valor a qué valor.
+
+Opciones, para decidir con tiempo:
+1. Aceptar el borde tal cual, documentado como limitación conocida. Es LOW y los cambios de correo
+   son infrecuentes; el no repudio (`usuario_id` + entidad + verbo + fecha) se conserva intacto.
+2. Guardar un marcador redactado (`email: '[redactado]'`) en ambas instantáneas en lugar de eliminar
+   la clave: se ve que el correo cambió sin conservar ninguno de los dos valores. Cuesta más, porque
+   el filtro actual elimina la clave en vez de reemplazarla.
+
+El costo de esperar es real y conviene tenerlo presente: cada mutación que ocurre deja otra fila con
+el correo dentro, y el propio backlog señala que esto se hace mejor **antes de que el volumen del
+rastro crezca**.
+
 ---
 
 ### INFO
