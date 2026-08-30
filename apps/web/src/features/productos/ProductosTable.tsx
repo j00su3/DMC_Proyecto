@@ -2,6 +2,8 @@ import {
   DataTable,
   type DataTableColumn,
 } from '../../components/ui/DataTable.js';
+import { StatusChip } from '../../components/ui/StatusChip.js';
+import { estadoStock } from './format.js';
 
 export type ProductoRow = {
   id: string;
@@ -41,11 +43,26 @@ const columns: DataTableColumn<ProductoRow>[] = [
     align: 'right',
     render: (row) => row.precio,
   },
+  {
+    key: 'estado',
+    header: 'Estado',
+    render: (row) => {
+      const estado = estadoStock(row.stockActual, row.stockMinimo);
+      if (estado === 'quiebre') {
+        return <StatusChip variant="danger" label="Quiebre" />;
+      }
+      if (estado === 'bajo') {
+        return <StatusChip variant="warning" label="Bajo" />;
+      }
+      return null;
+    },
+  },
 ];
 
 /**
  * Presentational, mirrors `UsuariosTable.tsx`'s route-module boundary.
- * Status chips and row actions land in S6b/S7b.
+ * Row actions (deactivate/reactivate) land in S7b. Status is derived
+ * client-side only (D9) — never a field read straight off the DTO.
  */
 export function ProductosTable({
   productos,
