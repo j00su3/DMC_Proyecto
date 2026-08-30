@@ -361,17 +361,48 @@ S7a (extends the same modal/form).
 
 **Forecast: ~180 prod / ~200 test ≈ 380 raw diff. Under budget.**
 
-- [ ] 7.4 RED `MovimientoModal.test.tsx` (extend) — Ajuste with quantity `0` refused before submit, no
+- [x] 7.4 RED `MovimientoModal.test.tsx` (extend) — Ajuste with quantity `0` refused before submit, no
       request sent; merma salida with blank `motivo` refused before submit; ordinary salida with blank
       `motivo` allowed to progress; the `es_discrepancia` checkbox is present and functional on the
       ajuste step (RECONCILE-4); step 3 renders a summary line and the `Registrar movimiento` button;
       given a `serverError` message containing `"5"`, the modal renders it and does **not** close;
       a successful submit calls `onSubmit` with the wire payload.
-- [ ] 7.5 GREEN `MovimientoModal.tsx` (extend) — steps 2 and 3 per D9's table (quantity field variant
+      → 13 new tests (7 component-level RTL + 6 pure-function: `computeStockResultante` ×4,
+      `buildSummaryLine` ×2) added; 2 existing S7a flow tests updated for the new per-choice field
+      labels (`Cantidad a retirar`, `Unidades`).
+      Confirmed RED first: 15 of 23 tests in the file failed (`computeStockResultante is not a
+      function`, `buildSummaryLine is not a function`, missing labels/text) before any production
+      code changed.
+- [x] 7.5 GREEN `MovimientoModal.tsx` (extend) — steps 2 and 3 per D9's table (quantity field variant
       by choice with `Stock disponible`/`Stock resultante` preview; `Sumar/Restar` segmented control
       + discrepancy checkbox for ajuste; motivo textarea labelled per requirement; summary line;
       `trigger(['cantidad'])`/`trigger(['motivo'])` step gating); accept a `serverError?: string`
       prop and render it without closing the modal.
+      → Implemented via two new exported pure functions (`computeStockResultante`,
+      `buildSummaryLine`) plus per-`eleccion` JSX branches in steps 2/3. `trigger(['cantidad'])` (already
+      present from S7a) continues to gate step 2→3 advancement — the same mechanism now also blocks a
+      zero-quantity ajuste, since `cantidad` shares one registered field across all variants. The
+      `motivo` gate is enforced by `handleSubmit`'s existing `zodResolver` validation at step 3's
+      final submit (the schema's `superRefine` already keys on `eleccion`), which is functionally
+      equivalent to an explicit `trigger(['motivo'])` call and requires no additional code — verified
+      by the mutation probe below. `stockActual` added as an optional prop (default `0`) so S7a's
+      existing call sites keep compiling; S8 wires the real `producto.stockActual`. `serverError`
+      renders via the existing `FormError` component, placed above the form, visible regardless of
+      step. All 23 tests in the file pass after implementation.
+      **Mutation-probe evidence (required, two probes)**:
+      (1) *Zero-quantity refusal* — changed `schemas.ts`'s `.refine((v) => Number(v) >= 1, ...)` to
+      `>= 0`. Result: "Ajuste with quantity 0 is refused before submit" failed —
+      `screen.getByLabelText('Unidades')` threw (`TestingLibraryElementError`, element not found)
+      because the wizard had advanced past step 2 to step 3 instead of staying blocked. Reverted;
+      `git diff --exit-code` on `schemas.ts` exits 0 (clean).
+      (2) *Conditional motivo gate* — changed the `superRefine`'s condition from
+      `v.eleccion === 'ajuste' || v.eleccion === 'merma'` to `v.eleccion === 'ajuste' ||
+      v.eleccion === 'ajuste'` (silently dropping the merma branch). Result: "a merma salida with
+      blank motivo is refused before submit" failed — `screen.findByText('Ingrese un motivo (mínimo
+      3 caracteres).')` timed out (the error never rendered) and the assertion trace showed the
+      wizard had reached the final actions with `Registrar movimiento` still clickable, i.e.
+      `onSubmit` would have fired. Reverted; `git diff --exit-code` on `schemas.ts` exits 0 (clean).
+      Neither probe is decorative — both proved load-bearing under mutation.
 
 > **Ownership resolved 2026-08-30.** As originally written, 7.4 and 7.5 had the modal own
 > `useRegistrarMovimiento` and map its own server errors. That contradicts this codebase: the
@@ -386,7 +417,13 @@ S7a (extends the same modal/form).
 > becoming the text a user reads, with the modal still open — moves to **S8's route test**, where
 > `useRegistrarMovimiento` and `movimientosErrorMessage` actually live. Neither half is dropped:
 > each lands in the slice that owns the code it exercises.
-- [ ] 7.6 Verify S7b: `pnpm --filter web test`, `pnpm typecheck`, `pnpm lint`.
+- [x] 7.6 Verify S7b: `pnpm --filter web test`, `pnpm typecheck`, `pnpm lint`.
+      → All exit 0. web: 239/239 passing (226 baseline + 13 new). typecheck: api + web both "Done".
+      lint (biome ci .): 236 files checked, no fixes applied (one `biome check --write` pass was
+      needed mid-session to fix import ordering in the extended test file; final run is clean).
+      `pnpm contract:check`: byte-identical, exit 0 (no route touched, no schema.d.ts drift).
+      Authored diff: 3 files, 398 insertions / 18 deletions (416 raw lines) — under the session's
+      800-line budget (forecast was ~380).
 
 ## Phase S8 — Web: Trigger + History List on `productosDetalle`
 

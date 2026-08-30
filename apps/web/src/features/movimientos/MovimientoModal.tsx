@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import type { paths } from '../../api/schema.js';
 import { Button } from '../../components/ui/Button.js';
+import { FormError } from '../../components/ui/FormError.js';
 import { Modal } from '../../components/ui/Modal.js';
 import styles from './MovimientoModal.module.css';
 import { type MovimientoFormValues, movimientoFormSchema } from './schemas.js';
@@ -28,6 +29,16 @@ export interface MovimientoModalProps {
   onClose: () => void;
   onSubmit: (submission: MovimientoWireSubmission) => void;
   isPending?: boolean;
+  /** Drives step 2's `Stock disponible`/`Stock resultante` preview (D9).
+   * Optional so S7a's existing call sites keep compiling; S8's route wires
+   * the real `producto.stockActual`. The preview is an affordance only —
+   * the server's `INSUFFICIENT_STOCK` response is authoritative. */
+  stockActual?: number;
+  /** An already-mapped server error message (owned by the caller — see
+   * `tasks.md`'s S7b ownership note). Rendered without closing the modal;
+   * this component never calls `useRegistrarMovimiento` or maps error
+   * codes itself, matching `ProductoForm.tsx`'s route-module boundary. */
+  serverError?: string;
 }
 
 type Step = 1 | 2 | 3;
@@ -89,6 +100,58 @@ export function toWireSubmission(
 }
 
 /**
+ * D9 step 2's live "Stock resultante: N" preview, and D9 step 3's summary
+ * line — both derive stock from the same delta rule D7 gives the service:
+ * `entrada` adds, `salida`/`merma` subtract, `ajuste` follows `direccion`.
+ * Pure and exported so the arithmetic is directly testable independent of
+ * the step UI. An affordance only — the server's committed
+ * `stockResultante` (from `aplicarDelta`) is authoritative, never this
+ * client-side estimate.
+ */
+export function computeStockResultante(
+  stockActual: number,
+  eleccion: MovimientoFormValues['eleccion'] | undefined,
+  cantidadRaw: string,
+  direccion: MovimientoFormValues['direccion'],
+): number {
+  const parsed = Number(cantidadRaw);
+  const magnitude = Number.isFinite(parsed) ? parsed : 0;
+
+  if (eleccion === 'entrada') {
+    return stockActual + magnitude;
+  }
+  if (eleccion === 'salida' || eleccion === 'merma') {
+    return stockActual - magnitude;
+  }
+  if (eleccion === 'ajuste') {
+    return direccion === 'restar'
+      ? stockActual - magnitude
+      : stockActual + magnitude;
+  }
+  return stockActual;
+}
+
+/** D9 step 3's read-only summary line, e.g. "Salida por merma · 3 unidades
+ * · stock resultante 9". */
+export function buildSummaryLine(
+  eleccion: MovimientoFormValues['eleccion'],
+  cantidadRaw: string,
+  stockResultante: number,
+): string {
+  const label =
+    ELECCION_OPTIONS.find((option) => option.value === eleccion)?.label ??
+    eleccion;
+  const cantidad = Number(cantidadRaw) || 0;
+  return `${label} · ${cantidad} unidades · stock resultante ${stockResultante}`;
+}
+
+/** D8's client-side echo, restated for the step-3 label: `motivo` reads as
+ * required only for `ajuste` and merma `salida`s. */
+function requiresMotivo(eleccion: MovimientoFormValues['eleccion']): boolean {
+  return eleccion === 'ajuste' || eleccion === 'merma';
+}
+
+/**
  * The 3-step movement-registration modal (D9), built on
  * `components/ui/Modal` with `closePolicy="casual"` — nothing here is a
  * one-time secret, so Escape and overlay dismissal stay enabled. One
@@ -96,11 +159,13 @@ export function toWireSubmission(
  * `zodResolver(movimientoFormSchema)`, matching `ProductoForm.tsx`'s
  * precedent.
  *
- * **S7a scope: step 1 only.** Steps 2 and 3 render generic
- * cantidad/motivo placeholders in this slice — enough to complete the flow
- * and prove the step-1 mapping end to end — and are replaced by D9's full
- * per-choice variant UI (stock preview, Sumar/Restar segmented control,
- * discrepancy checkbox) in S7b.
+ * **Steps 2-3 (S7b)** implement D9's full per-choice variant UI: a quantity
+ * label/hint that varies by `eleccion`, the ajuste-only `Sumar/Restar`
+ * segmented control and discrepancy checkbox, a live "Stock resultante"
+ * preview, a conditionally-labelled motivo textarea, and a read-only
+ * summary line. `serverError` is rendered without closing the modal — this
+ * component never maps error codes or calls the mutation hook itself, per
+ * the S7b ownership note in `tasks.md` (the `ProductoForm.tsx` precedent).
  *
  * Hiding/disabling the "Ajuste" card for a `deposito` actor is UX
  * convenience only, NOT the enforcement mechanism —
@@ -117,6 +182,8 @@ export function MovimientoModal({
   onClose,
   onSubmit,
   isPending = false,
+  stockActual = 0,
+  serverError,
 }: MovimientoModalProps) {
   const [step, setStep] = useState<Step>(1);
   const isDeposito = actorRol === 'deposito';
@@ -138,6 +205,18 @@ export function MovimientoModal({
   });
 
   const eleccion = watch('eleccion');
+  const cantidad = watch('cantidad');
+  const direccion = watch('direccion');
+  const motivoRequired = eleccion ? requiresMotivo(eleccion) : false;
+  const stockResultante = computeStockResultante(
+    stockActual,
+    eleccion,
+    cantidad,
+    direccion,
+  );
+  const summaryLine = eleccion
+    ? buildSummaryLine(eleccion, cantidad, stockResultante)
+    : '';
 
   async function goToStep3() {
     const valid = await trigger(['cantidad']);
@@ -162,6 +241,8 @@ export function MovimientoModal({
       </button>
       <div className={styles.divider} />
       <p className={styles.stepLabel}>{STEP_LABELS[step]}</p>
+
+      {serverError && <FormError message={serverError} />}
 
       <form onSubmit={submit} noValidate>
         {step === 1 && (
@@ -195,9 +276,57 @@ export function MovimientoModal({
 
         {step === 2 && (
           <div className={styles.stepBody}>
-            <label htmlFor="movimiento-cantidad" className={styles.fieldLabel}>
-              Cantidad
-            </label>
+            {eleccion === 'entrada' && (
+              <label
+                htmlFor="movimiento-cantidad"
+                className={styles.fieldLabel}
+              >
+                Cantidad a ingresar
+              </label>
+            )}
+
+            {(eleccion === 'salida' || eleccion === 'merma') && (
+              <label
+                htmlFor="movimiento-cantidad"
+                className={styles.fieldLabel}
+              >
+                Cantidad a retirar
+              </label>
+            )}
+
+            {eleccion === 'ajuste' && (
+              <>
+                <div
+                  className={styles.segmented}
+                  role="radiogroup"
+                  aria-label="Dirección del ajuste"
+                >
+                  <label className={styles.segmentedOption}>
+                    <input
+                      type="radio"
+                      value="sumar"
+                      {...register('direccion')}
+                    />
+                    Sumar
+                  </label>
+                  <label className={styles.segmentedOption}>
+                    <input
+                      type="radio"
+                      value="restar"
+                      {...register('direccion')}
+                    />
+                    Restar
+                  </label>
+                </div>
+                <label
+                  htmlFor="movimiento-cantidad"
+                  className={styles.fieldLabel}
+                >
+                  Unidades
+                </label>
+              </>
+            )}
+
             <input
               id="movimiento-cantidad"
               inputMode="numeric"
@@ -207,13 +336,26 @@ export function MovimientoModal({
             {errors.cantidad && (
               <span className={styles.error}>{errors.cantidad.message}</span>
             )}
+
+            {(eleccion === 'salida' || eleccion === 'merma') && (
+              <p className={styles.hint}>Stock disponible: {stockActual}</p>
+            )}
+
+            {eleccion === 'ajuste' && (
+              <label className={styles.checkboxLabel}>
+                <input type="checkbox" {...register('esDiscrepancia')} />
+                Marcar como discrepancia de inventario
+              </label>
+            )}
+
+            <p className={styles.hint}>Stock resultante: {stockResultante}</p>
           </div>
         )}
 
         {step === 3 && (
           <div className={styles.stepBody}>
             <label htmlFor="movimiento-motivo" className={styles.fieldLabel}>
-              Motivo
+              {motivoRequired ? 'Motivo' : 'Motivo (opcional)'}
             </label>
             <textarea
               id="movimiento-motivo"
@@ -223,6 +365,7 @@ export function MovimientoModal({
             {errors.motivo && (
               <span className={styles.error}>{errors.motivo.message}</span>
             )}
+            <p className={styles.summary}>{summaryLine}</p>
           </div>
         )}
 
