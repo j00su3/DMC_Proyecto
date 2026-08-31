@@ -1,0 +1,55 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px;
+  background: #ffffff;
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.nombre {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.sku {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-muted-soft);
+}
+
+.precio {
+  margin: 4px 0 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.stock {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--color-text-muted-strong);
+}
+
+.bloqueo {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-danger);
+}
