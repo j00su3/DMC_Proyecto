@@ -77,8 +77,8 @@ spec scenario. Ratified:
 
 ## Phase 4: Backend Real-DB Verification
 
-- [ ] 4.1 `apps/api/src/routes/ventas.integration.test.ts` — insufficient stock on last sorted item leaves zero new rows (assert DB, not status); correlativo gap after rollback; `pagos_vuelto_solo_efectivo`/`pagos_venta_id_medio_unique` reject; subtotal CHECK holds
-- [ ] 4.2 Concurrency test — two overlapping multi-item sales, opposite click order, assert no `40P01` (D3 invariant, proposal.md Medium risk)
+- [x] 4.1 `apps/api/src/routes/ventas.integration.test.ts` — insufficient stock on last sorted item leaves zero new rows (assert DB, not status); correlativo gap after rollback; `pagos_vuelto_solo_efectivo`/`pagos_venta_id_medio_unique` reject; subtotal CHECK holds
+- [x] 4.2 Concurrency test — two overlapping multi-item sales, opposite click order, assert no `40P01` (D3 invariant, proposal.md Medium risk)
 
 ## Phase 5: Frontend Cart Foundation
 
