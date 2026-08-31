@@ -509,11 +509,21 @@ Per Product, Paginated**. Depends on S6 (queries) and S7b (modal complete).
 
 ## Phase 9 — Bookkeeping
 
-- [ ] 9.1 Confirm no `.env*` file was touched or referenced by any task above, and no new environment
+- [x] 9.1 Confirm no `.env*` file was touched or referenced by any task above, and no new environment
       variable was introduced.
-- [ ] 9.2 If PRs are chained/stacked, retarget each PR to `main` as its predecessor merges
+- [x] 9.2 If PRs are chained/stacked, retarget each PR to `main` as its predecessor merges
       (`gh pr edit <n> --base main`) — GitHub does not auto-retarget.
-- [ ] 9.3 Update `docs/BACKLOG.md:41` marking backlog #6 complete, per project convention.
+- [x] 9.3 Update `docs/BACKLOG.md:41` marking backlog #6 complete, per project convention.
+      → Flipped to `✅ Hecho` with the two clarifications the cycle produced: merma is a `motivo`
+      on a `salida` persisted via `es_merma`, never a `tipo`; and the ajuste refusal for
+      `deposito` is a plain `403 FORBIDDEN` from `config.roles`, not a dedicated code.
+
+**Evidence for 9.1 and 9.2 (recorded 2026-08-30):**
+- 9.1 → `git log --name-only 5d7d37d..431fe3b` lists no `.env*` path, and the diff of `apps/`
+  introduces no new `process.env.*` read. No environment variable was added by this cycle.
+- 9.2 → Not needed. Every one of the ten PRs (#90-#99) was branched from a freshly-merged `main`
+  and targeted `main` directly, so no PR ever had another PR's branch as its base. That also means
+  the `--delete-branch` hazard that closed PR #59 in backlog #5 was never armed here.
 - [ ] 9.4 Confirm the claims-gate report
       (`openspec/changes/movimientos-inventario/claims-report.md`) is produced before this cycle
       reaches verify/archive, per `CLAUDE.md`'s claims gate section.
