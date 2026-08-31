@@ -82,10 +82,10 @@ spec scenario. Ratified:
 
 ## Phase 5: Frontend Cart Foundation
 
-- [ ] 5.1 `apps/web/src/features/pos/schemas.ts` — wire Zod schemas (`ItemVentaInput`/`PagoInput`)
-- [ ] 5.2 RED: `apps/web/src/features/pos/carrito.test.ts` — duplicate add merges (PD-3); explicit empty (PD-9); qty edit blocked past `stockActual` (PD-13)
-- [ ] 5.3 GREEN: `apps/web/src/features/pos/carrito.ts` — pure reducer
-- [ ] 5.4 RED+GREEN: `apps/web/src/features/pos/storage.ts` — versioned envelope `inventienda.pos.carrito.v1.<usuarioId>` (D14), corrupt/wrong-`v`/4h-TTL-expired/quota → empty cart, key removed, no throw
+- [x] 5.1 `apps/web/src/features/pos/schemas.ts` — wire Zod schemas (`ItemVentaInput`/`PagoInput`)
+- [x] 5.2 RED: `apps/web/src/features/pos/carrito.test.ts` — duplicate add merges (PD-3); explicit empty (PD-9); qty edit blocked past `stockActual` (PD-13)
+- [x] 5.3 GREEN: `apps/web/src/features/pos/carrito.ts` — pure reducer
+- [x] 5.4 RED+GREEN: `apps/web/src/features/pos/storage.ts` — versioned envelope `inventienda.pos.carrito.v1.<usuarioId>` (D14), corrupt/wrong-`v`/4h-TTL-expired/quota → empty cart, key removed, no throw
 
 ## Phase 6: Frontend Data Layer
 
