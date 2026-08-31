@@ -6,6 +6,7 @@ import type { MovimientosRepo } from '../movimientos/repository.js';
 import type { ProductosRepo } from '../productos/repository.js';
 import type { ProveedoresRepo } from '../proveedores/repository.js';
 import type { Usuario, UsuariosRepo } from '../usuarios/repository.js';
+import type { VentasRepo } from '../ventas/repository.js';
 
 const COOKIE_SECRET = 'test-cookie-secret-at-least-32-characters-long';
 
@@ -39,6 +40,7 @@ function fakeRepos(sesiones: Partial<SesionesRepo> = {}) {
     proveedores: {} as ProveedoresRepo,
     productos: {} as ProductosRepo,
     movimientos: {} as MovimientosRepo,
+    ventas: {} as VentasRepo,
   };
 }
 

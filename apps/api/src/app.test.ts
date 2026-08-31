@@ -6,6 +6,7 @@ import type { MovimientosRepo } from './movimientos/repository.js';
 import type { ProductosRepo } from './productos/repository.js';
 import type { ProveedoresRepo } from './proveedores/repository.js';
 import type { UsuariosRepo } from './usuarios/repository.js';
+import type { VentasRepo } from './ventas/repository.js';
 
 /**
  * `app.log.level` is the observable difference: Fastify swaps in a no-op
@@ -95,6 +96,11 @@ function fakeRepos() {
       create: unusedRepoMethod,
       listByProducto: unusedRepoMethod,
     } satisfies MovimientosRepo,
+    ventas: {
+      create: unusedRepoMethod,
+      createItems: unusedRepoMethod,
+      createPagos: unusedRepoMethod,
+    } satisfies VentasRepo,
   };
 }
 

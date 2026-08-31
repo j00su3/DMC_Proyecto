@@ -7,6 +7,7 @@ import type { MovimientosRepo } from '../movimientos/repository.js';
 import type { ProductosRepo } from '../productos/repository.js';
 import type { ProveedoresRepo } from '../proveedores/repository.js';
 import type { UsuariosRepo } from '../usuarios/repository.js';
+import type { VentasRepo } from '../ventas/repository.js';
 import { type Repos, buildRepos } from './repos.js';
 import reposPlugin from './repos.js';
 
@@ -24,6 +25,7 @@ describe('repos plugin', () => {
     const fakeProveedores = {} as ProveedoresRepo;
     const fakeProductos = {} as ProductosRepo;
     const fakeMovimientos = {} as MovimientosRepo;
+    const fakeVentas = {} as VentasRepo;
 
     await app.register(reposPlugin, {
       repos: {
@@ -33,6 +35,7 @@ describe('repos plugin', () => {
         proveedores: fakeProveedores,
         productos: fakeProductos,
         movimientos: fakeMovimientos,
+        ventas: fakeVentas,
       },
     });
     await app.ready();
@@ -43,6 +46,7 @@ describe('repos plugin', () => {
     expect(app.repos.proveedores).toBe(fakeProveedores);
     expect(app.repos.productos).toBe(fakeProductos);
     expect(app.repos.movimientos).toBe(fakeMovimientos);
+    expect(app.repos.ventas).toBe(fakeVentas);
 
     await app.close();
   });
@@ -59,6 +63,7 @@ describe('repos plugin', () => {
     expect(app.repos.proveedores).toBeDefined();
     expect(app.repos.productos).toBeDefined();
     expect(app.repos.movimientos).toBeDefined();
+    expect(app.repos.ventas).toBeDefined();
 
     await app.close();
   });
@@ -85,6 +90,7 @@ describe('repos plugin', () => {
         proveedores: {} as ProveedoresRepo,
         productos: {} as ProductosRepo,
         movimientos: {} as MovimientosRepo,
+        ventas: {} as VentasRepo,
       });
 
     await app.register(reposPlugin, { uow: { run: fakeRun } });
@@ -106,5 +112,6 @@ describe('buildRepos', () => {
     expect(repos.proveedores).toBeDefined();
     expect(repos.productos).toBeDefined();
     expect(repos.movimientos).toBeDefined();
+    expect(repos.ventas).toBeDefined();
   });
 });

@@ -69,11 +69,11 @@ spec scenario. Ratified:
 
 ## Phase 3: Backend Routes & Wiring
 
-- [ ] 3.1 `apps/api/src/productos/repository.ts`: additive `opts.soloActivos` on `list()` (D11), default unchanged
-- [ ] 3.2 RED: `apps/api/src/routes/ventas.test.ts` — 401/403 outside `['encargado','deposito']`; 201 body shape; bodyless/`Content-Type` POST parity (CLAUDE.md header caveat)
-- [ ] 3.3 GREEN: `apps/api/src/routes/ventas.ts` — `POST /api/ventas` (Zod `.strict()`), `GET /api/ventas/catalogo` (PD-8 exclude inactive, PD-12 alpha order)
-- [ ] 3.4 `apps/api/src/plugins/repos.ts`: add `ventas: VentasRepo`; `apps/api/src/app.ts`: register `ventasRoutes` under `/api`
-- [ ] 3.5 `pnpm contract` — regenerate `openapi.json`/`schema.d.ts`, stage before `contract:check`
+- [x] 3.1 `apps/api/src/productos/repository.ts`: additive `opts.soloActivos` on `list()` (D11), default unchanged
+- [x] 3.2 RED: `apps/api/src/routes/ventas.test.ts` — 401/403 outside `['encargado','deposito']`; 201 body shape; bodyless/`Content-Type` POST parity (CLAUDE.md header caveat)
+- [x] 3.3 GREEN: `apps/api/src/routes/ventas.ts` — `POST /api/ventas` (Zod `.strict()`), `GET /api/ventas/catalogo` (PD-8 exclude inactive, PD-12 alpha order)
+- [x] 3.4 `apps/api/src/plugins/repos.ts`: add `ventas: VentasRepo`; `apps/api/src/app.ts`: register `ventasRoutes` under `/api`
+- [x] 3.5 `pnpm contract` — regenerate `openapi.json`/`schema.d.ts`, stage before `contract:check`
 
 ## Phase 4: Backend Real-DB Verification
 

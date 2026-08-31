@@ -1,4 +1,4 @@
-import { type SQL, and, desc, eq, or, sql } from 'drizzle-orm';
+import { type SQL, and, asc, desc, eq, or, sql } from 'drizzle-orm';
 import type { DbExecutor } from '../db/client.js';
 import { productos } from '../db/schema.js';
 import { isUniqueViolation } from '../lib/db-errors.js';
@@ -39,11 +39,22 @@ export interface CambiosProducto {
   proveedorId?: string;
 }
 
+export interface ListProductosOpts {
+  // D11: additive-only. Undefined/false preserves today's behaviour
+  // (no `activo` filter, `creadoEn desc` order) — GET /api/productos is
+  // untouched. `true` is exercised by the new POS catalog read
+  // (routes/ventas.ts GET /api/ventas/catalogo, PD-8/PD-12): excludes
+  // `activo = false` entirely and orders alphabetically by `nombre` instead,
+  // since that ordering only makes sense once inactive rows are excluded.
+  soloActivos?: boolean;
+}
+
 export interface ProductosRepo {
   list(
     page: number,
     pageSize: number,
     q?: string,
+    opts?: ListProductosOpts,
   ): Promise<{ rows: Producto[]; total: number }>;
   findById(id: string): Promise<Producto | undefined>;
   findByIdForUpdate(id: string): Promise<Producto | undefined>;
@@ -90,6 +101,7 @@ export class DrizzleProductosRepo implements ProductosRepo {
     page: number,
     pageSize: number,
     q?: string,
+    opts?: ListProductosOpts,
   ): Promise<{ rows: Producto[]; total: number }> {
     const searchCondition: SQL | undefined = q
       ? or(
@@ -98,18 +110,30 @@ export class DrizzleProductosRepo implements ProductosRepo {
         )
       : undefined;
 
+    // D11: same condition applied to BOTH the page query and the count
+    // query — the D7 trap this file already documents applies equally here.
+    const whereCondition: SQL | undefined = opts?.soloActivos
+      ? searchCondition
+        ? and(eq(productos.activo, true), searchCondition)
+        : eq(productos.activo, true)
+      : searchCondition;
+
     const rows = await this.db
       .select()
       .from(productos)
-      .where(searchCondition)
-      .orderBy(desc(productos.creadoEn), desc(productos.id))
+      .where(whereCondition)
+      .orderBy(
+        ...(opts?.soloActivos
+          ? [asc(productos.nombre), asc(productos.id)]
+          : [desc(productos.creadoEn), desc(productos.id)]),
+      )
       .limit(pageSize)
       .offset((page - 1) * pageSize);
 
     const totalRows = await this.db
       .select({ total: sql<number>`count(*)::int` })
       .from(productos)
-      .where(searchCondition);
+      .where(whereCondition);
 
     return { rows, total: totalRows[0]?.total ?? 0 };
   }

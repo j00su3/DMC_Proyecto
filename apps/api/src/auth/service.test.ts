@@ -4,6 +4,7 @@ import type { MovimientosRepo } from '../movimientos/repository.js';
 import type { ProductosRepo } from '../productos/repository.js';
 import type { ProveedoresRepo } from '../proveedores/repository.js';
 import type { Usuario, UsuariosRepo } from '../usuarios/repository.js';
+import type { VentasRepo } from '../ventas/repository.js';
 import { hashPassword, verifyPassword } from './password.js';
 import type { SesionesRepo } from './repository.js';
 import { changePassword, login, logout, resolveSession } from './service.js';
@@ -253,6 +254,7 @@ function fakeUow(
     proveedores: {} as ProveedoresRepo,
     productos: {} as ProductosRepo,
     movimientos: {} as MovimientosRepo,
+    ventas: {} as VentasRepo,
   };
   const state = { committed: false, calls: 0 };
   async function run<T>(work: (r: typeof repos) => Promise<T>): Promise<T> {
