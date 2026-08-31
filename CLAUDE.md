@@ -92,7 +92,7 @@ audit row without its write, is a bug by construction.
 **The audit compile gate is sharper than it looks.** `entidadAuditoria` in
 `apps/api/src/db/schema.ts` already lists `usuarios`, `proveedores` and `productos`, so the pgEnum
 looks like it accepts anything. It does not matter:
-`AuditableEntidad = keyof typeof FIELD_CLASSIFICATION` (`apps/api/src/auditoria/service.ts:8`) is
+`AuditableEntidad = keyof typeof FIELD_CLASSIFICATION` (`apps/api/src/auditoria/service.ts:10`) is
 the real gate, and `recordAudit({ entidad: 'productos' })` will not compile until
 `apps/api/src/auditoria/fields.ts` gains a `productos` entry. Checking the enum proves the database
 would accept the value, not that the application builds. This has cost a correction once already.

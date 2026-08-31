@@ -22,7 +22,7 @@ Resolved by the orchestrator 2026-08-30, all four `[x] RESOLVED` in `design.md`'
   `create`. `NuevoMovimiento.esMerma` does not exist yet.
 - `crearProducto` (`apps/api/src/productos/service.ts:67-134`) calls `txRepos.movimientos.create`
   at `:110-118` without `esMerma` — this call site will not compile once `esMerma` becomes required.
-- `AuditableEntidad = keyof typeof FIELD_CLASSIFICATION` (`apps/api/src/auditoria/service.ts:8`,
+- `AuditableEntidad = keyof typeof FIELD_CLASSIFICATION` (`apps/api/src/auditoria/service.ts:10`,
   keys confirmed: `usuarios`, `proveedores`, `productos`) has exactly three keys. **No task below
   adds a fourth.**
 
@@ -451,7 +451,7 @@ Per Product, Paginated**. Depends on S6 (queries) and S7b (modal complete).
       guards the key's shape, but shape is not behaviour: this assertion is the half that proves
       the screen actually updates. CLAUDE.md's "route-level coverage, not just hook-level" names
       this exact failure, and it has already shipped twice in this project.
-      → 8 new tests (7 route-level + the file's existing 6 unaffected): active-product trigger
+      → 8 new tests (all 8 route-level + the file's existing 5 unaffected): active-product trigger
       shown/enabled for both roles; inactive-product trigger hidden; full entrada flow closes the
       modal and updates `Stock actual`; paginated history render; merma badge distinguishes a
       merma row from an ordinary salida; the owed "gains the new row without reload" assertion; the
@@ -524,9 +524,23 @@ Per Product, Paginated**. Depends on S6 (queries) and S7b (modal complete).
 - 9.2 → Not needed. Every one of the ten PRs (#90-#99) was branched from a freshly-merged `main`
   and targeted `main` directly, so no PR ever had another PR's branch as its base. That also means
   the `--delete-branch` hazard that closed PR #59 in backlog #5 was never armed here.
-- [ ] 9.4 Confirm the claims-gate report
+- [x] 9.4 Confirm the claims-gate report
       (`openspec/changes/movimientos-inventario/claims-report.md`) is produced before this cycle
       reaches verify/archive, per `CLAUDE.md`'s claims gate section.
+      → Produced 2026-08-30 against `7d0dedb`. 36 claims extracted verbatim from this file's 55
+      ticked boxes, the PR #90-#100 bodies, `CLAUDE.md` and `docs/TECH-DESIGNv2.md`, then handed
+      cold to a verifier that received the statements and nothing else — no report, no rationale,
+      no indication of which were expected to hold. Seven were settled by mutation; all seven
+      observed failure counts matched the claimed ones exactly. Working tree clean afterwards.
+      **Three claims came back REFUTED**, each re-verified independently before being written
+      down: (1) `AuditableEntidad` is at `auditoria/service.ts:10`, not `:8` — the stale citation
+      sat in this file AND in `CLAUDE.md:95`, where it is load-bearing; (2) the cycle's own
+      RECONCILE-2 (`max(500)`) reached the API but never the web form schema, so a 501-character
+      motivo passed the browser, was submitted, and came back as a bare `VALIDATION_ERROR` naming
+      no limit — every gate was green over that gap; (3) PR #99's body miscounted S8's new tests
+      (7 vs the actual 8) and contradicted its own total. All three corrected; the `max(500)` gap
+      was closed as its own TDD slice (RED → GREEN → off-by-one mutation failing exactly 2 tests
+      → revert). Web suite 247 → 250.
 
 ## Requirement Coverage Map
 

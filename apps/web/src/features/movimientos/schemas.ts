@@ -11,6 +11,20 @@ import { z } from 'zod';
 export const MOTIVO_MIN_LENGTH = 3;
 
 /**
+ * Mirrors the API's `max(500)` on `motivoSchema`
+ * (`apps/api/src/routes/movimientos.ts:27-32`), which applies to the body of
+ * all three write routes.
+ *
+ * Unlike the minimum, this ceiling is unconditional: it holds for every
+ * `eleccion`, including the ones where `motivo` is optional. The server has
+ * always enforced it, but until the claims gate caught the gap
+ * (`openspec/changes/movimientos-inventario/claims-report.md`, refuted claim
+ * 10) the form did not, so an over-long motivo was refused only after a round
+ * trip, as a generic `VALIDATION_ERROR` naming no limit.
+ */
+export const MOTIVO_MAX_LENGTH = 500;
+
+/**
  * Form-only: raw strings off `<input>`/`<select>`, parsed once at submit.
  * Follows `productoFormSchema`'s precedent (`features/productos/schemas.ts`).
  *
@@ -33,7 +47,10 @@ export const movimientoFormSchema = z
       .refine((v) => Number(v) >= 1, 'La cantidad debe ser al menos 1.'),
     direccion: z.enum(['sumar', 'restar']),
     esDiscrepancia: z.boolean(),
-    motivo: z.string().trim(),
+    motivo: z
+      .string()
+      .trim()
+      .max(MOTIVO_MAX_LENGTH, `Máximo ${MOTIVO_MAX_LENGTH} caracteres.`),
   })
   .superRefine((v, ctx) => {
     if (
