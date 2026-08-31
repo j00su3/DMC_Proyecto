@@ -187,8 +187,15 @@ Written at `tasks.md:61`. `git log -- apps/api/src/productos/service.ts` shows n
 in this cycle. Either the checkbox is wrong or the work is missing.
 ```
 
-The **Verified revision** line is load-bearing: the hook compares it against `HEAD` and
-refuses a merge when the report describes code that has since moved. Record the full sha.
+The **Verified revision** line is load-bearing: the hook refuses a merge when the report
+describes code that has since moved. Record the full sha of the revision you actually
+verified against.
+
+It does not have to be `HEAD`, and it cannot be: writing a sha into the report changes the
+report, which changes the sha, so a commit can never contain its own. Verify at a revision,
+then commit the report on top of it — the hook accepts a recorded revision behind `HEAD` as
+long as nothing outside `openspec/changes/<cycle>/` changed in between. Put any code or
+harness change in the commit you verify *at*, never in one after it.
 
 **Accepted unverifiable** must equal the UNVERIFIABLE count before the gate passes. It is
 the owner's signature that those claims ship unproven, on purpose. Never write it on the
@@ -206,7 +213,11 @@ still holding only proposal, spec, design and tasks is planning, and its claims 
 intent rather than code that exists, so it is not gated.
 
 - no `claims-report.md` at all;
-- a report whose `Verified revision` is not `HEAD` (stale — the code moved);
+- a report whose `Verified revision` is stale — either it cannot be resolved, or a file
+  outside `openspec/changes/<cycle>/` changed between it and `HEAD`, which means code moved
+  after the claims were proven. Being *behind* `HEAD` is not itself stale: the commit that
+  introduces the report cannot record its own sha, so a report is allowed to sit one or more
+  commits back as long as every commit since touches only the cycle's own folder;
 - a report with no verdict rows (empty is not passing);
 - one or more REFUTED claims;
 - UNVERIFIABLE claims the owner has not accepted on the record.

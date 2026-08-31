@@ -16,8 +16,11 @@ verifiable claim the cycle makes about this codebase, each `CONFIRMED`, `REFUTED
 archived with the cycle.
 
 A `PreToolUse` hook refuses `gh pr merge` while a cycle that has reached verify or archive
-has no report, a report whose `Verified revision` is not `HEAD`, or any refuted or
-unaccepted-unverifiable claim. Cycles still in planning are not gated.
+has no report, a report whose `Verified revision` is stale, or any refuted or
+unaccepted-unverifiable claim. Stale means the recorded revision cannot be resolved, or a
+file outside the cycle's own folder changed between it and `HEAD` — being merely *behind*
+`HEAD` is fine, because the commit that adds a report can never contain its own sha.
+Cycles still in planning are not gated.
 **Do not work around a refusal** — it is reporting a false statement that is still written
 down. Fix the claim or fix the code, then re-run the gate.
 

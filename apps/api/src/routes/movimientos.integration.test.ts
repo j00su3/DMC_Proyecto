@@ -376,4 +376,83 @@ describe('movimientos routes (integration, real app + real Postgres)', () => {
     expect(mermaRow?.esMerma).toBe(true);
     expect(ordinaryRow?.esMerma).toBe(false);
   });
+
+  /**
+   * Closes the one untested spec scenario `sdd-verify` found at `643dfb6`:
+   * `specs/inventory-movements/spec.md:104-112`, "Motivo Is Free Text With No
+   * Closed Reason List" / "Arbitrary reason text is accepted and stored
+   * verbatim" (PD-3). No assertion on `motivo` content existed anywhere in
+   * this module's tests — the behaviour was correct by inspection (a plain
+   * Drizzle `text` column with no transformation) but unproven at runtime,
+   * and "correct by inspection" is exactly what this project does not accept.
+   *
+   * Read back from the COLUMN, not from the response body: the requirement is
+   * about what is *persisted*. A handler echoing its own input satisfies a
+   * response-only assertion while writing something else.
+   *
+   * Two motivos, because the requirement has two halves. The first is the
+   * spec's own literal string, non-ASCII accents included, proving byte-exact
+   * storage. The second is deliberately nothing like an inventory reason,
+   * proving no closed list is consulted — a whitelist would reject it while
+   * still accepting the first.
+   *
+   * The wire schema applies `.trim()` (`routes/movimientos.ts:27-32`), so
+   * "verbatim" means the trimmed value is stored unaltered; both strings here
+   * have no leading or trailing whitespace, matching the spec's scenario.
+   */
+  it('7. motivo is free text: stored byte-exact in the column, with no closed reason list', async () => {
+    const encargado = await seedUsuario('encargado');
+    const proveedor = await seedProveedor();
+    const producto = await seedProducto(proveedor.id, 20);
+
+    app = await buildApp({ cookieSecret: COOKIE_SECRET });
+    await app.ready();
+    const sid = await loginAs(app, encargado.email);
+
+    const specMotivo = 'Conteo físico mensual';
+    const arbitraryMotivo = 'Se lo llevó el gato, 3er piso — ticket #42/A';
+
+    let response = await app.inject({
+      method: 'POST',
+      url: `/api/productos/${producto.id}/movimientos/ajuste`,
+      payload: {
+        cantidad: 2,
+        direccion: 'sumar',
+        esDiscrepancia: false,
+        motivo: specMotivo,
+      },
+      cookies: { sid },
+    });
+    expect(response.statusCode).toBe(201);
+
+    response = await app.inject({
+      method: 'POST',
+      url: `/api/productos/${producto.id}/movimientos/salida`,
+      payload: { cantidad: 1, esMerma: true, motivo: arbitraryMotivo },
+      cookies: { sid },
+    });
+    expect(response.statusCode).toBe(201);
+
+    const persisted = await db.execute(
+      sql`select cantidad, motivo from movimientos where producto_id = ${producto.id} order by cantidad desc`,
+    );
+    const rows = (
+      persisted as unknown as { rows: { cantidad: number; motivo: string }[] }
+    ).rows;
+    expect(rows).toHaveLength(2);
+    expect(rows[0]?.motivo).toBe(specMotivo);
+    expect(rows[1]?.motivo).toBe(arbitraryMotivo);
+
+    const history = await app.inject({
+      method: 'GET',
+      url: `/api/productos/${producto.id}/movimientos?page=1&pageSize=10`,
+      cookies: { sid },
+    });
+    expect(history.statusCode).toBe(200);
+    const motivos: string[] = history
+      .json()
+      .data.map((row: { motivo: string }) => row.motivo);
+    expect(motivos).toContain(specMotivo);
+    expect(motivos).toContain(arbitraryMotivo);
+  });
 });
