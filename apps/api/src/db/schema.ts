@@ -11,6 +11,7 @@ import {
   jsonb,
   numeric,
   pgEnum,
+  pgSequence,
   pgTable,
   text,
   timestamp,
@@ -211,8 +212,14 @@ export const movimientos = pgTable(
     fecha: timestamp('fecha', { withTimezone: true, mode: 'date' })
       .notNull()
       .defaultNow(),
-    // No FK — `ventas` does not exist until backlog #7.
-    ventaId: uuid('venta_id'),
+    // backlog #7 (punto-de-venta) D8 — column stays nullable (only
+    // `tipo = 'venta'` rows set it), but the FK is `restrict` like every
+    // other FK in this file except `sesiones.usuario_id`: a venta is
+    // append-only and never deleted, so `cascade` would document an intent
+    // that contradicts immutability.
+    ventaId: uuid('venta_id').references(() => ventas.id, {
+      onDelete: 'restrict',
+    }),
     stockResultante: integer('stock_resultante').notNull(),
   },
   (table) => [
@@ -243,6 +250,123 @@ export const movimientos = pgTable(
     check(
       'movimientos_ajuste_cantidad_no_cero',
       sql`${table.tipo} <> 'ajuste'::movimiento_tipo OR ${table.cantidad} <> 0`,
+    ),
+  ],
+);
+
+// Point of sale (backlog #7). See design.md D2-D10. `confirmarVenta` writes
+// one `ventas` row, N `items_venta` rows, and M `pagos` rows inside one
+// `uow.run`, alongside the `movimientos` rows it produces via the existing
+// `aplicarDelta` path (unmodified, D9 no audit entity added for `ventas`).
+export const ventaEstado = pgEnum('venta_estado', ['confirmada', 'anulada']);
+
+export const pagoEstado = pgEnum('pago_estado', ['registrado', 'revertido']);
+
+export const medioPago = pgEnum('medio_pago', [
+  'efectivo',
+  'tarjeta',
+  'transferencia',
+  'qr',
+]);
+
+// D7 — `numero_correlativo` defaults to `nextval(...)` on this sequence
+// rather than being generated in application code, so the value can never
+// be forgotten by a future writer. Verification step (tasks.md 1.5): run
+// `pnpm db:generate` twice; the second run must produce no migration. If
+// `pgSequence` does not round-trip cleanly, fall back to a hand-written
+// `CREATE SEQUENCE` in the generated SQL.
+export const ventasNumeroCorrelativoSeq = pgSequence(
+  'ventas_numero_correlativo_seq',
+  {
+    startWith: 1,
+    increment: 1,
+    minValue: 1,
+  },
+);
+
+export const ventas = pgTable(
+  'ventas',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    numeroCorrelativo: integer('numero_correlativo')
+      .notNull()
+      .default(sql`nextval('ventas_numero_correlativo_seq')`),
+    usuarioId: uuid('usuario_id')
+      .notNull()
+      .references(() => usuarios.id, { onDelete: 'restrict' }),
+    // D10 — `anulada_por` / `anulada_en` / `motivo_anulacion` are deferred
+    // to backlog #9; only the state column ships now.
+    estado: ventaEstado('estado').notNull().default('confirmada'),
+    total: numeric('total', { precision: 12, scale: 2 }).notNull(),
+    creadoEn: timestamp('creado_en', { withTimezone: true, mode: 'date' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('ventas_numero_correlativo_unique').on(table.numeroCorrelativo),
+  ],
+);
+
+export const itemsVenta = pgTable(
+  'items_venta',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ventaId: uuid('venta_id')
+      .notNull()
+      .references(() => ventas.id, { onDelete: 'restrict' }),
+    productoId: uuid('producto_id')
+      .notNull()
+      .references(() => productos.id, { onDelete: 'restrict' }),
+    cantidad: integer('cantidad').notNull(),
+    // D5 — the price read from `productos.precio` at confirmation time,
+    // never the client-submitted value.
+    precioUnitario: numeric('precio_unitario', {
+      precision: 12,
+      scale: 2,
+    }).notNull(),
+    subtotal: numeric('subtotal', { precision: 12, scale: 2 }).notNull(),
+  },
+  (table) => [
+    // D6 / D13 — PD-3, enforced at the database as the invariant that
+    // survives a future writer, mirroring `proveedores_nombre_lower_unique`.
+    uniqueIndex('items_venta_venta_id_producto_id_unique').on(
+      table.ventaId,
+      table.productoId,
+    ),
+    // Belt-and-braces (design.md): the database re-checks the JS
+    // arithmetic. Postgres `numeric × integer` is exact, so equality holds
+    // for every legitimate row; a violation can only ever be an internal
+    // arithmetic bug, never user input — same class as
+    // `movimientos_signo_tipo`.
+    check(
+      'items_venta_subtotal_igual_precio_por_cantidad',
+      sql`${table.subtotal} = ${table.precioUnitario} * ${table.cantidad}`,
+    ),
+  ],
+);
+
+export const pagos = pgTable(
+  'pagos',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ventaId: uuid('venta_id')
+      .notNull()
+      .references(() => ventas.id, { onDelete: 'restrict' }),
+    medio: medioPago('medio').notNull(),
+    monto: numeric('monto', { precision: 12, scale: 2 }).notNull(),
+    vuelto: numeric('vuelto', { precision: 12, scale: 2 })
+      .notNull()
+      .default('0'),
+    estado: pagoEstado('estado').notNull().default('registrado'),
+  },
+  (table) => [
+    // D6 — PD-7, "at most one payment row per medio".
+    uniqueIndex('pagos_venta_id_medio_unique').on(table.ventaId, table.medio),
+    // D6 — PD-2, "vuelto only on the cash row", structurally identical to
+    // `movimientos_merma_solo_salida`.
+    check(
+      'pagos_vuelto_solo_efectivo',
+      sql`${table.vuelto} = 0 OR ${table.medio} = 'efectivo'::medio_pago`,
     ),
   ],
 );
