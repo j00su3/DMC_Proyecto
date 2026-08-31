@@ -95,11 +95,11 @@ spec scenario. Ratified:
 
 ## Phase 7: Frontend UI
 
-- [ ] 7.1 `apps/web/src/features/pos/CatalogoGrid.tsx`+`.module.css` — PD-8 zero-stock visible/disabled add
-- [ ] 7.2 RTL test: `CatalogoGrid` inactive absent, zero-stock disabled
-- [ ] 7.3 `apps/web/src/features/pos/CarritoPanel.tsx`+`.module.css` — qty controls, empty-cart action
-- [ ] 7.4 `apps/web/src/features/pos/PagoPanel.tsx`+`.module.css` — multi-payment (PD-1/PD-7), vuelto on cash row only (PD-2)
-- [ ] 7.5 RTL tests: `CarritoPanel`/`PagoPanel` per above scenarios
+- [x] 7.1 `apps/web/src/features/pos/CatalogoGrid.tsx`+`.module.css` — PD-8 zero-stock visible/disabled add
+- [x] 7.2 RTL test: `CatalogoGrid` inactive absent, zero-stock disabled
+- [x] 7.3 `apps/web/src/features/pos/CarritoPanel.tsx`+`.module.css` — qty controls, empty-cart action
+- [x] 7.4 `apps/web/src/features/pos/PagoPanel.tsx`+`.module.css` — multi-payment (PD-1/PD-7), vuelto on cash row only (PD-2)
+- [x] 7.5 RTL tests: `CarritoPanel`/`PagoPanel` per above scenarios
 
 ## Phase 8: Route & Full-Flow Integration
 
