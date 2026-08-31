@@ -57,6 +57,47 @@ def head_sha(root):
     return out.stdout.strip() if out.returncode == 0 else None
 
 
+def code_moved_since(root, recorded, cycle):
+    """Files outside the cycle's own folder that changed since `recorded`.
+
+    The guarantee this gate owes is that a report never describes code that
+    has since moved. Demanding `Verified revision == HEAD` is a stricter
+    reading than that, and an unsatisfiable one: the commit that introduces
+    the report changes the very sha the report would have to contain, so no
+    amend can ever converge. A cycle whose closing commit carries its own
+    report could never pass.
+
+    So the real question is not "is this the tip?" but "has anything the
+    claims could be about changed since?". A commit that only touches
+    `openspec/changes/<cycle>/` — the report itself, tasks.md, the verify
+    report — moves no code and invalidates no claim. Anything else does.
+
+    Returns a sorted list of offending paths, or None when the recorded
+    revision cannot be resolved at all (an unknown sha proves nothing, and is
+    treated as stale by the caller).
+    """
+    try:
+        out = subprocess.run(
+            ["git", "diff", "--name-only", "{0}..HEAD".format(recorded)],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+    except Exception:
+        return None
+    if out.returncode != 0:
+        return None
+
+    prefix = "{0}/{1}/".format(CHANGES_DIR.replace("\\", "/"), cycle)
+    offenders = set()
+    for line in out.stdout.splitlines():
+        path = line.strip().replace("\\", "/")
+        if path and not path.startswith(prefix):
+            offenders.add(path)
+    return sorted(offenders)
+
+
 # A cycle that has reached verify or archive is closing, and its claims are about
 # code that now exists. A cycle still carrying only proposal/spec/design/tasks is
 # planning: its claims describe intent, and there is nothing yet to check them
@@ -108,11 +149,24 @@ def inspect(root, cycle, head):
 
     recorded = revision.group(1)
     if head and not (head.startswith(recorded) or recorded.startswith(head)):
-        return (
-            "{0} was verified against `{1}`, but HEAD is `{2}`.\n"
-            "  The report is stale: the code moved after the claims were proven.\n"
-            "  Re-run the claims-gate skill over the current revision."
-        ).format(rel, recorded[:12], head[:12])
+        moved = code_moved_since(root, recorded, cycle)
+        if moved is None:
+            return (
+                "{0} was verified against `{1}`, which cannot be resolved in this\n"
+                "  repository, so there is no way to tell what the claims describe.\n"
+                "  Re-run the claims-gate skill over the current revision."
+            ).format(rel, recorded[:12])
+        if moved:
+            shown = ", ".join(moved[:5])
+            more = "" if len(moved) <= 5 else " (+{0} more)".format(len(moved) - 5)
+            return (
+                "{0} was verified against `{1}`, but HEAD is `{2}` and these files\n"
+                "  changed in between: {3}{4}.\n"
+                "  The report is stale: the code moved after the claims were proven.\n"
+                "  Re-run the claims-gate skill over the current revision."
+            ).format(rel, recorded[:12], head[:12], shown, more)
+        # Behind HEAD, but every commit since touches only this cycle's own
+        # folder. No claim can have been invalidated, so the report stands.
 
     verdicts = [v.upper() for v in VERDICT_RE.findall(text)]
     if not verdicts:

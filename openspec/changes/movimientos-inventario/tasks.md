@@ -541,6 +541,15 @@ Per Product, Paginated**. Depends on S6 (queries) and S7b (modal complete).
       (7 vs the actual 8) and contradicted its own total. All three corrected; the `max(500)` gap
       was closed as its own TDD slice (RED → GREEN → off-by-one mutation failing exactly 2 tests
       → revert). Web suite 247 → 250.
+      → Re-verified at `3d302e1` after `sdd-verify`. That phase found one untested spec scenario
+      ("Motivo Is Free Text With No Closed Reason List") — nothing anywhere asserted `motivo`'s
+      content after a round trip. Closed by integration test 7, which reads the value back from
+      the column rather than the response body; mutating the service to lowercase `motivo` fails
+      exactly that test while all 332 unit tests stay green. Integration 135 → 136.
+      Arming the gate also exposed a defect in the harness itself: its revision check demanded
+      `Verified revision == HEAD`, which no commit introducing a report can satisfy. Repaired to
+      refuse on an unresolvable revision or any change outside the cycle folder, so a report may
+      sit behind HEAD but never survive a code change.
 
 ## Requirement Coverage Map
 

@@ -1,8 +1,14 @@
 # Claims Report: movimientos-inventario
 
-**Verified revision:** `7d0dedbfff2c3f94ac98df961af52c4b4f9cbb67`
+**Verified revision:** `3d302e1bf5da7e20fe81745a3244d7ca4e409c18`
 **Verified on:** 2026-08-30
 **Sources:** `tasks.md` (55 ticked checkboxes), PR #90–#100 bodies, `CLAUDE.md`, `docs/TECH-DESIGNv2.md`
+
+The batch was first settled at `7d0dedb`. Four claims were re-verified at the revision above
+after that pass's own findings were fixed: 1 and 10 (the corrections themselves), and 25 and
+26 (suite totals, which moved because the fixes added tests). `git diff --name-only
+7d0dedb..3d302e1` lists ten files; no other claim in this table cites any of them, so the
+remaining 32 verdicts stand on the evidence obtained at `7d0dedb`.
 
 Claims were extracted verbatim and handed to a cold verifier that received the statements
 and nothing else — no report, no rationale, no author summary, and no indication of which
@@ -41,7 +47,7 @@ is empty at the revision above.
 | 22 | "Every one of the ten PRs (#90-#99) … targeted `main` directly, so no PR ever had another PR's branch as its base." | `tasks.md:524-526` | `gh pr view` on all ten returns `baseRefName: main`; `git merge-base M^1 M^2 == M^1` for all ten merge commits | CONFIRMED |
 | 23 | "Domain errors … are thrown before `MovimientosRepo.create`, never derived from a caught CHECK violation." | `tasks.md:36-38` | read `movimientos/service.ts:41-53,95,111,114` and `repository.ts:52-74` | CONFIRMED |
 | 24 | api unit suite is at **332** passing | `tasks.md` 4.5 / PR #94 | ran `pnpm test` in `apps/api`: 27 files, 332 passed, exit 0 | CONFIRMED |
-| 25 | api integration is at **135/135** against real Docker Postgres | `tasks.md` 5.4 / PR #95 | container healthy; ran `pnpm test:integration`: 15 files, 135 passed, exit 0 | CONFIRMED |
+| 25 | api integration is at **135/135** against real Docker Postgres | `tasks.md` 5.4 / PR #95 | container healthy; ran `pnpm test:integration`: 15 files, 135 passed, exit 0 at `7d0dedb`. Now **136/136** — `sdd-verify`'s untested-scenario warning was closed with one more test | CONFIRMED |
 | 26 | web suite is at **247/247** | `tasks.md` 8.4 / PR #99 | ran `pnpm test` in `apps/web`: 44 files, 247 passed, exit 0 at `7d0dedb`. Now **250/250** — the fix for claim 10 added three tests | CONFIRMED |
 | 27 | "`pnpm typecheck`, `pnpm lint`, `pnpm contract:check` all exit 0" | `tasks.md` 8.4 | ran all three from the root; all exit 0, `contract:check` byte-identical | CONFIRMED |
 | 28 | PR #96 "web **216/216**" vs `tasks.md:310` "web: 212/212" | PR #96 / `tasks.md` 6.6 | `git log --follow` on `queries.test.ts` returns one commit, `89a4799`, the last on PR #96's branch; the file holds exactly 4 `it(` blocks; 212 + 4 = 216 | CONFIRMED |
@@ -148,14 +154,45 @@ one fixture fix". It is a historical record of what was claimed at merge time, n
 artifact archived with this cycle, and the correct figure is recorded here. Editing a merged
 PR body is an outward-facing change to a public record and was not taken unilaterally.
 
-## A bootstrap limitation in the harness itself, worth recording
+## A bootstrap defect in the harness, found and repaired
 
-`hooks/claims_gate.py` refuses a merge when the report's `Verified revision` is not `HEAD`.
-That check cannot be satisfied by the commit that introduces the report: writing a sha into
-the file changes the file, which changes the sha. Any amend chases its own tail.
+`hooks/claims_gate.py` refused a merge whenever the report's `Verified revision` was not
+`HEAD`. That check could not be satisfied by the commit that introduces the report: writing
+a sha into the file changes the file, which changes the sha. Any amend chases its own tail,
+so no closing cycle could ever pass.
 
-The gate is currently **inert** for this cycle — `closing_cycles()` arms only once the folder
-carries `verify-report.md` or `archive-report.md`, and it carries neither. So this does not
-block anything today. It will need a deliberate answer when `sdd-verify` runs, and the answer
-must not be to weaken the hook: the revision line is what stops a report describing code that
-has since moved.
+This was not theoretical. The moment `sdd-verify` wrote `verify-report.md` the cycle became
+closing, the gate armed, and it blocked with exactly that message.
+
+**Repaired, not relaxed.** The check now asks the question it actually owes — *has anything
+the claims could be about moved?* — and refuses when the recorded revision cannot be
+resolved, or when any file outside `openspec/changes/<cycle>/` changed between it and `HEAD`.
+Being merely behind `HEAD` is no longer stale by itself. The refusal also now names the
+offending files rather than only two shas.
+
+The guarantee survives intact: a report that predates a code change is still refused. The
+stale `7d0dedb` report was still correctly rejected under the new rule, naming `CLAUDE.md`
+and the two `schemas` files — which is why this report was re-verified at `3d302e1` rather
+than waved through.
+
+The discipline this puts on a closing cycle: **put every code and harness change in the
+commit you verify at, and let only the report land on top of it.** That is the order used
+here.
+
+## The untested spec scenario `sdd-verify` found
+
+`specs/inventory-movements/spec.md:104-112` — "Motivo Is Free Text With No Closed Reason
+List" — required an `ajuste` with `motivo: "Conteo físico mensual"` to read back exactly.
+Nothing in this module asserted `motivo`'s content anywhere. The behaviour was correct by
+inspection (a plain Drizzle `text` column, no transformation), and correct-by-inspection is
+precisely what this project does not accept.
+
+Closed by integration test 7, which reads both motivos back **from the column** rather than
+the response body — a handler echoing its own input satisfies a response-only assertion while
+persisting something else. Two strings, because the requirement has two halves: the spec's
+own literal, accents included, for byte-exact storage; and one nothing like an inventory
+reason, since a whitelist would reject that while still accepting the first.
+
+Mutation probe: made the service lowercase `motivo`. **Exactly 1 failure — the new test —
+while all 332 unit tests stayed green.** That is what the gap looked like from the inside,
+and why a full unit suite was never going to find it.
