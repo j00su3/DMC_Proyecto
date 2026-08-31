@@ -61,11 +61,11 @@ spec scenario. Ratified:
 
 ## Phase 2: Backend Domain Layer
 
-- [ ] 2.1 `apps/api/src/lib/errors.ts`: add D12 factories per RECONCILE-1 (codes/statuses above)
-- [ ] 2.2 `apps/api/src/ventas/repository.ts`: `VentasRepo` port + Drizzle adapter (`create`, `createItems`, `createPagos`, `findCatalogo`) — `proveedores/repository.ts` shape
-- [ ] 2.3 RED: `apps/api/src/ventas/service.test.ts` — fakes; assert `aplicarDelta` call order is producto_id-ascending regardless of input order (spec L148-158); price mismatch lists every line (spec L119-134); `Σpagos ≥ total` refused below (spec L63-67); cashless must equal exactly (spec L85-88); vuelto only on efectivo row; duplicate item/medio refused (RECONCILE-1)
-- [ ] 2.4 GREEN: `apps/api/src/ventas/service.ts` — `ordenarItems` (D3, named helper), `confirmarVenta` (D2 two-pass: Pass A price+payment validation, Pass B `aplicarDelta`+`movimientos.create`+inserts), `rechazarVenta`
-- [ ] 2.5 REFACTOR: extract payment-validation helpers if `confirmarVenta` exceeds one screen
+- [x] 2.1 `apps/api/src/lib/errors.ts`: add D12 factories per RECONCILE-1 (codes/statuses above)
+- [x] 2.2 `apps/api/src/ventas/repository.ts`: `VentasRepo` port + Drizzle adapter (`create`, `createItems`, `createPagos`) — `proveedores/repository.ts` shape. `findCatalogo` deliberately NOT included: D11 routes the POS catalog read through an additive `opts.soloActivos` on `ProductosRepo.list` (task 3.1, PR5), not through `VentasRepo`.
+- [x] 2.3 RED: `apps/api/src/ventas/service.test.ts` — fakes; assert `aplicarDelta` call order is producto_id-ascending regardless of input order (spec L148-158); price mismatch lists every line (spec L119-134); `Σpagos ≥ total` refused below (spec L63-67); cashless must equal exactly (spec L85-88); vuelto only on efectivo row; duplicate item/medio refused (RECONCILE-1)
+- [x] 2.4 GREEN: `apps/api/src/ventas/service.ts` — `ordenarItems` (D3, named helper), `confirmarVenta` (D2 two-pass: Pass A price+payment validation, Pass B `aplicarDelta`+`movimientos.create`+inserts), `rechazarVenta`
+- [x] 2.5 REFACTOR: extract payment-validation helpers if `confirmarVenta` exceeds one screen — reviewed; `confirmarVenta` stays inside one screen once `ordenarItems`/`rechazarVenta`/`conGuardaDeRango` are already named helpers, no further extraction needed
 
 ## Phase 3: Backend Routes & Wiring
 
