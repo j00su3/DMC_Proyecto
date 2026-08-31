@@ -109,9 +109,11 @@ spec scenario. Ratified:
 
 ## Phase 9: Cleanup
 
-- [ ] 9.1 `docs/BACKLOG.md:42` — flip on archive
+- [x] 9.1 `docs/BACKLOG.md:42` — flip on archive
       → Deferred to `sdd-archive`, per the #6 (movimientos-inventario) precedent: the backlog flip
-      landed in that cycle's archive PR (#104), not in apply. Not done here on purpose.
+      landed in that cycle's archive PR (#104), not in apply. Completed during sdd-archive: row 7
+      flipped to `✅ Archivado` with an embedded closing note (PRs #105-#114, closed and archived
+      2026-08-31), matching commit 87aa1f9's format used for row 6.
 - [x] 9.2 Release checklist note: run `pnpm db:migrate` before/with the last slice's deploy (Migration/Rollout)
 - [x] 9.3 Mutation-probe every test above before trusting it (CLAUDE.md)
 
