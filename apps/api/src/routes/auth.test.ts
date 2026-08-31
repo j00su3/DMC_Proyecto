@@ -8,6 +8,7 @@ import { PROXY_SECRET_HEADER } from '../plugins/clientIp.js';
 import type { ProductosRepo } from '../productos/repository.js';
 import type { ProveedoresRepo } from '../proveedores/repository.js';
 import type { Usuario, UsuariosRepo } from '../usuarios/repository.js';
+import type { VentasRepo } from '../ventas/repository.js';
 
 const COOKIE_SECRET = 'test-cookie-secret-at-least-32-characters-long';
 const PASSWORD = 'correct-horse-battery-staple';
@@ -55,6 +56,7 @@ function fakeRepos(
     proveedores: {} as ProveedoresRepo,
     productos: {} as ProductosRepo,
     movimientos: {} as MovimientosRepo,
+    ventas: {} as VentasRepo,
   };
 }
 

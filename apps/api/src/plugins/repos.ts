@@ -24,6 +24,7 @@ import {
   DrizzleUsuariosRepo,
   type UsuariosRepo,
 } from '../usuarios/repository.js';
+import { DrizzleVentasRepo, type VentasRepo } from '../ventas/repository.js';
 
 export interface Repos {
   usuarios: UsuariosRepo;
@@ -32,6 +33,7 @@ export interface Repos {
   proveedores: ProveedoresRepo;
   productos: ProductosRepo;
   movimientos: MovimientosRepo;
+  ventas: VentasRepo;
 }
 
 // Binds every repo to the same executor (design.md D1/D2). Called with the
@@ -47,6 +49,7 @@ export function buildRepos(executor: DbExecutor): Repos {
     proveedores: new DrizzleProveedoresRepo(executor),
     productos: new DrizzleProductosRepo(executor),
     movimientos: new DrizzleMovimientosRepo(executor),
+    ventas: new DrizzleVentasRepo(executor),
   };
 }
 

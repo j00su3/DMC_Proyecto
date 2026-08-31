@@ -23,6 +23,7 @@ import movimientosRoutes from './routes/movimientos.js';
 import productosRoutes from './routes/productos.js';
 import proveedoresRoutes from './routes/proveedores.js';
 import usuariosRoutes from './routes/usuarios.js';
+import ventasRoutes from './routes/ventas.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -132,6 +133,7 @@ export async function buildApp(
   // `/productos/:id/movimientos*`). Fastify resolves them as distinct
   // paths, so the split ownership is legal.
   app.register(movimientosRoutes, { prefix: '/api' });
+  app.register(ventasRoutes, { prefix: '/api' });
 
   app.setErrorHandler((error, _request, reply) => {
     const { status, body } = toErrorEnvelope(error);

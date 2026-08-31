@@ -11,6 +11,7 @@ import type {
   UsuarioResumen,
   UsuariosRepo,
 } from '../usuarios/repository.js';
+import type { VentasRepo } from '../ventas/repository.js';
 
 const COOKIE_SECRET = 'test-cookie-secret-at-least-32-characters-long';
 const TARGET_ID = '11111111-1111-4111-8111-111111111111';
@@ -84,6 +85,7 @@ function fakeRepos(
     proveedores: {} as ProveedoresRepo,
     productos: {} as ProductosRepo,
     movimientos: {} as MovimientosRepo,
+    ventas: {} as VentasRepo,
   };
 }
 

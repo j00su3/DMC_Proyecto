@@ -26,7 +26,6 @@ import type {
   NuevoPago,
   Pago,
   Venta,
-  VentasRepo,
 } from './repository.js';
 
 export type { MedioPago } from './repository.js';
@@ -49,14 +48,6 @@ export interface ConfirmarVentaInput {
   pagos: PagoInput[]; // >= 1
   actor: { id: string; rol: Rol };
 }
-
-// Until tasks.md task 3.4 (a later PR) wires `ventas: VentasRepo` into the
-// shared `Repos` interface + `buildRepos`, this service reaches for it via
-// a narrowing cast on the repos handed in by `uow.run`. The cast is safe:
-// every call site in this file only exists once a `VentasRepo` fake/adapter
-// is actually present on the object (tests inject it; PR5 wires it for
-// real).
-type VentasTxRepos = Repos & { ventas: VentasRepo };
 
 // D3 (ADR-0005/A3): a named helper, called once, so both passes iterate
 // only its result. `producto_id` ascending — plain string comparison is a
@@ -134,9 +125,7 @@ export async function confirmarVenta(
 
   const itemsOrdenados = ordenarItems(input.items);
 
-  return uow.run(async (repos) => {
-    const txRepos = repos as VentasTxRepos;
-
+  return uow.run(async (txRepos) => {
     // ── Pass A: read-only, sorted — price check, total, payment rules ──
     const mismatches: Array<{
       productoId: string;
