@@ -258,6 +258,86 @@ export function movementReasonRequired(): AppError {
   );
 }
 
+// design.md D12/D13, tasks.md RECONCILE-1 (resolved). English UPPER_SNAKE
+// per the two-naming-families rule. 400 — the request itself is
+// unrepresentable (a duplicate line the cart is supposed to have merged
+// before submission), not a state conflict.
+export function duplicateSaleItem(): AppError {
+  return new AppError(
+    'DUPLICATE_SALE_ITEM',
+    'A product cannot appear more than once in the same sale request',
+    400,
+  );
+}
+
+// design.md D12, RECONCILE-1: spec L101-104. 400 — same reasoning as
+// duplicateSaleItem(): the payload itself carries two rows for one medio,
+// which the cashier's UI is supposed to have combined before submission.
+export function paymentMediumDuplicated(): AppError {
+  return new AppError(
+    'PAYMENT_MEDIUM_DUPLICATED',
+    'A payment medium cannot appear more than once in the same sale request',
+    400,
+  );
+}
+
+// design.md D12, RECONCILE-1: spec L63-67 (PD-1). 409 — the request is
+// valid, but the current payment sum conflicts with the sale's total.
+// `details.total`/`details.pagado` are English camelCase (accountLocked's
+// `retryAfter`/insufficientStock's `available` precedent), both decimal
+// strings — same wire shape as every other money field.
+export function paymentBelowTotal(total: string, pagado: string): AppError {
+  return new AppError(
+    'PAYMENT_BELOW_TOTAL',
+    'The sum of payments is below the sale total',
+    409,
+    { total, pagado },
+  );
+}
+
+// design.md D12, RECONCILE-1: spec L85-88 (card-only exceeds total) and
+// proposal PD-10 (non-cash payments exceeding the total even alongside a
+// cash row — cash cannot correct a non-cash overcharge). 409 — the request
+// is valid, but the current non-cash payment sum conflicts with the total.
+export function cashlessPaymentMustMatchTotal(): AppError {
+  return new AppError(
+    'CASHLESS_PAYMENT_MUST_MATCH_TOTAL',
+    'Non-cash payments cannot exceed the sale total',
+    409,
+  );
+}
+
+// design.md D5/D12, RECONCILE-1: spec L119-134 (PD-6). 409 — the request is
+// valid, but the server's current price for one or more items conflicts
+// with the price the cashier last acknowledged. `details.items` lists every
+// mismatched line at once (D5) so re-confirmation is not a per-line loop.
+export function priceChanged(
+  items: Array<{
+    productoId: string;
+    precioEsperado: string;
+    precioActual: string;
+  }>,
+): AppError {
+  return new AppError(
+    'PRICE_CHANGED',
+    'One or more item prices changed since they were added to the sale',
+    409,
+    { items },
+  );
+}
+
+// design.md D1/D12: thrown when the dinero module's overflow guard trips
+// (MontoFueraDeRangoError) — see apps/api/src/lib/dinero.ts. 400 because the
+// request itself produced a value outside numeric(12,2)'s representable
+// range, never a raw Postgres 22003 (#6's S3 rule).
+export function saleAmountOutOfRange(): AppError {
+  return new AppError(
+    'SALE_AMOUNT_OUT_OF_RANGE',
+    'The sale amount is outside the representable range',
+    400,
+  );
+}
+
 export function toErrorEnvelope(error: unknown): MappedError {
   if (hasValidationErrors(error)) {
     return {
