@@ -1,0 +1,14 @@
+.screen {
+  display: grid;
+  grid-template-columns: 1.2fr 460px;
+  gap: 16px;
+  align-items: start;
+}
+
+.derecha {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: sticky;
+  top: 16px;
+}
