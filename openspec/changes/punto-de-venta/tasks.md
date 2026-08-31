@@ -56,8 +56,8 @@ spec scenario. Ratified:
 - [x] 1.1 RED: `apps/api/src/lib/dinero.test.ts` — vector table (`"10.5"/"10.50"→1050`, round-trip, `MAX_CENTAVOS` boundary, overflow throws, malformed throws)
 - [x] 1.2 GREEN: `apps/api/src/lib/dinero.ts` (D1: `aCentavos`/`aMonto`/`multiplicar`/`sumar`, no `parseFloat`)
 - [x] 1.3 Byte-identical twin `apps/web/src/lib/dinero.ts` + `.test.ts`, header comment naming both files (D1 dup rationale)
-- [ ] 1.4 `apps/api/src/db/schema.ts`: `ventas`, `items_venta`, `pagos` tables; `venta_estado`/`pago_estado`/`medio_pago` enums; `ventas_numero_correlativo_seq` (D7); D6 constraints (`pagos_venta_id_medio_unique`, `pagos_vuelto_solo_efectivo`, `items_venta_venta_id_producto_id_unique`); `CHECK subtotal = precio_unitario * cantidad`; D8 FK `movimientos.venta_id → ventas.id` `onDelete: 'restrict'`
-- [ ] 1.5 `pnpm db:generate` twice — assert no second migration diff (D7 verification step); if it fails, hand-write `CREATE SEQUENCE`
+- [x] 1.4 `apps/api/src/db/schema.ts`: `ventas`, `items_venta`, `pagos` tables; `venta_estado`/`pago_estado`/`medio_pago` enums; `ventas_numero_correlativo_seq` (D7); D6 constraints (`pagos_venta_id_medio_unique`, `pagos_vuelto_solo_efectivo`, `items_venta_venta_id_producto_id_unique`); `CHECK subtotal = precio_unitario * cantidad`; D8 FK `movimientos.venta_id → ventas.id` `onDelete: 'restrict'`
+- [x] 1.5 `pnpm db:generate` twice — assert no second migration diff (D7 verification step); if it fails, hand-write `CREATE SEQUENCE` — `pgSequence` round-tripped cleanly, no fallback needed (`apps/api/drizzle/0006_magical_mandarin.sql`)
 
 ## Phase 2: Backend Domain Layer
 
