@@ -89,9 +89,9 @@ spec scenario. Ratified:
 
 ## Phase 6: Frontend Data Layer
 
-- [ ] 6.1 `apps/web/src/features/pos/queries.ts` — `productosKeys`-style keys for catalog
-- [ ] 6.2 `apps/web/src/features/pos/errorMessages.ts` — map RECONCILE-1 codes to cashier-facing text
-- [ ] 6.3 `apps/web/src/features/pos/{useCarrito,useCatalogo,useConfirmarVenta}.ts` + tests (mismatch keeps sale open per PD-6)
+- [x] 6.1 `apps/web/src/features/pos/queries.ts` — `productosKeys`-style keys for catalog
+- [x] 6.2 `apps/web/src/features/pos/errorMessages.ts` — map RECONCILE-1 codes to cashier-facing text
+- [x] 6.3 `apps/web/src/features/pos/{useCarrito,useCatalogo,useConfirmarVenta}.ts` + tests (mismatch keeps sale open per PD-6)
 
 ## Phase 7: Frontend UI
 
