@@ -103,9 +103,9 @@ spec scenario. Ratified:
 
 ## Phase 8: Route & Full-Flow Integration
 
-- [ ] 8.1 `apps/web/src/routes/pos.tsx` — `/pos` under `shellLayout`, grid `1.2fr | 460px`
-- [ ] 8.2 `apps/web/src/routes/routeTree.ts` — register `posRoute`
-- [ ] 8.3 RED+GREEN: route test — full `routeTree`+`createMemoryHistory`, `await router.load()`; add→confirm→cart cleared+`productosKeys.all` invalidated; `PRICE_CHANGED` blocks close until re-confirm
+- [x] 8.1 `apps/web/src/routes/pos.tsx` — `/pos` under `shellLayout`, grid `1.2fr | 460px`
+- [x] 8.2 `apps/web/src/routes/routeTree.ts` — register `posRoute`
+- [x] 8.3 RED+GREEN: route test — full `routeTree`+`createMemoryHistory`, `await router.load()`; add→confirm→cart cleared+`productosKeys.all` invalidated; `PRICE_CHANGED` blocks close until re-confirm
 
 ## Phase 9: Cleanup
 
