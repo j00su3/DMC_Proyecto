@@ -190,7 +190,7 @@ changes yet. **DONE** (`feat/recibo-pr2-datos`, commit `f2b94dc`, not pushed —
 Depends on: Phase 2. This is the anchor route Phase 4 and Phase 5 both link to — it must land
 before either.
 
-### Task 3.1 — `Recibo` presentational component + print CSS
+### Task 3.1 — `Recibo` presentational component + print CSS [x]
 - **File**: `apps/web/src/features/recibo/Recibo.tsx` + `Recibo.module.css` (new)
 - **Satisfies**: recibo-ui spec, "Printable Receipt Route" (field list), "Estado Shown As Plain
   Text, No Visual Flag" (PD-6), "Receipt Omits Store Identity" (PD-2), and the "Correlativo Search"
@@ -209,7 +209,7 @@ before either.
   - every `pagos` row renders (multi-payment case); `vuelto` shows only on the cash row when
     nonzero
 
-### Task 3.2 — `/ventas/$id/recibo` route + registration
+### Task 3.2 — `/ventas/$id/recibo` route + registration [x]
 - **File**: `apps/web/src/routes/recibo.tsx` (new), `apps/web/src/routes/routeTree.ts` (modify)
 - Depends on: 3.1, Task 2.2.
 - **Satisfies**: recibo-ui spec, "Printable Receipt Route" (route reachability, role gate,
@@ -228,7 +228,7 @@ before either.
     Audit-Style")
   - route is reachable under `shellLayout`, not redirected by an `encargado`-only guard
 
-### Task 3.3 — `AppShell` print chrome suppression
+### Task 3.3 — `AppShell` print chrome suppression [x]
 - **File**: `apps/web/src/components/ui/AppShell.tsx` + `AppShell.module.css` (modify)
 - Depends on: none structurally, but only meaningful once 3.2 exists to print from — same slice.
 - **Satisfies**: recibo-ui spec, "Printable Receipt Route" (clean print output — not a separate
@@ -241,7 +241,9 @@ before either.
   content is not.
 
 **Phase 3 exit criteria**: `/ventas/$id/recibo` is reachable, renders per spec, and prints without
-chrome. `pnpm -r test`, `pnpm typecheck`, `pnpm lint` green.
+chrome. `pnpm -r test`, `pnpm typecheck`, `pnpm lint` green. **DONE**
+(`feat/recibo-pr3-ruta`, not pushed — see `sdd/recibo-interno/apply-progress` in Engram).
+`pnpm --filter web test` (399/399), `pnpm typecheck`, `pnpm lint` all green.
 
 ---
 

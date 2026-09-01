@@ -99,3 +99,21 @@
   flex: 1;
   padding: 24px;
 }
+
+.logoutButton {
+  cursor: pointer;
+}
+
+/**
+ * recibo-ui / Printable Receipt Route (D6): the component that owns the
+ * chrome hides its own chrome when printing, rather than a receipt route
+ * reaching into these class names from outside. Every `shellLayout` child
+ * (including `/ventas/$id/recibo`) renders inside `AppShell`, so this is
+ * the one place sidebar/logout suppression needs to exist.
+ */
+@media print {
+  .sidebar,
+  .logoutButton {
+    display: none;
+  }
+}
