@@ -805,3 +805,43 @@ fase 2 del checklist de release.
 **Próximo paso:** este plan requiere aprobación explícita del propietario antes de pasar a GENERATE
 (generar workflows, scripts o configuración). No se generó ni se modificó ningún archivo del
 proyecto fuera de este documento.
+
+### 2026-09-01 — Incidente: `POST /api/ventas` devolvía 500 en producción
+
+**Qué se rompió:** la migración `0006_magical_mandarin` (tablas `ventas`/`items_venta`/`pagos` +
+la secuencia del correlativo, backlog #7) nunca se aplicó a mano contra Neon después de mergear ese
+ciclo — exactamente el riesgo que este mismo documento ya había anticipado (más arriba, para el
+ítem #5). El health check no lo detectó porque solo corre `select 1`.
+
+**Síntoma:** confirmar una venta devolvía `500 INTERNAL_ERROR` genérico. `GET
+/api/ventas/recibo` (búsqueda por correlativo) también devolvía `INTERNAL_ERROR` en vez del
+`SALE_NOT_FOUND` tipado que debería — la señal de que faltaban tablas, no de que faltaba un dato.
+
+**Diagnóstico:** DevTools → pestaña Network → la fila de la request fallida → sub-pestaña Response
+(no Preview) mostró el cuerpo crudo del error; cruzado con `apps/api/drizzle/meta/_journal.json`,
+que confirmó `0006` como la última migración en el árbol.
+
+**Arreglo:** el usuario corrió `pnpm db:migrate` a mano contra su propio `DATABASE_URL` de Neon.
+Confirmado funcionando de inmediato.
+
+**Lección para el checklist de release:** cualquier PR que agregue tablas necesita su línea propia
+en este registro confirmando que la migración corrió contra Neon — un merge en verde no es
+evidencia de eso.
+
+### 2026-09-01 — Migración `0007_giant_cerebro` aplicada (backlog #9, anulación de venta)
+
+**Qué se agregó:** columnas `anuladaPor`/`anuladaEn`/`motivoAnulacion` en `ventas` + el CHECK
+`ventas_anulacion_datos_solo_anulada`, migración additiva shippeada en PR #130. Toda fila existente
+(`confirmada`, 3 columnas `NULL`) satisface el CHECK sin intervención.
+
+**Aplicación a Neon:** corrida a mano por el usuario (`pnpm db:migrate` contra su `DATABASE_URL`)
+después de que PR #133 (archive) ya estaba mergeado — mismo patrón manual que el incidente de
+arriba, esta vez sin ventana de 500 porque se corrió antes de que nadie ejecutara el flujo de
+anulación en producción. Confirmado funcionando probando una anulación real contra el demo en vivo.
+
+**Nota de proceso:** la entrada de arriba (`2026-09-01 — Incidente...`) se había escrito en una
+sesión anterior pero nunca llegó a commitearse — quedó como cambio local sin guardar y se perdió en
+un `git checkout`/`git reset` posterior de esa misma noche. Reconstruida acá desde el resumen de
+la conversación para no perder el registro; el claims-gate de `anulacion-venta` (ver
+`openspec/changes/archive/2026-09-01-anulacion-venta/claims-report.md`, claim #23) fue lo que hizo
+notar la ausencia de esta entrada para la migración `0007`.
