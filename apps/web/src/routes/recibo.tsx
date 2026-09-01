@@ -31,6 +31,7 @@ export const reciboRoute = createRoute({
 
 function ReciboScreen() {
   const { id } = reciboRoute.useParams();
+  const navigate = reciboRoute.useNavigate();
   const query = useRecibo(id);
 
   if (query.isError) {
@@ -52,5 +53,7 @@ function ReciboScreen() {
     return <h1>Recibo</h1>;
   }
 
-  return <Recibo recibo={query.data} />;
+  return (
+    <Recibo recibo={query.data} onVolver={() => navigate({ to: '/pos' })} />
+  );
 }

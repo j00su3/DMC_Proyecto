@@ -4,7 +4,7 @@ import {
   createMemoryHistory,
   createRouter,
 } from '@tanstack/react-router';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { routeTree } from './routeTree.js';
@@ -152,6 +152,18 @@ describe('/ventas/$id/recibo route', () => {
     await user.click(await screen.findByRole('button', { name: 'Imprimir' }));
 
     expect(printSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('navigates to /pos when Volver is activated — window.history.back() no-ops on a fresh page load with no prior in-app history', async () => {
+    stubFetch({ usuario: encargadoUsuario });
+    const user = userEvent.setup();
+    const router = await loadAndRenderRecibo();
+
+    await user.click(await screen.findByRole('button', { name: 'Volver' }));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/pos');
+    });
   });
 
   it('lets a deposito session view a receipt confirmed by an encargado (PD-4, audit-style access)', async () => {

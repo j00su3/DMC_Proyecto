@@ -15,6 +15,14 @@ const MEDIO_LABEL: Record<string, string> = {
 
 interface ReciboProps {
   recibo: ReciboData;
+  /**
+   * `window.history.back()` no-ops with nothing visibly happening whenever
+   * this route is entered with no prior in-app history — a fresh page load
+   * on the URL, a bookmark, a new tab. `onVolver` lets the route hand this
+   * component a destination that always works instead; falls back to
+   * `history.back()` only if the route does not supply one.
+   */
+  onVolver?: () => void;
 }
 
 /**
@@ -24,7 +32,7 @@ interface ReciboProps {
  * pure `@media print` CSS (D6) — "Imprimir" calls `window.print()` directly,
  * no auto-print on mount (PD-9).
  */
-export function Recibo({ recibo }: ReciboProps) {
+export function Recibo({ recibo, onVolver }: ReciboProps) {
   const { venta, cajero, items, pagos } = recibo;
 
   return (
@@ -33,7 +41,7 @@ export function Recibo({ recibo }: ReciboProps) {
         <Button
           type="button"
           variant="secondary"
-          onClick={() => window.history.back()}
+          onClick={() => (onVolver ? onVolver() : window.history.back())}
         >
           Volver
         </Button>
