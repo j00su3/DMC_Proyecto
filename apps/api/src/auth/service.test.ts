@@ -143,7 +143,13 @@ describe('login', () => {
   // could keep them out indefinitely with five requests every five minutes,
   // well under the route's 10/min limit, and the counter only cleared on a
   // successful login the owner was being prevented from performing.
-  it('rejects a locked account whose password is also wrong (ACCOUNT_LOCKED)', async () => {
+  //
+  // SECURITY-REPORT.md S01, owner-ratified 2026-09-01: a WRONG password
+  // against a locked account is now indistinguishable from an unknown
+  // email — INVALID_CREDENTIALS, not the informative ACCOUNT_LOCKED. The
+  // status code was the enumeration oracle; DUMMY_HASH only equalized
+  // timing, never the response shape.
+  it('rejects a locked account whose password is also wrong (INVALID_CREDENTIALS, not ACCOUNT_LOCKED)', async () => {
     const hash = await hashPassword('correct-horse-battery-staple');
     const usuario = makeUsuario({
       hashContrasena: hash,
@@ -161,23 +167,53 @@ describe('login', () => {
     await expect(
       login(repos, { email: 'test@example.com', password: 'wrong-password' }),
     ).rejects.toMatchObject({
-      code: 'ACCOUNT_LOCKED',
-      details: { retryAfter: expect.any(Number) },
+      code: 'INVALID_CREDENTIALS',
+      details: undefined,
     });
     // Already locked: the window is not extended by an attempt it already
     // refuses, so the owner's wait never grows while an attacker keeps trying.
     expect(registerFailedAttempt).not.toHaveBeenCalled();
   });
 
-  // The whole point of SEC-001's fix: knowing your own password always gets
-  // you in. Whoever guesses wrong stays locked; the legitimate holder never
-  // does.
-  it('lets the legitimate holder in while locked, clearing the lock (SEC-001)', async () => {
+  // SECURITY-REPORT.md S01, owner-ratified 2026-09-01: a correct password
+  // no longer silently bypasses the lockout — that made the 423/401 split
+  // an enumeration oracle by construction (only the true owner could ever
+  // reach the branch that logged in, so success itself leaked existence
+  // just as much as the old 423 did). The owner is still refused, but
+  // informatively: 423 with retryAfter, since they are the one caller who
+  // has just proven they know the account exists.
+  it('refuses the legitimate holder while locked with the informative 423, not a silent login (SEC-001 / S01)', async () => {
     const hash = await hashPassword('correct-horse-battery-staple');
     const usuario = makeUsuario({
       hashContrasena: hash,
       intentosFallidos: 5,
       bloqueadoHasta: new Date(Date.now() + 120_000),
+    });
+    const resetAttempts = vi.fn(async () => {});
+    const repos = fakeRepos({
+      findByEmail: async () => usuario,
+      resetAttempts,
+    });
+
+    await expect(
+      login(repos, {
+        email: 'test@example.com',
+        password: 'correct-horse-battery-staple',
+      }),
+    ).rejects.toMatchObject({
+      code: 'ACCOUNT_LOCKED',
+      details: { retryAfter: expect.any(Number) },
+    });
+    // The lock is not silently cleared just because the password matched.
+    expect(resetAttempts).not.toHaveBeenCalled();
+  });
+
+  it('lets the legitimate holder in once the lock has actually elapsed, resetting the counter', async () => {
+    const hash = await hashPassword('correct-horse-battery-staple');
+    const usuario = makeUsuario({
+      hashContrasena: hash,
+      intentosFallidos: 5,
+      bloqueadoHasta: new Date(Date.now() - 1_000), // already elapsed
     });
     const resetAttempts = vi.fn(async () => {});
     const repos = fakeRepos({
@@ -191,9 +227,6 @@ describe('login', () => {
     });
 
     expect(result.usuario.id).toBe(usuario.id);
-    // resetAttempts clears intentos_fallidos AND bloqueado_hasta
-    // (usuarios/repository.ts:151-156), so the lock does not outlive the
-    // successful login that disproved it.
     expect(resetAttempts).toHaveBeenCalledWith(usuario.id);
   });
 });

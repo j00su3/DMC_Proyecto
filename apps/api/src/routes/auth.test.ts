@@ -187,8 +187,14 @@ describe('POST /api/auth/login', () => {
     expect(response.json().error.code).toBe('ACCOUNT_INACTIVE');
   });
 
-  it('returns 423 ACCOUNT_LOCKED with details.retryAfter for a locked account', async () => {
+  // SECURITY-REPORT.md S01, owner-ratified resolution: the informative 423
+  // (with retryAfter) is reserved for the caller who has PROVEN they know
+  // the account's password — the account's own owner. Only a correct
+  // password against a locked account reaches this branch.
+  it('returns 423 ACCOUNT_LOCKED with details.retryAfter for a locked account given the CORRECT password', async () => {
+    const hash = await hashPassword(PASSWORD);
     const usuario = makeUsuario({
+      hashContrasena: hash,
       bloqueadoHasta: new Date(Date.now() + 120_000),
     });
     app = await buildApp({
@@ -199,13 +205,84 @@ describe('POST /api/auth/login', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/auth/login',
-      payload: { email: usuario.email, password: 'irrelevant' },
+      payload: { email: usuario.email, password: PASSWORD },
     });
 
     expect(response.statusCode).toBe(423);
     const payload = response.json();
     expect(payload.error.code).toBe('ACCOUNT_LOCKED');
     expect(typeof payload.error.details.retryAfter).toBe('number');
+  });
+
+  // SECURITY-REPORT.md S01: a WRONG password against a locked, known
+  // account must be indistinguishable from an unknown email — the status
+  // code was the enumeration oracle DUMMY_HASH's timing equalization never
+  // covered. Same code, same message, no `details` key on either side.
+  it('returns 401 INVALID_CREDENTIALS (not 423) for a locked account given a WRONG password', async () => {
+    const hash = await hashPassword(PASSWORD);
+    const usuario = makeUsuario({
+      hashContrasena: hash,
+      bloqueadoHasta: new Date(Date.now() + 120_000),
+    });
+    app = await buildApp({
+      repos: fakeRepos({ findByEmail: async () => usuario }),
+      cookieSecret: COOKIE_SECRET,
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email: usuario.email, password: 'wrong-password' },
+    });
+
+    expect(response.statusCode).toBe(401);
+    const payload = response.json();
+    expect(payload.error.code).toBe('INVALID_CREDENTIALS');
+    expect(payload.error.details).toBeUndefined();
+  });
+
+  // SECURITY-REPORT.md S01 Suggested Verification + S11: the byte-for-byte
+  // comparison that proves the enumeration oracle is closed. A known email
+  // with a wrong password against a LOCKED account must produce a response
+  // body indistinguishable from an unknown email's — same status, same
+  // envelope, field for field.
+  it('produces a byte-for-byte identical response for an unknown email and a known-but-locked email with a wrong password', async () => {
+    const hash = await hashPassword(PASSWORD);
+    const lockedUsuario = makeUsuario({
+      email: 'known@example.com',
+      hashContrasena: hash,
+      bloqueadoHasta: new Date(Date.now() + 120_000),
+    });
+
+    const unknownEmailApp = await buildApp({
+      repos: fakeRepos({ findByEmail: async () => undefined }),
+      cookieSecret: COOKIE_SECRET,
+    });
+    const unknownResponse = await unknownEmailApp.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email: 'unknown@example.com', password: 'wrong-password' },
+    });
+    await unknownEmailApp.close();
+
+    const lockedApp = await buildApp({
+      repos: fakeRepos({ findByEmail: async () => lockedUsuario }),
+      cookieSecret: COOKIE_SECRET,
+    });
+    const lockedResponse = await lockedApp.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: {
+        email: lockedUsuario.email,
+        password: 'wrong-password',
+      },
+    });
+    await lockedApp.close();
+
+    expect(lockedResponse.statusCode).toBe(unknownResponse.statusCode);
+    expect(lockedResponse.statusCode).toBe(401);
+    expect(lockedResponse.json()).toEqual(unknownResponse.json());
+    expect(lockedResponse.body).toBe(unknownResponse.body);
   });
 
   // Exercises the REAL @fastify/rate-limit plugin (max: 1 on this instance),

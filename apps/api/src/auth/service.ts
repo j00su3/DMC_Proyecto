@@ -61,14 +61,24 @@ export async function login(
   //
   // Verifying first makes the lockout what it was meant to be: a defence
   // against guessing. Whoever guesses wrong stays locked; whoever knows their
-  // own password is never locked out. Accepted cost, on the record in the
-  // ADR: argon2.verify now also runs for locked accounts, bounded by the
-  // login route's rate limit (SEC-004).
+  // own password is never silently locked in the dark about it — see S01
+  // below. Accepted cost, on the record in the ADR: argon2.verify now also
+  // runs for locked accounts, bounded by the login route's rate limit
+  // (SEC-004).
   const passwordOk = await verifyPassword(
     usuario.hashContrasena,
     input.password,
   );
 
+  // SECURITY-REPORT.md S01, owner-ratified 2026-09-01: the status code
+  // itself was an enumeration oracle — a wrong password against a known,
+  // locked account produced 423 while an unknown email always produced 401,
+  // even though DUMMY_HASH equalized their timing. Whoever has NOT proven
+  // they know the account's password gets the exact same 401
+  // INVALID_CREDENTIALS as an unknown email, locked or not. The informative
+  // 423 ACCOUNT_LOCKED (with retryAfter) is reserved for the one case where
+  // the submitted password WAS correct — the only caller who has just
+  // proven the account exists.
   if (!passwordOk) {
     // `bloqueadoHasta` is the pre-attempt state read above, so an account
     // already locked is refused without extending its own window: the
@@ -77,13 +87,23 @@ export async function login(
       usuario.bloqueadoHasta &&
       usuario.bloqueadoHasta.getTime() > Date.now()
     ) {
-      const retryAfter = Math.ceil(
-        (usuario.bloqueadoHasta.getTime() - Date.now()) / 1000,
-      );
-      throw accountLocked(retryAfter);
+      throw invalidCredentials();
     }
     await repos.usuarios.registerFailedAttempt(usuario.id);
     throw invalidCredentials();
+  }
+
+  // Password was correct, but the account is still locked: SEC-001's fix
+  // only moved this check to run after the password verify, it never meant
+  // a correct password should silently bypass the lockout. Refuse the
+  // login, but — because this caller has just proven they own the
+  // account — tell them so plainly, with retryAfter, instead of a generic
+  // 401 that would leave the genuine owner guessing.
+  if (usuario.bloqueadoHasta && usuario.bloqueadoHasta.getTime() > Date.now()) {
+    const retryAfter = Math.ceil(
+      (usuario.bloqueadoHasta.getTime() - Date.now()) / 1000,
+    );
+    throw accountLocked(retryAfter);
   }
 
   if (!usuario.activo) {

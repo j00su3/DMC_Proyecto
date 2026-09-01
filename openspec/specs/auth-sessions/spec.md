@@ -37,17 +37,22 @@ The system MUST persist `usuarios` (`id`, `nombre`, `email` UNIQUE, `hash_contra
 #### Scenario: Unknown email
 - GIVEN no user exists for the submitted email
 - WHEN `POST /api/auth/login` is called
-- THEN the response is `401 { error: { code: "INVALID_CREDENTIALS" } }` with the same shape/timing profile as a wrong-password response (no user enumeration)
+- THEN the response is `401 { error: { code: "INVALID_CREDENTIALS" } }` with the same shape/timing profile as a wrong-password response (no user enumeration) — including, per the amendment below, the same shape as a wrong password submitted against a locked account
 
 #### Scenario: Inactive user
 - GIVEN a user with `activo = false`
 - WHEN `POST /api/auth/login` is called with that user's correct credentials
 - THEN the response is `401 { error: { code: "ACCOUNT_INACTIVE" } }` and no cookie is set
 
-#### Scenario: Locked account
+#### Scenario: Locked account, correct password
 - GIVEN a user whose `bloqueado_hasta` is in the future
-- WHEN `POST /api/auth/login` is called with that user's correct password
-- THEN the response is `423 { error: { code: "ACCOUNT_LOCKED", details: { retryAfter } } }` without evaluating the password hash
+- WHEN `POST /api/auth/login` is called with that user's CORRECT password
+- THEN the password hash IS evaluated (and matches), and the response is `423 { error: { code: "ACCOUNT_LOCKED", details: { retryAfter } } }` — reserved for this one case, because the caller has just proven they know the account's password
+
+#### Scenario: Locked account, wrong password (no enumeration)
+- GIVEN a user whose `bloqueado_hasta` is in the future
+- WHEN `POST /api/auth/login` is called with a WRONG password for that user
+- THEN the response is `401 { error: { code: "INVALID_CREDENTIALS" } }`, byte-for-byte identical in shape to the Unknown email scenario's response — the caller has not proven they know the password, so they learn nothing about the account's existence or lock state
 
 #### Scenario: Rate-limited by IP
 - GIVEN `@fastify/rate-limit` on `/api/auth/login` has exceeded its configured window for the caller's IP
@@ -95,7 +100,15 @@ Sessions MUST expire 12 hours after creation. Expiry MUST be checked lazily on e
 - THEN the request is treated as unauthenticated (401), independent of whether the row is later cleaned up
 
 ### Requirement: Account Lockout Counter
-On each failed login, the system MUST increment `usuarios.intentos_fallidos` for the matched user; on the 5th consecutive failure it MUST set `bloqueado_hasta` to 5 minutes in the future. A successful login MUST reset `intentos_fallidos` to 0 and clear `bloqueado_hasta`. This state MUST be DB-backed so it survives process restarts (Render cold starts).
+On each failed login attempt against a currently-unlocked account, the system MUST increment
+`usuarios.intentos_fallidos` for the matched user; on the 5th consecutive failure it MUST set
+`bloqueado_hasta` to 5 minutes in the future. A failed attempt (wrong password) against an
+already-locked account MUST NOT extend `bloqueado_hasta` or increment the counter further. A
+successful login MUST reset `intentos_fallidos` to 0 and clear `bloqueado_hasta`; a *correct*
+password submitted against a currently-locked account is refused (`423 ACCOUNT_LOCKED`, see the
+2026-09-01 amendment below) rather than treated as a successful login, so the counter is only ever
+reset once `bloqueado_hasta` has actually elapsed. This state MUST be DB-backed so it survives
+process restarts (Render cold starts).
 
 #### Scenario: Fifth failure locks the account
 - GIVEN a user with `intentos_fallidos = 4`
@@ -104,13 +117,15 @@ On each failed login, the system MUST increment `usuarios.intentos_fallidos` for
 
 #### Scenario: Lockout survives restart
 - GIVEN a user is currently locked (`bloqueado_hasta` in the future)
-- WHEN the API process restarts and someone attempts to log in **with a wrong password** before `bloqueado_hasta` elapses
-- THEN the login still returns `423 ACCOUNT_LOCKED`
+- WHEN the API process restarts and someone attempts to log in **with that user's correct
+  password** before `bloqueado_hasta` elapses
+- THEN the login still returns `423 ACCOUNT_LOCKED` with `details.retryAfter` — the lock state
+  survived the restart because it is read from the DB, not process memory
 
-#### Scenario: The account holder is never locked out of their own account
+#### Scenario: The account holder is refused informatively while locked, not silently let in
 - GIVEN a user is currently locked (`bloqueado_hasta` in the future)
 - WHEN that user logs in with the **correct** password
-- THEN the login succeeds, `intentos_fallidos` returns to 0 and `bloqueado_hasta` is cleared
+- THEN the login is refused with `423 { error: { code: "ACCOUNT_LOCKED", details: { retryAfter } } }`, `intentos_fallidos` and `bloqueado_hasta` are left unchanged, and no session is created — the account holder is the one caller who has just proven they know the password, so they are the one caller ever told the account is locked and when it unlocks, instead of a generic 401 or a silent bypass
 
 Amended 2026-08-30, closing **SEC-001** (HIGH) per ADR-0007 § *Actualizado 2026-08-29*. The
 password MUST be verified **before** the lockout is evaluated. The previous wording said only
@@ -123,6 +138,38 @@ shut with five requests every five minutes.
 Accepted cost, recorded in the ADR: `argon2.verify` now also runs for locked accounts, so the
 lockout no longer throttles guessing — the login route's rate limit does. That makes SEC-003
 (`trustProxy`, so the rate limit sees real client IPs) load-bearing rather than cosmetic.
+
+**Amended 2026-09-01, closing SECURITY-REPORT.md S01 (MEDIUM), owner-ratified.** The 2026-08-30
+amendment above fixed the denial-of-service (SEC-001) but introduced a fresh enumeration oracle:
+having the correct password silently bypass the lockout meant only the true account holder could
+ever reach the "login succeeds" branch, so a wrong password against a *locked* account still had
+to answer distinctly (`423`) from a wrong password against an *unknown* email (`401`) — the status
+code itself let an attacker fingerprint valid emails with one lockout-inducing attempt sequence
+per candidate (`docs/SECURITY-REPORT.md` §S01: "Cinco intentos con contraseña arbitraria... Seis
+peticiones por candidato"). `DUMMY_HASH` (§ Unknown email scenario) only equalizes *timing*; it
+never touched the response *shape*.
+
+This requirement previously read: "A successful login MUST reset `intentos_fallidos` to 0 and
+clear `bloqueado_hasta`," full stop — silently implying a correct password on a locked account
+was itself the successful-login path. It is not, as of this amendment: a correct password against
+a *locked* account is refused (informatively, `423`), not treated as success. The password is
+still verified before the lockout is evaluated (2026-08-30 stands), but the two checks now yield
+three distinct outcomes instead of two:
+
+1. Password wrong, account unlocked → `401 INVALID_CREDENTIALS`, counter increments.
+2. Password wrong, account locked → `401 INVALID_CREDENTIALS`, counter unchanged (same response as
+   an unknown email — the enumeration oracle this amendment closes).
+3. Password correct, account locked → `423 ACCOUNT_LOCKED` with `retryAfter`, counter unchanged
+   (the one case that gets the informative response, because the caller has just proven the
+   account is theirs).
+4. Password correct, account unlocked → `200`, counter resets.
+
+This is not a reversion to SEC-001: a wrong password against a locked account still does not
+extend `bloqueado_hasta` (case 2 above), so the window remains bounded at 5 minutes regardless of
+how many further guesses arrive, and the genuine holder's own wait never grows. What changed is
+only that the wait, once it elapses, is now the sole path back in — a correct password no longer
+short-circuits it — and that during the wait, a wrong guess and an unknown email are answered
+identically.
 
 #### Scenario: Successful login resets counter
 - GIVEN a user with `intentos_fallidos = 3` and no active lockout
