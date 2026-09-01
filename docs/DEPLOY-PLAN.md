@@ -805,3 +805,29 @@ fase 2 del checklist de release.
 **Próximo paso:** este plan requiere aprobación explícita del propietario antes de pasar a GENERATE
 (generar workflows, scripts o configuración). No se generó ni se modificó ningún archivo del
 proyecto fuera de este documento.
+
+### 2026-09-01 — Incidente: `POST /api/ventas` devolvía 500 en producción
+
+**Qué se rompió:** exactamente el riesgo anticipado el 2026-08-29, pero con la migración `0006`
+(tablas `ventas`/`items_venta`/`pagos` + secuencia de correlativo, backlog #7) en vez de la de
+`productos-ledger-base`. La migración nunca se corrió a mano contra Neon después de que el PR de
+`punto-de-venta` se mergeó. `/api/health` seguía en verde (`select 1` no toca esas tablas), así que
+nadie se enteró hasta que un usuario real intentó confirmar una venta.
+
+**Síntoma:** `POST /api/ventas` → `500 {"error":{"code":"INTERNAL_ERROR","message":"An unexpected
+error occurred"}}`. Confirmado que no era un error de negocio (que hubiera devuelto un código
+tipado como `PRICE_CHANGED` o `PAYMENT_BELOW_TOTAL`) probando también `GET /api/ventas/recibo?...`,
+que devolvió el mismo `INTERNAL_ERROR` genérico en vez de `SALE_NOT_FOUND` — señal de que las tablas
+mismas no existían, no de un dato faltante.
+
+**Diagnóstico:** DevTools del navegador (Network → Response del request fallido), ya que no había
+acceso a los logs de Render desde este entorno. `apps/api/drizzle/meta/_journal.json` mostraba
+`0006_magical_mandarin` como la última migración en el árbol — nunca aplicada a Neon.
+
+**Arreglo:** `pnpm db:migrate` corrido a mano contra el `DATABASE_URL` de Neon. Aditivo, sin
+pérdida de datos. Verificado: `POST /api/ventas` y `GET /api/ventas/recibo` funcionan.
+
+**Lección para el checklist de release:** el paso "Fase 2 — migración aditiva antes de mergear" del
+checklist de arriba existía desde el 2026-08-29 pero no se siguió para el PR de `punto-de-venta`.
+El health check, tal como está diseñado, **no puede** detectar este modo de fallo — sigue siendo el
+hueco crítico documentado en **Data & Migrations**.
