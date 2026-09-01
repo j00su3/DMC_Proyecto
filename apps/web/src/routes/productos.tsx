@@ -1,6 +1,7 @@
-import { createRoute } from '@tanstack/react-router';
+import { Link, createRoute } from '@tanstack/react-router';
 import { z } from 'zod';
 import { isApiError } from '../api/errors.js';
+import buttonStyles from '../components/ui/Button.module.css';
 import { FormError } from '../components/ui/FormError.js';
 import { Pagination } from '../components/ui/Pagination.js';
 import { TextField } from '../components/ui/TextField.js';
@@ -53,6 +54,21 @@ export const productosListRoute = createRoute({
   component: ProductosListScreen,
 });
 
+/**
+ * `/inventario/nuevo` shipped fully built with zero entry point from this
+ * list — same gap as `/usuarios/nuevo` (usuarios-ui), same fix.
+ */
+function NuevoProductoLink() {
+  return (
+    <Link
+      to="/inventario/nuevo"
+      className={`${buttonStyles.button} ${buttonStyles.primary}`}
+    >
+      Nuevo producto
+    </Link>
+  );
+}
+
 function ProductosListScreen() {
   const { page, q } = productosListRoute.useSearch();
   const navigate = productosListRoute.useNavigate();
@@ -71,6 +87,7 @@ function ProductosListScreen() {
     return (
       <div>
         <h1>Inventario</h1>
+        <NuevoProductoLink />
         <FormError message={message} />
       </div>
     );
@@ -82,6 +99,7 @@ function ProductosListScreen() {
   return (
     <div>
       <h1>Inventario</h1>
+      <NuevoProductoLink />
       <TextField
         id="productos-search"
         label="Buscar por nombre o SKU"
@@ -91,6 +109,7 @@ function ProductosListScreen() {
       <ProductosTable
         productos={data?.data ?? []}
         aria-busy={query.isPlaceholderData}
+        onView={(id) => navigate({ to: '/inventario/$id', params: { id } })}
       />
       <Pagination
         page={page}

@@ -31,6 +31,13 @@ type UsuariosTableProps = {
   onDeactivate?: (id: string) => void;
   onReactivate?: (id: string) => void;
   onPasswordReset?: (id: string) => void;
+  /**
+   * `/usuarios/$id` (detail/edit screen) shipped fully built with zero
+   * entry point from this list — the only way in was typing the URL by
+   * hand. Not a `Link` here: this component stays presentational (see the
+   * route-module boundary note below), the route decides how to navigate.
+   */
+  onView?: (id: string) => void;
 };
 
 const SELF_ACTION_REASON =
@@ -46,9 +53,14 @@ function buildColumns({
   onDeactivate,
   onReactivate,
   onPasswordReset,
+  onView,
 }: Pick<
   UsuariosTableProps,
-  'currentUserId' | 'onDeactivate' | 'onReactivate' | 'onPasswordReset'
+  | 'currentUserId'
+  | 'onDeactivate'
+  | 'onReactivate'
+  | 'onPasswordReset'
+  | 'onView'
 >): DataTableColumn<UsuarioRow>[] {
   return [
     { key: 'nombre', header: 'Nombre', render: (row) => row.nombre },
@@ -77,6 +89,9 @@ function buildColumns({
         return (
           <div className={styles.actions}>
             <div className={styles.actionRow}>
+              <Button variant="secondary" onClick={() => onView?.(row.id)}>
+                Ver
+              </Button>
               {row.activo ? (
                 <Button
                   variant="secondary"
@@ -126,12 +141,14 @@ export function UsuariosTable({
   onDeactivate,
   onReactivate,
   onPasswordReset,
+  onView,
 }: UsuariosTableProps) {
   const columns = buildColumns({
     currentUserId,
     onDeactivate,
     onReactivate,
     onPasswordReset,
+    onView,
   });
   return (
     <DataTable

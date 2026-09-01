@@ -79,6 +79,23 @@ describe('UsuariosTable', () => {
     expect(restablecerButtons[1]).toBeEnabled();
   });
 
+  it('calls onView with the row id for every row, including the logged-in user own row', async () => {
+    const user = userEvent.setup();
+    const onView = vi.fn();
+    render(
+      <UsuariosTable usuarios={usuarios} currentUserId="1" onView={onView} />,
+    );
+
+    const verButtons = screen.getAllByRole('button', { name: 'Ver' });
+    expect(verButtons).toHaveLength(2);
+
+    await user.click(verButtons[0] as HTMLElement);
+    expect(onView).toHaveBeenCalledWith('1');
+
+    await user.click(verButtons[1] as HTMLElement);
+    expect(onView).toHaveBeenCalledWith('2');
+  });
+
   it('calls onDeactivate/onReactivate/onPasswordReset with the row id when clicked on another user row', async () => {
     const user = userEvent.setup();
     const onDeactivate = vi.fn();

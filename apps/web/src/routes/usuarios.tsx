@@ -147,6 +147,7 @@ function UsuariosListScreen() {
         onDeactivate={(id) => estado.deactivate.mutate(id)}
         onReactivate={(id) => estado.reactivate.mutate(id)}
         onPasswordReset={(id) => restablecer.mutate(id)}
+        onView={(id) => navigate({ to: '/usuarios/$id', params: { id } })}
       />
       <Pagination
         page={page}
