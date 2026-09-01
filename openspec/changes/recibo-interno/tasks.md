@@ -47,7 +47,7 @@ Sequential internally (each task's code depends on the previous one compiling). 
 may start until this phase is green, since `pnpm contract` regenerates the types the frontend
 consumes.
 
-### Task 1.1 — `SALE_NOT_FOUND` error factory
+### Task 1.1 — `SALE_NOT_FOUND` error factory [x]
 - **File**: `apps/api/src/lib/errors.ts`
 - **Satisfies**: point-of-sale spec, "Sale Detail Read Path" (404 clause) and "Lookup By Numero
   Correlativo" (404 clause).
@@ -56,7 +56,7 @@ consumes.
 - RED test first: direct factory assertion on code/status/`details`-absence, in the `lib/errors`
   test file's existing shape.
 
-### Task 1.2 — `VentasRepo` read methods (port + Drizzle adapter)
+### Task 1.2 — `VentasRepo` read methods (port + Drizzle adapter) [x]
 - **File**: `apps/api/src/ventas/repository.ts`
 - **Satisfies**: point-of-sale spec, "Sale Detail Read Path" (data shape).
 - Depends on: 1.1 (not code-dependent, but same PR-slice).
@@ -70,7 +70,7 @@ consumes.
 - No new RED test of its own (a repo method with no business rule); covered by Task 1.3's service
   tests via the fake.
 
-### Task 1.3 — `getRecibo` service function
+### Task 1.3 — `getRecibo` service function [x]
 - **File**: `apps/api/src/ventas/service.ts`
 - **Satisfies**: point-of-sale spec, "Sale Detail Read Path", "Estado Is Returned Verbatim, No
   Derived Receipt State", "Lookup By Numero Correlativo", "Detail Read Path Excludes Store
@@ -94,7 +94,7 @@ consumes.
     even though none can occur yet)
   - `estado` passes through verbatim for both `confirmada` and `anulada`
 
-### Task 1.4 — Routes: `GET /ventas/:id`, `GET /ventas/numero/:numeroCorrelativo`, route-shadowing RED test
+### Task 1.4 — Routes: `GET /ventas/:id`, `GET /ventas/numero/:numeroCorrelativo`, route-shadowing RED test [x]
 - **File**: `apps/api/src/routes/ventas.ts`
 - **Satisfies**: point-of-sale spec, "Sale Detail Read Path", "Lookup By Numero Correlativo",
   "Detail Read Path Excludes Store Configuration Data".
@@ -122,7 +122,7 @@ consumes.
   - response body contains no store name/address field (spec: "Detail Read Path Excludes Store
     Configuration Data")
 
-### Task 1.5 — Contract regeneration
+### Task 1.5 — Contract regeneration [x]
 - **Files**: `apps/api/openapi.json`, `apps/web/src/api/schema.d.ts`
 - Depends on: 1.4 green.
 - Run `pnpm contract`, stage the regenerated files, run `pnpm contract:check` before trusting
