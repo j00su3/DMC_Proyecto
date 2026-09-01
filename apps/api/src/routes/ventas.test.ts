@@ -534,6 +534,71 @@ describe('.strict() body — POST /api/ventas', () => {
     expect(response.statusCode).toBe(400);
     expect(response.json().error.code).toBe('VALIDATION_ERROR');
   });
+
+  // SECURITY-REPORT.md S06: items/pagos had no upper bound — confirmarVenta
+  // walks the array twice inside one UnitOfWork transaction, so an unbounded
+  // request could hold a pooled connection for thousands of sequential
+  // round trips. 50 is the chosen cap (routes/ventas.ts).
+  it('rejects an items array over the 50-item cap with 400 VALIDATION_ERROR, never opening a transaction', async () => {
+    const spies = emptySpies();
+    app = await buildWithSession(makeUsuario({ rol: 'encargado' }), spies);
+    const cookies = { sid: app.signCookie('valid-token') };
+    const items = Array.from({ length: 51 }, () => validPayload.items[0]);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: routes.confirmar(),
+      payload: { items, pagos: validPayload.pagos },
+      cookies,
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('VALIDATION_ERROR');
+    expect(spies.ventasCreateCalls).toHaveLength(0);
+  });
+
+  it('accepts an items array at exactly the 50-item cap', async () => {
+    const spies = emptySpies();
+    app = await buildWithSession(makeUsuario({ rol: 'encargado' }), spies);
+    const cookies = { sid: app.signCookie('valid-token') };
+    // confirmarVenta refuses a duplicate productoId (D13) before this even
+    // opens a transaction, so the cap test needs 50 DISTINCT valid UUIDs —
+    // the fake productos.findById ignores which id it was asked for and
+    // always answers makeProducto() (price '10.00'), so pagos must total
+    // 50 * 10.00 to clear the payment-total check too.
+    const items = Array.from({ length: 50 }, (_, i) => ({
+      ...validPayload.items[0],
+      productoId: `11111111-1111-4111-8111-${String(i).padStart(12, '0')}`,
+    }));
+
+    const response = await app.inject({
+      method: 'POST',
+      url: routes.confirmar(),
+      payload: { items, pagos: [{ medio: 'efectivo', monto: '500.00' }] },
+      cookies,
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json().items).toHaveLength(50);
+  });
+
+  it('rejects a pagos array over the 50-item cap with 400 VALIDATION_ERROR, never opening a transaction', async () => {
+    const spies = emptySpies();
+    app = await buildWithSession(makeUsuario({ rol: 'encargado' }), spies);
+    const cookies = { sid: app.signCookie('valid-token') };
+    const pagos = Array.from({ length: 51 }, () => validPayload.pagos[0]);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: routes.confirmar(),
+      payload: { items: validPayload.items, pagos },
+      cookies,
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('VALIDATION_ERROR');
+    expect(spies.ventasCreateCalls).toHaveLength(0);
+  });
 });
 
 describe('Domain error mapping — POST /api/ventas', () => {

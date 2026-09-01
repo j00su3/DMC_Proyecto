@@ -5660,6 +5660,7 @@
                 "properties": {
                   "items": {
                     "minItems": 1,
+                    "maxItems": 50,
                     "type": "array",
                     "items": {
                       "type": "object",
@@ -5688,6 +5689,7 @@
                   },
                   "pagos": {
                     "minItems": 1,
+                    "maxItems": 50,
                     "type": "array",
                     "items": {
                       "type": "object",
