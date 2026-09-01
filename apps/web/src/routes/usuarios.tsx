@@ -1,6 +1,7 @@
-import { createRoute, redirect } from '@tanstack/react-router';
+import { Link, createRoute, redirect } from '@tanstack/react-router';
 import { z } from 'zod';
 import { isApiError } from '../api/errors.js';
+import buttonStyles from '../components/ui/Button.module.css';
 import { FormError } from '../components/ui/FormError.js';
 import { Pagination } from '../components/ui/Pagination.js';
 import { CredentialDialog } from '../features/usuarios/CredentialDialog.js';
@@ -69,6 +70,23 @@ export const usuariosListRoute = createRoute({
   component: UsuariosListScreen,
 });
 
+/**
+ * The create route (`/usuarios/nuevo`) shipped fully built — form, service,
+ * tests — with no link to it anywhere in the SPA, so it was unreachable
+ * except by typing the URL by hand. Rendered in every branch below (error,
+ * empty, and populated) so it stays reachable regardless of list state.
+ */
+function CrearUsuarioLink() {
+  return (
+    <Link
+      to="/usuarios/nuevo"
+      className={`${buttonStyles.button} ${buttonStyles.primary}`}
+    >
+      Crear usuario
+    </Link>
+  );
+}
+
 function UsuariosListScreen() {
   const { page } = usuariosListRoute.useSearch();
   const navigate = usuariosListRoute.useNavigate();
@@ -84,6 +102,7 @@ function UsuariosListScreen() {
     return (
       <div>
         <h1>Usuarios</h1>
+        <CrearUsuarioLink />
         <FormError message={message} />
       </div>
     );
@@ -95,6 +114,7 @@ function UsuariosListScreen() {
     return (
       <div>
         <h1>Usuarios</h1>
+        <CrearUsuarioLink />
         <p>No hay usuarios registrados.</p>
       </div>
     );
@@ -110,6 +130,7 @@ function UsuariosListScreen() {
   return (
     <div>
       <h1>Usuarios</h1>
+      <CrearUsuarioLink />
       {mutationError ? (
         <FormError
           message={

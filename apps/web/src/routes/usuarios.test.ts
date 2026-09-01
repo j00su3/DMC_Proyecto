@@ -178,6 +178,29 @@ describe('usuarios routes', () => {
     expect(router.state.location.search).toEqual({ page: 1 });
   });
 
+  it('renders a link to /usuarios/nuevo — the create route existed with zero entry point from this list', async () => {
+    stubFetchAsEncargadoWithList({
+      data: [usuarioRow('1')],
+      page: 1,
+      pageSize: PAGE_SIZE,
+      total: 1,
+    });
+    const { router, queryClient } =
+      buildAuthenticatedRouterWithQueryClient('/usuarios');
+
+    render(
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(RouterProvider, { router }),
+      ),
+    );
+
+    expect(
+      await screen.findByRole('link', { name: 'Crear usuario' }),
+    ).toHaveAttribute('href', '/usuarios/nuevo');
+  });
+
   it('renders the empty state when total===0, not a blank/errored table', async () => {
     stubFetchAsEncargadoWithList({
       data: [],
