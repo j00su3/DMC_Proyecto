@@ -141,7 +141,7 @@ Depends on: Phase 1 (needs `schema.d.ts` types for `okRecibo`/`SALE_NOT_FOUND`).
 Internally sequential (queries → hook → error messages/format are small and independent of each
 other but all live in the same new `features/recibo/` directory — one slice).
 
-### Task 2.1 — Query keys + query options
+### Task 2.1 — Query keys + query options [x]
 - **File**: `apps/web/src/features/recibo/queries.ts` (new)
 - **Satisfies**: recibo-ui spec, "Printable Receipt Route" and "Correlativo Search" (data layer
   underpinning both).
@@ -150,7 +150,7 @@ other but all live in the same new `features/recibo/` directory — one slice).
   `GET /ventas/numero/:numeroCorrelativo`.
 - No RED test of its own (pure config); exercised through Task 2.2's hook tests.
 
-### Task 2.2 — `useRecibo` / `useReciboPorNumero` hooks
+### Task 2.2 — `useRecibo` / `useReciboPorNumero` hooks [x]
 - **File**: `apps/web/src/features/recibo/useRecibo.ts` (new)
 - Depends on: 2.1.
 - `useRecibo(id)` — always enabled. `useReciboPorNumero(numero)` — `enabled` gated on submit (not
@@ -159,7 +159,7 @@ other but all live in the same new `features/recibo/` directory — one slice).
   (pure hook-level test; route-level coverage happens in Phase 3/4 per CLAUDE.md's "route-level,
   not just hook-level" rule).
 
-### Task 2.3 — Error message mapping
+### Task 2.3 — Error message mapping [x]
 - **File**: `apps/web/src/features/recibo/errorMessages.ts` (new)
 - **Satisfies**: recibo-ui spec, "Correlativo Search" (PD-5 generic message) and "Printable
   Receipt Route" (not-found scenario).
@@ -169,7 +169,7 @@ other but all live in the same new `features/recibo/` directory — one slice).
 - RED test: `reciboErrorMessage` maps `SALE_NOT_FOUND` to the generic copy; unknown codes fall
   back to a generic default (existing pattern).
 
-### Task 2.4 — Date/time formatter
+### Task 2.4 — Date/time formatter [x]
 - **File**: `apps/web/src/features/recibo/format.ts` (new)
 - **Satisfies**: recibo-ui spec, "Printable Receipt Route" (fecha field).
 - `formatFechaHora` — `Intl.DateTimeFormat('es', { dateStyle: 'short', timeStyle: 'short' })`.
@@ -179,7 +179,9 @@ other but all live in the same new `features/recibo/` directory — one slice).
   gracefully, matching `usuarios/format.ts`'s existing `formatFecha` behavior).
 
 **Phase 2 exit criteria**: `pnpm -r test` and `pnpm typecheck` green for `apps/web`; no route
-changes yet.
+changes yet. **DONE** (`feat/recibo-pr2-datos`, commit `f2b94dc`, not pushed — see
+`sdd/recibo-interno/apply-progress` in Engram). `pnpm --filter web test` (384/384),
+`pnpm typecheck`, `pnpm lint` all green.
 
 ---
 
