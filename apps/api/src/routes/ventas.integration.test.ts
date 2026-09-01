@@ -726,12 +726,22 @@ describe('POST /api/ventas/:id/anular (integration, real app + real Postgres)', 
         realUow.run((repos) =>
           work({
             ...repos,
-            ventas: {
-              ...repos.ventas,
-              revertirPagos: async () => {
-                throw new Error('forced pagos-revert failure');
+            // `DrizzleVentasRepo` methods (createItems, marcarAnulada, ...)
+            // live on the prototype, not as instance fields — a plain
+            // `{ ...repos.ventas, revertirPagos: ... }` spread copies only
+            // own enumerable properties and silently drops all of them,
+            // which broke this test at its first repo call instead of at
+            // the intended final `revertirPagos` step. Preserve the
+            // prototype so every other method still dispatches normally.
+            ventas: Object.assign(
+              Object.create(Object.getPrototypeOf(repos.ventas)),
+              repos.ventas,
+              {
+                revertirPagos: async () => {
+                  throw new Error('forced pagos-revert failure');
+                },
               },
-            },
+            ),
           }),
         ),
     };
