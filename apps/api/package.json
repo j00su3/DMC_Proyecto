@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",
+    "@fastify/helmet": "^13.1.1",
     "@fastify/rate-limit": "^11.0.1",
     "@fastify/swagger": "^9.8.1",
     "argon2": "^0.44.0",

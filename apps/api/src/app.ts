@@ -1,3 +1,4 @@
+import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import Fastify, {
@@ -92,12 +93,42 @@ export async function buildApp(
     transform: jsonSchemaTransform,
   });
 
+  // SECURITY-REPORT.md S03: neither the API nor the SPA emitted any HTTP
+  // security header. CSP is deliberately strict — this is a pure JSON API,
+  // nothing here ever serves or needs a runtime script. frame-ancestors
+  // 'none' is the clickjacking control the report calls out explicitly;
+  // @fastify/helmet's other defaults (noSniff -> X-Content-Type-Options,
+  // frameguard, hsts, …) come along for free as extra defense in depth.
+  await app.register(helmet, {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+      },
+    },
+    referrerPolicy: { policy: 'same-origin' },
+  });
   await app.register(cookiePlugin, { secret: opts.cookieSecret });
   await app.register(dbPlugin, { db: opts.db });
   await app.register(reposPlugin, { repos: opts.repos, uow: opts.uow });
   // Must be registered before any route plugin below — Fastify hooks only
   // apply to routes registered after the hook (design.md risk register).
   await app.register(authPlugin);
+  // SECURITY-REPORT.md S04: every authenticated response except the two that
+  // already set it explicitly (POST /usuarios, POST /usuarios/:id/password-reset)
+  // left Cache-Control unset. Setting it here for every response, then letting
+  // those two routes' own `reply.header('Cache-Control', 'no-store')` calls run
+  // as before, is idempotent — same header, same value, either order. Routes
+  // that opt out of auth (`config: { auth: false }`, e.g. GET /api/health,
+  // POST /api/auth/login) are excluded: they carry nothing session-specific to
+  // protect from an intermediate cache.
+  app.addHook('onSend', async (request, reply, payload) => {
+    if (request.routeOptions.config?.auth === false) {
+      return payload;
+    }
+    reply.header('Cache-Control', 'no-store');
+    return payload;
+  });
   // global: false — rate limiting only applies to routes that opt in via
   // config.rateLimit (currently only POST /api/auth/login).
   // SEC-003. `trustProxy` stays OFF deliberately: the Render origin is

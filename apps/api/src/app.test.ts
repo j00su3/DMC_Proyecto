@@ -34,7 +34,7 @@ function unusedRepoMethod(): never {
   throw new Error('app.test.ts fake: this repo method is outside this suite');
 }
 
-function fakeRepos() {
+function fakeRepos(sesionesOverrides: Partial<SesionesRepo> = {}) {
   return {
     usuarios: {
       findByEmail: async () => undefined,
@@ -67,6 +67,7 @@ function fakeRepos() {
       purgeExpired: async () => {},
       deleteOthers: async () => {},
       deleteAllForUser: unusedRepoMethod,
+      ...sesionesOverrides,
     } satisfies SesionesRepo,
     auditoria: {
       record: async () => {},
@@ -160,5 +161,74 @@ describe('buildApp logging', () => {
     app = await build(false);
 
     expect(app.log.level).toBeUndefined();
+  });
+});
+
+// SECURITY-REPORT.md S03: no HTTP security headers were emitted anywhere.
+describe('buildApp security headers', () => {
+  let app: Awaited<ReturnType<typeof buildApp>> | undefined;
+
+  afterEach(async () => {
+    await app?.close();
+    app = undefined;
+  });
+
+  it('emits a strict CSP, nosniff and a same-origin referrer policy on every response', async () => {
+    app = await buildApp({
+      repos: fakeRepos(),
+      cookieSecret: COOKIE_SECRET,
+      db: fakeDb,
+    });
+
+    // /api/health is unauthenticated (config: { auth: false }) and simplest
+    // to exercise here — headers come from a hook registered ahead of every
+    // route plugin, so this is not testing health-route-specific behaviour.
+    const response = await app.inject({ method: 'GET', url: '/api/health' });
+
+    expect(response.headers['content-security-policy']).toContain(
+      "frame-ancestors 'none'",
+    );
+    expect(response.headers['x-content-type-options']).toBe('nosniff');
+    expect(response.headers['referrer-policy']).toBe('same-origin');
+  });
+});
+
+// SECURITY-REPORT.md S04: authenticated responses carried no Cache-Control,
+// letting an intermediate cache serve a prior user's identity or directory.
+describe('buildApp Cache-Control on authenticated responses', () => {
+  let app: Awaited<ReturnType<typeof buildApp>> | undefined;
+
+  afterEach(async () => {
+    await app?.close();
+    app = undefined;
+  });
+
+  it('sets no-store on an authenticated GET route, and leaves /api/health unset', async () => {
+    const repos = fakeRepos({
+      findValid: async () => ({
+        id: 'u1',
+        nombre: 'Test User',
+        email: 'test@example.com',
+        hashContrasena: 'irrelevant-hash',
+        rol: 'encargado',
+        activo: true,
+        intentosFallidos: 0,
+        bloqueadoHasta: null,
+        creadoEn: new Date('2026-01-01T00:00:00.000Z'),
+        debeCambiarPassword: false,
+      }),
+    });
+    app = await buildApp({ repos, cookieSecret: COOKIE_SECRET, db: fakeDb });
+    const cookies = { sid: app.signCookie('valid-token') };
+
+    const me = await app.inject({
+      method: 'GET',
+      url: '/api/auth/me',
+      cookies,
+    });
+    expect(me.headers['cache-control']).toBe('no-store');
+
+    const health = await app.inject({ method: 'GET', url: '/api/health' });
+    expect(health.headers['cache-control']).toBeUndefined();
   });
 });

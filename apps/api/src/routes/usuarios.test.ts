@@ -170,6 +170,23 @@ describe('GET /api/usuarios', () => {
     expect(response.json().data).toHaveLength(1);
   });
 
+  // SECURITY-REPORT.md S04: the user directory (emails, roles) had no
+  // Cache-Control at all — the buildApp-level onSend hook is what fixes it,
+  // not anything in this route.
+  it('sets Cache-Control: no-store, same as the app-wide onSend hook', async () => {
+    app = await buildWithSession(makeUsuario(), {
+      list: async () => ({ rows: [makeResumen()], total: 1 }),
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/usuarios',
+      cookies: { sid: app.signCookie('valid-token') },
+    });
+
+    expect(response.headers['cache-control']).toBe('no-store');
+  });
+
   it('passes explicit page and pageSize through to the repo and echoes them', async () => {
     const seen: { page?: number; pageSize?: number } = {};
     app = await buildWithSession(makeUsuario(), {
