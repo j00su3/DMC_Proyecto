@@ -968,6 +968,12 @@ El propio paso de CI es la verificación.
 **Location**: `apps/api/src/db/schema.ts:113-115`, `apps/api/src/auditoria/fields.ts:20-34`,
 `apps/api/src/usuarios/service.ts:215-222`, `openspec/specs/record-audit-trail/spec.md:7`
 
+**Status (2026-09-01)**: la mitad del correo del hallazgo está implementada — backlog #2.5,
+`docs/BACKLOG.md`. `recordAudit` (`apps/api/src/auditoria/service.ts`) ahora seudonimiza
+`usuarios.email` con HMAC-SHA256 keyed en ambas instantáneas antes de escribirlas; el correo en
+claro ya no llega a `auditoria`. La segunda mitad — la FK `onDelete: 'restrict'` que hace
+irreversible el borrado real de un usuario auditado — sigue sin resolver.
+
 **Description**
 Dos propiedades combinadas producen un efecto que ningún documento del proyecto declara. Primera: las
 instantáneas de auditoría almacenan el correo del usuario en JSONB, sin política de retención ni ruta
