@@ -178,6 +178,13 @@ describe('pos route', () => {
       'href',
       '/ventas/v1/recibo',
     );
+    // /ventas/recibo (search-by-correlativo) had no reachable entry point
+    // anywhere in the app — its own docblock claimed this screen linked to
+    // it and did not.
+    expect(screen.getByRole('link', { name: 'Buscar recibo' })).toHaveAttribute(
+      'href',
+      '/ventas/recibo',
+    );
     expect(
       screen.getByRole('button', { name: 'Nueva venta' }),
     ).toBeInTheDocument();
