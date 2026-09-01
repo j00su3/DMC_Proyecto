@@ -93,7 +93,12 @@ export function AppShell({
       </aside>
       <main className={styles.main}>
         {children}
-        <button type="button" onClick={onLogout} disabled={isLoggingOut}>
+        <button
+          type="button"
+          className={styles.logoutButton}
+          onClick={onLogout}
+          disabled={isLoggingOut}
+        >
           Cerrar sesión
         </button>
       </main>

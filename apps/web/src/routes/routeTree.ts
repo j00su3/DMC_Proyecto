@@ -9,6 +9,7 @@ import { productosListRoute } from './productos.js';
 import { productosDetalleRoute } from './productosDetalle.js';
 import { productosNuevoRoute } from './productosNuevo.js';
 import { publicLayout } from './publicLayout.js';
+import { reciboRoute } from './recibo.js';
 import { shellLayout } from './shellLayout.js';
 import { usuariosListRoute } from './usuarios.js';
 import { usuariosDetalleRoute } from './usuariosDetalle.js';
@@ -31,6 +32,7 @@ export const routeTree = rootRoute.addChildren([
     shellLayout.addChildren([
       indexRoute,
       posRoute,
+      reciboRoute,
       productosListRoute,
       productosNuevoRoute,
       productosDetalleRoute,

@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { cwd } from 'node:process';
 import {
   RouterProvider,
   createMemoryHistory,
@@ -146,4 +149,47 @@ describe('AppShell', () => {
       ).toHaveAttribute('href', '/inventario');
     },
   );
+
+  it('gives the logout control a class the print stylesheet can target', async () => {
+    renderShell({
+      usuario: encargado,
+      onLogout: vi.fn(),
+      isLoggingOut: false,
+      children: <p>content</p>,
+    });
+
+    const logout = await screen.findByRole('button', { name: 'Cerrar sesión' });
+    expect(logout.className).not.toBe('');
+  });
+});
+
+/**
+ * recibo-ui / Printable Receipt Route (D6): jsdom never applies a CSS
+ * Module's stylesheet (see `styles/tokens.test.ts`'s house rule), so this
+ * pins the source directly — the sidebar and the logout control must be
+ * print-hidden while `<main>`'s own content is untouched by the rule.
+ */
+describe('AppShell.module.css print chrome suppression (D6)', () => {
+  const css = readFileSync(
+    resolve(cwd(), 'src/components/ui/AppShell.module.css'),
+    'utf8',
+  );
+
+  it('hides the sidebar when printing', () => {
+    expect(css).toMatch(
+      /@media print[\s\S]*\.sidebar[\s\S]*\{[\s\S]*display:\s*none/,
+    );
+  });
+
+  it('hides the logout button when printing', () => {
+    expect(css).toMatch(
+      /@media print[\s\S]*\.logoutButton[\s\S]*\{[\s\S]*display:\s*none/,
+    );
+  });
+
+  it('does not hide .main inside the print media query', () => {
+    const printBlockMatch = css.match(/@media print\s*\{([\s\S]*)\n\}/);
+    expect(printBlockMatch).not.toBeNull();
+    expect(printBlockMatch?.[1]).not.toMatch(/\.main\b/);
+  });
 });
