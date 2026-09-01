@@ -112,7 +112,7 @@ describe('pos route', () => {
     expect(screen.getByLabelText('Pago')).toBeInTheDocument();
   });
 
-  it('adding a product then confirming clears the cart and invalidates productosKeys.all (PD-9)', async () => {
+  it('adding a product then confirming shows the success screen and invalidates productosKeys.all (PD-9, PD-10)', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn((input: string | URL | Request) => {
@@ -136,7 +136,14 @@ describe('pos route', () => {
             ok: true,
             status: 201,
             json: async () => ({
-              venta: { id: 'v1', numeroCorrelativo: 1 },
+              venta: {
+                id: 'v1',
+                numeroCorrelativo: 1,
+                usuarioId: encargadoUsuario.id,
+                estado: 'confirmada',
+                total: '10.00',
+                creadoEn: '2026-01-01T00:00:00.000Z',
+              },
               items: [],
               pagos: [],
             }),
@@ -162,16 +169,105 @@ describe('pos route', () => {
       screen.getByRole('button', { name: 'Confirmar venta' }),
     );
 
-    await waitFor(() =>
-      expect(
-        within(carrito).getByText('El carrito está vacío'),
-      ).toBeInTheDocument(),
+    expect(
+      await screen.findByRole('heading', { name: 'Venta confirmada' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('#1', { exact: false })).toBeInTheDocument();
+    expect(screen.getByText('$10.00', { exact: false })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Ver recibo' })).toHaveAttribute(
+      'href',
+      '/ventas/v1/recibo',
     );
+    expect(
+      screen.getByRole('button', { name: 'Nueva venta' }),
+    ).toBeInTheDocument();
+
+    // Success screen replaces the two-pane grid — cart/pago panel unmounted.
+    expect(screen.queryByLabelText('Carrito')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Pago')).not.toBeInTheDocument();
+
     await waitFor(() =>
       expect(invalidateSpy).toHaveBeenCalledWith(
         expect.objectContaining({ queryKey: ['productos'] }),
       ),
     );
+  });
+
+  it('the success screen persists with no auto-dismiss, and "Nueva venta" returns a fresh empty cart and payment lines (D5)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string | URL | Request) => {
+        const url = String(input);
+        if (url.includes('/api/auth/me')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({ usuario: encargadoUsuario }),
+          });
+        }
+        if (url.includes('/api/ventas/catalogo')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => catalogoResponse([catalogoProducto('1')]),
+          });
+        }
+        if (url.includes('/api/ventas') && !url.includes('catalogo')) {
+          return Promise.resolve({
+            ok: true,
+            status: 201,
+            json: async () => ({
+              venta: {
+                id: 'v1',
+                numeroCorrelativo: 1,
+                usuarioId: encargadoUsuario.id,
+                estado: 'confirmada',
+                total: '10.00',
+                creadoEn: '2026-01-01T00:00:00.000Z',
+              },
+              items: [],
+              pagos: [],
+            }),
+          });
+        }
+        throw new Error(`unexpected fetch: ${url}`);
+      }),
+    );
+
+    await renderPos(encargadoUsuario, newQueryClient());
+
+    await screen.findByText('Producto 1');
+    await userEvent.click(screen.getByRole('button', { name: 'Agregar' }));
+    await userEvent.type(screen.getByLabelText('Monto'), '10.00');
+    await userEvent.click(screen.getByRole('button', { name: 'Agregar pago' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Confirmar venta' }),
+    );
+
+    await screen.findByRole('heading', { name: 'Venta confirmada' });
+
+    // No auto-dismiss: still showing after some time passes with no action.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(
+      screen.getByRole('heading', { name: 'Venta confirmada' }),
+    ).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Nueva venta' }));
+
+    expect(
+      screen.queryByRole('heading', { name: 'Venta confirmada' }),
+    ).not.toBeInTheDocument();
+    const carrito = await screen.findByLabelText('Carrito');
+    expect(
+      within(carrito).getByText('El carrito está vacío'),
+    ).toBeInTheDocument();
+    // D5's latent-defect fix: PagoPanel's local state (montoInput/pagos) is
+    // reset too — the "Agregar pago" input starts empty and no pago line
+    // remains, proven by a fresh mount rather than manual reset code.
+    expect(screen.getByLabelText('Monto')).toHaveValue('');
+    expect(
+      screen.queryByText('Vuelto', { exact: false }),
+    ).not.toBeInTheDocument();
   });
 
   it('surfaces PRICE_CHANGED as a re-confirmation notice and does not close the sale (PD-6)', async () => {
@@ -221,7 +317,14 @@ describe('pos route', () => {
             ok: true,
             status: 201,
             json: async () => ({
-              venta: { id: 'v1', numeroCorrelativo: 1 },
+              venta: {
+                id: 'v1',
+                numeroCorrelativo: 1,
+                usuarioId: encargadoUsuario.id,
+                estado: 'confirmada',
+                total: '10.00',
+                creadoEn: '2026-01-01T00:00:00.000Z',
+              },
               items: [],
               pagos: [],
             }),
@@ -254,11 +357,52 @@ describe('pos route', () => {
       screen.getByRole('button', { name: 'Confirmar con los nuevos precios' }),
     );
 
-    await waitFor(() =>
-      expect(
-        within(carrito).getByText('El carrito está vacío'),
-      ).toBeInTheDocument(),
-    );
+    expect(
+      await screen.findByRole('heading', { name: 'Venta confirmada' }),
+    ).toBeInTheDocument();
     expect(ventasCallCount).toBe(2);
+  });
+
+  it('explicit "empty cart" action still clears the cart without confirming a sale (regression)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string | URL | Request) => {
+        const url = String(input);
+        if (url.includes('/api/auth/me')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({ usuario: encargadoUsuario }),
+          });
+        }
+        if (url.includes('/api/ventas/catalogo')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => catalogoResponse([catalogoProducto('1')]),
+          });
+        }
+        throw new Error(`unexpected fetch: ${url}`);
+      }),
+    );
+
+    await renderPos(encargadoUsuario, newQueryClient());
+
+    await screen.findByText('Producto 1');
+    await userEvent.click(screen.getByRole('button', { name: 'Agregar' }));
+
+    const carrito = screen.getByLabelText('Carrito');
+    expect(within(carrito).getByText('Producto 1')).toBeInTheDocument();
+
+    await userEvent.click(
+      within(carrito).getByRole('button', { name: 'Vaciar carrito' }),
+    );
+
+    expect(
+      within(carrito).getByText('El carrito está vacío'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Venta confirmada' }),
+    ).not.toBeInTheDocument();
   });
 });

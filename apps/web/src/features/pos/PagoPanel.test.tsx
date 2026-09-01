@@ -83,9 +83,14 @@ describe('PagoPanel', () => {
 
   it('shows the cart total via dinero.ts (precio × cantidad)', () => {
     const Wrapper = buildWrapper();
-    render(<PagoPanel items={[LINEA]} vaciarCarrito={vi.fn()} />, {
-      wrapper: Wrapper,
-    });
+    render(
+      <PagoPanel
+        items={[LINEA]}
+        vaciarCarrito={vi.fn()}
+        onVentaConfirmada={vi.fn()}
+      />,
+      { wrapper: Wrapper },
+    );
 
     expect(screen.getByText('$100.00')).toBeInTheDocument();
   });
@@ -94,9 +99,14 @@ describe('PagoPanel', () => {
     stubFetchOk();
     const user = userEvent.setup();
     const Wrapper = buildWrapper();
-    render(<PagoPanel items={[LINEA]} vaciarCarrito={vi.fn()} />, {
-      wrapper: Wrapper,
-    });
+    render(
+      <PagoPanel
+        items={[LINEA]}
+        vaciarCarrito={vi.fn()}
+        onVentaConfirmada={vi.fn()}
+      />,
+      { wrapper: Wrapper },
+    );
 
     const montoInput = screen.getByLabelText('Monto');
     await user.type(montoInput, '30.00');
@@ -125,9 +135,14 @@ describe('PagoPanel', () => {
     stubFetchOk();
     const user = userEvent.setup();
     const Wrapper = buildWrapper();
-    render(<PagoPanel items={[LINEA]} vaciarCarrito={vi.fn()} />, {
-      wrapper: Wrapper,
-    });
+    render(
+      <PagoPanel
+        items={[LINEA]}
+        vaciarCarrito={vi.fn()}
+        onVentaConfirmada={vi.fn()}
+      />,
+      { wrapper: Wrapper },
+    );
 
     await user.type(screen.getByLabelText('Monto'), '150.00');
     await user.click(screen.getByRole('button', { name: 'Agregar pago' }));
@@ -138,9 +153,14 @@ describe('PagoPanel', () => {
   it('shows no vuelto for a card-only payment', async () => {
     const user = userEvent.setup();
     const Wrapper = buildWrapper();
-    render(<PagoPanel items={[LINEA]} vaciarCarrito={vi.fn()} />, {
-      wrapper: Wrapper,
-    });
+    render(
+      <PagoPanel
+        items={[LINEA]}
+        vaciarCarrito={vi.fn()}
+        onVentaConfirmada={vi.fn()}
+      />,
+      { wrapper: Wrapper },
+    );
 
     await user.click(screen.getByRole('radio', { name: 'Tarjeta' }));
     await user.type(screen.getByLabelText('Monto'), '100.00');
@@ -153,9 +173,14 @@ describe('PagoPanel', () => {
     stubFetchPriceChanged();
     const user = userEvent.setup();
     const Wrapper = buildWrapper();
-    render(<PagoPanel items={[LINEA]} vaciarCarrito={vi.fn()} />, {
-      wrapper: Wrapper,
-    });
+    render(
+      <PagoPanel
+        items={[LINEA]}
+        vaciarCarrito={vi.fn()}
+        onVentaConfirmada={vi.fn()}
+      />,
+      { wrapper: Wrapper },
+    );
 
     await user.type(screen.getByLabelText('Monto'), '100.00');
     await user.click(screen.getByRole('button', { name: 'Agregar pago' }));
@@ -177,9 +202,14 @@ describe('PagoPanel', () => {
     stubFetchPriceChanged();
     const user = userEvent.setup();
     const Wrapper = buildWrapper();
-    render(<PagoPanel items={[LINEA]} vaciarCarrito={vi.fn()} />, {
-      wrapper: Wrapper,
-    });
+    render(
+      <PagoPanel
+        items={[LINEA]}
+        vaciarCarrito={vi.fn()}
+        onVentaConfirmada={vi.fn()}
+      />,
+      { wrapper: Wrapper },
+    );
 
     await user.type(screen.getByLabelText('Monto'), '100.00');
     await user.click(screen.getByRole('button', { name: 'Agregar pago' }));
@@ -200,5 +230,61 @@ describe('PagoPanel', () => {
     const call = fetchMock.mock.calls[0];
     const body = JSON.parse(call?.[1]?.body as string);
     expect(body.items[0].precioUnitarioEsperado).toBe('120.00');
+  });
+
+  it('calls onVentaConfirmada with the confirmed venta on a successful mutate', async () => {
+    stubFetchOk();
+    const user = userEvent.setup();
+    const Wrapper = buildWrapper();
+    const onVentaConfirmada = vi.fn();
+    render(
+      <PagoPanel
+        items={[LINEA]}
+        vaciarCarrito={vi.fn()}
+        onVentaConfirmada={onVentaConfirmada}
+      />,
+      { wrapper: Wrapper },
+    );
+
+    await user.type(screen.getByLabelText('Monto'), '100.00');
+    await user.click(screen.getByRole('button', { name: 'Agregar pago' }));
+    await user.click(screen.getByRole('button', { name: 'Confirmar venta' }));
+
+    await waitFor(() => {
+      expect(onVentaConfirmada).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'venta-1', numeroCorrelativo: 1 }),
+      );
+    });
+  });
+
+  it('calls onVentaConfirmada on the PRICE_CHANGED re-confirmation path too', async () => {
+    stubFetchPriceChanged();
+    const user = userEvent.setup();
+    const Wrapper = buildWrapper();
+    const onVentaConfirmada = vi.fn();
+    render(
+      <PagoPanel
+        items={[LINEA]}
+        vaciarCarrito={vi.fn()}
+        onVentaConfirmada={onVentaConfirmada}
+      />,
+      { wrapper: Wrapper },
+    );
+
+    await user.type(screen.getByLabelText('Monto'), '100.00');
+    await user.click(screen.getByRole('button', { name: 'Agregar pago' }));
+    await user.click(screen.getByRole('button', { name: 'Confirmar venta' }));
+    await screen.findByRole('alert');
+
+    stubFetchOk();
+    await user.click(
+      screen.getByRole('button', { name: 'Confirmar con los nuevos precios' }),
+    );
+
+    await waitFor(() => {
+      expect(onVentaConfirmada).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'venta-1', numeroCorrelativo: 1 }),
+      );
+    });
   });
 });
