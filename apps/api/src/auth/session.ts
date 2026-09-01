@@ -35,13 +35,20 @@ export function hashToken(token: string): string {
 // design.md "Key Config Shapes" — sessionCookieOptions(). Attributes are set
 // explicitly here rather than relying on the plugin's global parseOptions so
 // this stays the single source of truth for the ADR-0010 "no domain" rule.
+//
+// SECURITY-REPORT.md S05: `secure: process.env.NODE_ENV === 'production'`
+// failed OPEN — a missing, misspelled or platform-omitted NODE_ENV produced
+// an insecure cookie silently, with nothing to opt into. `secure` now
+// defaults to `true` unconditionally; only an explicit
+// `ALLOW_INSECURE_COOKIES=true` disables it, so the unsafe state has to be
+// requested on purpose rather than fallen into.
 export function sessionCookieOptions(): CookieSerializeOptions {
   return {
     path: '/',
     httpOnly: true,
     sameSite: 'lax',
     signed: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: process.env.ALLOW_INSECURE_COOKIES !== 'true',
     maxAge: SESSION_TTL_SECONDS,
   };
 }

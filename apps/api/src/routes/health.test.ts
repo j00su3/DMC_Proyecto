@@ -2,6 +2,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../app.js';
 import type { DbLike } from '../plugins/db.js';
 
+// S05: resolveCookieSecret now throws without an explicit COOKIE_SECRET (or
+// ALLOW_INSECURE_COOKIES=true) — same explicit `cookieSecret` convention
+// every other route suite already uses.
+const COOKIE_SECRET = 'test-cookie-secret-at-least-32-characters-long';
+
 describe('GET /api/health', () => {
   let app: Awaited<ReturnType<typeof buildApp>> | undefined;
 
@@ -12,7 +17,7 @@ describe('GET /api/health', () => {
 
   it('returns 200 with status ok and db up when the DB check succeeds', async () => {
     const stubDb: DbLike = { checkDb: async () => true };
-    app = await buildApp({ db: stubDb });
+    app = await buildApp({ db: stubDb, cookieSecret: COOKIE_SECRET });
 
     const response = await app.inject({ method: 'GET', url: '/api/health' });
 
@@ -24,7 +29,7 @@ describe('GET /api/health', () => {
 
   it('returns a non-2xx error envelope with db down when the DB check fails', async () => {
     const stubDb: DbLike = { checkDb: async () => false };
-    app = await buildApp({ db: stubDb });
+    app = await buildApp({ db: stubDb, cookieSecret: COOKIE_SECRET });
 
     const response = await app.inject({ method: 'GET', url: '/api/health' });
 

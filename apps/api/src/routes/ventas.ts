@@ -41,10 +41,23 @@ const pagoBody = z
   })
   .strict();
 
+// SECURITY-REPORT.md S06: neither array had an upper bound. confirmarVenta
+// (ventas/service.ts) walks `items` twice inside ONE UnitOfWork transaction
+// — a findById pass then an aplicarDelta UPDATE + movimientos INSERT pass,
+// all sequential, all on the same held connection — against a `pg` Pool
+// that defaults to 10 connections (db/pool.ts). The route has no rateLimit
+// and is open to both roles, so an unbounded array let the lowest-privilege
+// session hold the pool with a single request. 50 is well past "a few dozen
+// line items", which is already a generous counter sale for a small shop
+// (PRD.md), while keeping a worst-case request bounded to ~100 sequential
+// DB round trips instead of thousands.
+const MAX_VENTA_ITEMS = 50;
+const MAX_VENTA_PAGOS = 50;
+
 const confirmarVentaBody = z
   .object({
-    items: z.array(itemBody).min(1),
-    pagos: z.array(pagoBody).min(1),
+    items: z.array(itemBody).min(1).max(MAX_VENTA_ITEMS),
+    pagos: z.array(pagoBody).min(1).max(MAX_VENTA_PAGOS),
   })
   .strict();
 

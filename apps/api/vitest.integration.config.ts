@@ -17,6 +17,12 @@ export default defineConfig({
     env: {
       DATABASE_URL:
         'postgres://inventienda:inventienda@localhost:5432/inventienda',
+      // S05: resolveCookieSecret now throws without an explicit
+      // COOKIE_SECRET (or ALLOW_INSECURE_COOKIES=true). Every integration
+      // suite except health.integration.test.ts already passes its own
+      // `cookieSecret` to `buildApp` (which wins over this); this covers
+      // health's deliberately-unconfigured `buildApp()` call.
+      COOKIE_SECRET: 'integration-cookie-secret-at-least-32-characters',
     },
   },
 });
