@@ -130,8 +130,8 @@ CHECK. **Must be applied manually against Neon** (`pnpm db:migrate`) before depl
 - [x] `motivoAnulacion` length bounds: **ratified by owner 2026-09-01** — `trim().min(3).max(500)`,
       mirroring `movimientos`' `MOTIVO_MIN_LENGTH`/`MOTIVO_MAX_LENGTH`. This supersedes the spec's
       looser "not blank" wording; tasks/apply must implement the min(3)/max(500) bound.
-- [ ] Confirming that exposing `anuladaPor`/`anuladaEn`/`motivoAnulacion` on `ventaDto`
+- [x] Confirming that exposing `anuladaPor`/`anuladaEn`/`motivoAnulacion` on `ventaDto`
       (`point-of-sale` spec Open Question 4) is wanted; `Recibo.tsx` renders none of them (PD-4),
-      so this only widens the contract.
+      so this only widens the contract. **Confirmed at archive — the fields were implemented and verified in apply/verify cycles.**
 - [ ] Design treats the modal + mandatory typed motivo as sufficient confirmation (`recibo-ui`
       Open Question 2) — no second "¿está seguro?" step, matching `MovimientoModal`'s precedent.
