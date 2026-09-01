@@ -252,7 +252,7 @@ chrome. `pnpm -r test`, `pnpm typecheck`, `pnpm lint` green. **DONE**
 Depends on: Phase 3 (navigates to `/ventas/$id/recibo` on match). Independent of Phase 5 — may run
 in parallel with it once Phase 3 is merged.
 
-### Task 4.1 — `/ventas/recibo` landing route + registration
+### Task 4.1 — `/ventas/recibo` landing route + registration [x]
 - **File**: `apps/web/src/routes/reciboBuscar.tsx` (new), `apps/web/src/routes/routeTree.ts`
   (modify)
 - **Satisfies**: recibo-ui spec, "Correlativo Search" (all scenarios).
@@ -270,7 +270,9 @@ in parallel with it once Phase 3 is merged.
   - both roles (`encargado`, `deposito`) can reach and use the search (PD-4)
 
 **Phase 4 exit criteria**: `/ventas/recibo` reachable and functional standalone (independently
-testable even before Phase 5 wires the POS link to it).
+testable even before Phase 5 wires the POS link to it). **DONE**
+(`feat/recibo-pr4-busqueda`, not pushed). `pnpm --filter web test` (404/404), `pnpm typecheck`,
+`pnpm lint` all green.
 
 ---
 
