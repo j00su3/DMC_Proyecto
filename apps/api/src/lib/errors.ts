@@ -349,6 +349,15 @@ export function saleNotFound(): AppError {
   return new AppError('SALE_NOT_FOUND', 'Sale not found', 404);
 }
 
+// backlog #9 (anulacion-venta) design.md's "missing motivo is a Zod
+// VALIDATION_ERROR, not a new error factory" decision — this is the ONE new
+// factory the cycle adds. Same shape as skuAlreadyInUse(): no `details`,
+// English UPPER_SNAKE, 409 because the request is valid but the venta's
+// current state (already anulada) conflicts with it.
+export function saleAlreadyVoided(): AppError {
+  return new AppError('SALE_ALREADY_VOIDED', 'Sale is already voided', 409);
+}
+
 export function toErrorEnvelope(error: unknown): MappedError {
   if (hasValidationErrors(error)) {
     return {

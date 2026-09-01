@@ -13,9 +13,11 @@ import type {
   VentasRepo,
 } from './repository.js';
 import {
+  type AnularVentaInput,
   type ConfirmarVentaInput,
   type ItemVentaInput,
   type PagoInput,
+  anularVenta,
   confirmarVenta,
   getRecibo,
   ordenarItems,
@@ -53,6 +55,13 @@ interface HarnessOptions {
   // productoId -> aplicarDelta return value; undefined key means "not
   // stubbed", a stubbed undefined VALUE means "aplicarDelta refused".
   aplicarDeltaResults?: Record<string, number | undefined>;
+  // productoId -> revertirStockPorAnulacion return value (backlog #9).
+  revertirStockPorAnulacionResults?: Record<string, number>;
+  // backlog #9 (anulacion-venta) harness controls for anularVenta.
+  marcarAnuladaResult?: Venta | undefined;
+  findByIdResult?: Venta | undefined;
+  findItemsResult?: ItemVenta[];
+  revertirPagosResult?: Pago[];
 }
 
 // Mirrors movimientos/service.test.ts's harness precedent: a UnitOfWork
@@ -81,6 +90,18 @@ function harness(options: HarnessOptions = {}) {
       'productos.aplicarDelta',
       async (id: string, _delta: number) => options.aplicarDeltaResults?.[id],
     ),
+    revertirStockPorAnulacion: spy(
+      'productos.revertirStockPorAnulacion',
+      async (id: string, _cantidad: number) => {
+        const result = options.revertirStockPorAnulacionResults?.[id];
+        if (result === undefined) {
+          throw new Error(
+            `revertirStockPorAnulacion: no stubbed result for ${id}`,
+          );
+        }
+        return result;
+      },
+    ),
   };
 
   const movimientos = {
@@ -102,6 +123,9 @@ function harness(options: HarnessOptions = {}) {
         numeroCorrelativo: ventaSeq,
         estado: 'confirmada',
         creadoEn: new Date('2026-01-01T00:00:00.000Z'),
+        anuladaPor: null,
+        anuladaEn: null,
+        motivoAnulacion: null,
         ...input,
       };
       return venta;
@@ -126,13 +150,27 @@ function harness(options: HarnessOptions = {}) {
         };
       }),
     ) as unknown as VentasRepo['createPagos'],
-    findById: spy('ventas.findById', async (_id: string) => undefined),
+    findById: spy(
+      'ventas.findById',
+      async (_id: string) => options.findByIdResult,
+    ),
     findByNumeroCorrelativo: spy(
       'ventas.findByNumeroCorrelativo',
       async (_numero: number) => undefined,
     ),
-    findItems: spy('ventas.findItems', async (_ventaId: string) => []),
+    findItems: spy(
+      'ventas.findItems',
+      async (_ventaId: string) => options.findItemsResult ?? [],
+    ),
     findPagos: spy('ventas.findPagos', async (_ventaId: string) => []),
+    marcarAnulada: spy(
+      'ventas.marcarAnulada',
+      async (_input: unknown) => options.marcarAnuladaResult,
+    ) as unknown as VentasRepo['marcarAnulada'],
+    revertirPagos: spy(
+      'ventas.revertirPagos',
+      async (_ventaId: string) => options.revertirPagosResult ?? [],
+    ),
   };
 
   const repos = { productos, movimientos, ventas } as unknown as Repos & {
@@ -597,6 +635,269 @@ describe('confirmarVenta — atomicity and ledger shape', () => {
   });
 });
 
+// backlog #9 (anulacion-venta) — tasks.md 3.2, design.md's Technical
+// Approach ("confirmarVenta's mirror image").
+const ANULACION_VENTA_ID = 'venta-1';
+
+describe('anularVenta — no partial-selection param exists on the signature', () => {
+  it('AnularVentaInput has no item/pago selection key at the type level', () => {
+    const input: AnularVentaInput = {
+      ventaId: ANULACION_VENTA_ID,
+      actorId: ACTOR_ENCARGADO_ID,
+      motivoAnulacion: 'Cliente canceló el pedido',
+      // @ts-expect-error — no itemIds/pagoIds selection key exists
+      itemIds: ['item-1'],
+    };
+    expect(input).toBeDefined();
+  });
+});
+
+describe('anularVenta — PD-1 mandatory motivo, refused before any write', () => {
+  it.each(['', '  ', 'ab', 'a'.repeat(501)])(
+    'refuses %j before uow.run ever opens, with VALIDATION_ERROR 400',
+    async (motivoAnulacion) => {
+      const h = harness();
+
+      await expect(
+        anularVenta(h.uow, {
+          ventaId: ANULACION_VENTA_ID,
+          actorId: ACTOR_ENCARGADO_ID,
+          motivoAnulacion,
+        }),
+      ).rejects.toMatchObject({ code: 'VALIDATION_ERROR', status: 400 });
+
+      expect(h.uow.run).not.toHaveBeenCalled();
+    },
+  );
+
+  it('accepts a motivo at exactly the 3-char floor and the 500-char ceiling', async () => {
+    const itemA = itemVenta({
+      id: 'item-1',
+      ventaId: ANULACION_VENTA_ID,
+      productoId: PRODUCT_A_ID,
+      cantidad: 2,
+    });
+    const h = harness({
+      marcarAnuladaResult: venta({
+        id: ANULACION_VENTA_ID,
+        estado: 'anulada',
+        anuladaPor: ACTOR_ENCARGADO_ID,
+        anuladaEn: new Date('2026-01-02T00:00:00.000Z'),
+        motivoAnulacion: 'abc',
+      }),
+      findItemsResult: [itemA],
+      revertirStockPorAnulacionResults: { [PRODUCT_A_ID]: 12 },
+    });
+
+    await expect(
+      anularVenta(h.uow, {
+        ventaId: ANULACION_VENTA_ID,
+        actorId: ACTOR_ENCARGADO_ID,
+        motivoAnulacion: 'abc',
+      }),
+    ).resolves.toBeDefined();
+
+    const h2 = harness({
+      marcarAnuladaResult: venta({
+        id: ANULACION_VENTA_ID,
+        estado: 'anulada',
+        motivoAnulacion: 'a'.repeat(500),
+      }),
+      findItemsResult: [itemA],
+      revertirStockPorAnulacionResults: { [PRODUCT_A_ID]: 12 },
+    });
+
+    await expect(
+      anularVenta(h2.uow, {
+        ventaId: ANULACION_VENTA_ID,
+        actorId: ACTOR_ENCARGADO_ID,
+        motivoAnulacion: 'a'.repeat(500),
+      }),
+    ).resolves.toBeDefined();
+  });
+});
+
+describe('anularVenta — D2 transition-first ordering (design.md serialization point)', () => {
+  it('calls marcarAnulada BEFORE any productos.revertirStockPorAnulacion / movimientos.create / revertirPagos call', async () => {
+    const itemA = itemVenta({
+      id: 'item-1',
+      ventaId: ANULACION_VENTA_ID,
+      productoId: PRODUCT_A_ID,
+      cantidad: 2,
+    });
+    const itemB = itemVenta({
+      id: 'item-2',
+      ventaId: ANULACION_VENTA_ID,
+      productoId: PRODUCT_B_ID,
+      cantidad: 3,
+    });
+    const h = harness({
+      marcarAnuladaResult: venta({
+        id: ANULACION_VENTA_ID,
+        estado: 'anulada',
+        anuladaPor: ACTOR_ENCARGADO_ID,
+        anuladaEn: new Date('2026-01-02T00:00:00.000Z'),
+        motivoAnulacion: 'Cliente canceló el pedido',
+      }),
+      findItemsResult: [itemA, itemB],
+      revertirStockPorAnulacionResults: {
+        [PRODUCT_A_ID]: 12,
+        [PRODUCT_B_ID]: 13,
+      },
+      revertirPagosResult: [pagoRow({ estado: 'revertido' })],
+    });
+
+    await anularVenta(h.uow, {
+      ventaId: ANULACION_VENTA_ID,
+      actorId: ACTOR_ENCARGADO_ID,
+      motivoAnulacion: 'Cliente canceló el pedido',
+    });
+
+    const methodOrder = h.calls.map((c) => c.method);
+    const marcarIdx = methodOrder.indexOf('ventas.marcarAnulada');
+    const stockIdx = methodOrder.indexOf('productos.revertirStockPorAnulacion');
+    const movIdx = methodOrder.indexOf('movimientos.create');
+    const pagosIdx = methodOrder.indexOf('ventas.revertirPagos');
+
+    expect(marcarIdx).toBe(0);
+    expect(marcarIdx).toBeLessThan(stockIdx);
+    expect(marcarIdx).toBeLessThan(movIdx);
+    expect(stockIdx).toBeLessThan(pagosIdx);
+    expect(movIdx).toBeLessThan(pagosIdx);
+    expect(h.uow.run).toHaveBeenCalledTimes(1);
+  });
+
+  it('persists motivoAnulacion verbatim through marcarAnulada', async () => {
+    const itemA = itemVenta({ productoId: PRODUCT_A_ID, cantidad: 1 });
+    const h = harness({
+      marcarAnuladaResult: venta({ id: ANULACION_VENTA_ID, estado: 'anulada' }),
+      findItemsResult: [itemA],
+      revertirStockPorAnulacionResults: { [PRODUCT_A_ID]: 10 },
+    });
+
+    await anularVenta(h.uow, {
+      ventaId: ANULACION_VENTA_ID,
+      actorId: ACTOR_ENCARGADO_ID,
+      motivoAnulacion: 'Cliente canceló el pedido',
+    });
+
+    expect(h.ventas.marcarAnulada).toHaveBeenCalledWith({
+      ventaId: ANULACION_VENTA_ID,
+      anuladaPor: ACTOR_ENCARGADO_ID,
+      motivoAnulacion: 'Cliente canceló el pedido',
+    });
+  });
+
+  it('creates one movimientos row per item, tipo anulacion, positive cantidad, motivo null, linked by ventaId', async () => {
+    const itemA = itemVenta({
+      id: 'item-1',
+      productoId: PRODUCT_A_ID,
+      cantidad: 4,
+    });
+    const h = harness({
+      marcarAnuladaResult: venta({ id: ANULACION_VENTA_ID, estado: 'anulada' }),
+      findItemsResult: [itemA],
+      revertirStockPorAnulacionResults: { [PRODUCT_A_ID]: 20 },
+    });
+
+    await anularVenta(h.uow, {
+      ventaId: ANULACION_VENTA_ID,
+      actorId: ACTOR_ENCARGADO_ID,
+      motivoAnulacion: 'Cliente canceló el pedido',
+    });
+
+    expect(h.movimientos.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        productoId: PRODUCT_A_ID,
+        tipo: 'anulacion',
+        cantidad: 4,
+        motivo: null,
+        ventaId: ANULACION_VENTA_ID,
+        stockResultante: 20,
+      }),
+    );
+  });
+});
+
+describe('anularVenta — D4 classify-on-undefined (rechazarVenta precedent)', () => {
+  it('marcarAnulada undefined + findById absent -> saleNotFound() (404)', async () => {
+    const h = harness({
+      marcarAnuladaResult: undefined,
+      findByIdResult: undefined,
+    });
+
+    await expect(
+      anularVenta(h.uow, {
+        ventaId: ANULACION_VENTA_ID,
+        actorId: ACTOR_ENCARGADO_ID,
+        motivoAnulacion: 'Motivo cualquiera',
+      }),
+    ).rejects.toMatchObject({ code: 'SALE_NOT_FOUND', status: 404 });
+  });
+
+  it('marcarAnulada undefined + findById present -> saleAlreadyVoided() (409)', async () => {
+    const h = harness({
+      marcarAnuladaResult: undefined,
+      findByIdResult: venta({ id: ANULACION_VENTA_ID, estado: 'anulada' }),
+    });
+
+    await expect(
+      anularVenta(h.uow, {
+        ventaId: ANULACION_VENTA_ID,
+        actorId: ACTOR_ENCARGADO_ID,
+        motivoAnulacion: 'Motivo cualquiera',
+      }),
+    ).rejects.toMatchObject({ code: 'SALE_ALREADY_VOIDED', status: 409 });
+
+    expect(h.productos.revertirStockPorAnulacion).not.toHaveBeenCalled();
+    expect(h.movimientos.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('anularVenta — total reversal, every item and every pago (v1, not partial)', () => {
+  it('reverses every item and every pago row, none held back', async () => {
+    const itemA = itemVenta({
+      id: 'item-1',
+      productoId: PRODUCT_A_ID,
+      cantidad: 1,
+    });
+    const itemB = itemVenta({
+      id: 'item-2',
+      productoId: PRODUCT_B_ID,
+      cantidad: 2,
+    });
+    const itemC = itemVenta({
+      id: 'item-3',
+      productoId: PRODUCT_C_ID,
+      cantidad: 3,
+    });
+    const h = harness({
+      marcarAnuladaResult: venta({ id: ANULACION_VENTA_ID, estado: 'anulada' }),
+      findItemsResult: [itemA, itemB, itemC],
+      revertirStockPorAnulacionResults: {
+        [PRODUCT_A_ID]: 1,
+        [PRODUCT_B_ID]: 2,
+        [PRODUCT_C_ID]: 3,
+      },
+      revertirPagosResult: [
+        pagoRow({ id: 'pago-1', estado: 'revertido' }),
+        pagoRow({ id: 'pago-2', estado: 'revertido' }),
+      ],
+    });
+
+    const result = await anularVenta(h.uow, {
+      ventaId: ANULACION_VENTA_ID,
+      actorId: ACTOR_ENCARGADO_ID,
+      motivoAnulacion: 'Cliente canceló el pedido',
+    });
+
+    expect(h.productos.revertirStockPorAnulacion).toHaveBeenCalledTimes(3);
+    expect(h.movimientos.create).toHaveBeenCalledTimes(3);
+    expect(h.ventas.revertirPagos).toHaveBeenCalledTimes(1);
+    expect(result.pagos).toHaveLength(2);
+  });
+});
+
 // recibo-interno (backlog #8) — tasks.md Task 1.3, design.md D2/D7.
 const CAJERO_ID = '44444444-4444-4444-8444-444444444444';
 
@@ -608,6 +909,9 @@ function venta(over: Partial<Venta> = {}): Venta {
     estado: 'confirmada',
     total: '10.00',
     creadoEn: new Date('2026-01-01T00:00:00.000Z'),
+    anuladaPor: null,
+    anuladaEn: null,
+    motivoAnulacion: null,
     ...over,
   };
 }

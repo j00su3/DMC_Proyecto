@@ -8,6 +8,7 @@ import {
   sumar,
 } from '../lib/dinero.js';
 import {
+  AppError,
   cashlessPaymentMustMatchTotal,
   duplicateSaleItem,
   insufficientStock,
@@ -16,6 +17,7 @@ import {
   priceChanged,
   productInactive,
   productNotFound,
+  saleAlreadyVoided,
   saleAmountOutOfRange,
   saleNotFound,
 } from '../lib/errors.js';
@@ -267,6 +269,103 @@ export async function confirmarVenta(
     }));
 
     const pagos = await txRepos.ventas.createPagos(nuevosPagos);
+
+    return { venta, items, pagos };
+  });
+}
+
+// backlog #9 (anulacion-venta) design.md's ratified Open Question 1: the
+// motivo bound mirrors movimientos.ts's MOTIVO_MIN_LENGTH/MOTIVO_MAX_LENGTH
+// exactly (trim().min(3).max(500)). This is the SAME bound the route's Zod
+// schema enforces (task 4.2) — kept here too as a payload-only guard so the
+// service is safe standalone and refuses before uow.run ever opens, mirroring
+// confirmarVenta's duplicateSaleItem/paymentMediumDuplicated precedent.
+export const MOTIVO_ANULACION_MIN_LENGTH = 3;
+export const MOTIVO_ANULACION_MAX_LENGTH = 500;
+
+// design.md: unconditionally required, so it is wire shape — VALIDATION_ERROR
+// (400), never a new domain error factory (the design's own stated
+// rationale, distinguishing it from movementReasonRequired()'s conditional
+// case).
+export interface AnularVentaInput {
+  ventaId: string;
+  actorId: string;
+  motivoAnulacion: string;
+}
+
+// design.md's Technical Approach: confirmarVenta's mirror image. One
+// uow.run: marcarAnulada FIRST (the serialization point, ADR-0005 idiom —
+// see repository.ts's marcarAnulada doc comment), then a per-item loop
+// (revertirStockPorAnulacion + one `anulacion` movimiento each), then a bulk
+// pagos revert. No recordAudit call anywhere (ventas is not an
+// AuditableEntidad, #7 D9) — the movimientos rows plus
+// anuladaPor/anuladaEn/motivoAnulacion ARE the audit trail.
+export async function anularVenta(
+  uow: UnitOfWork,
+  input: AnularVentaInput,
+): Promise<{ venta: Venta; items: ItemVenta[]; pagos: Pago[] }> {
+  const motivoTrimmed = input.motivoAnulacion.trim();
+  if (
+    motivoTrimmed.length < MOTIVO_ANULACION_MIN_LENGTH ||
+    motivoTrimmed.length > MOTIVO_ANULACION_MAX_LENGTH
+  ) {
+    throw new AppError(
+      'VALIDATION_ERROR',
+      `motivoAnulacion must be between ${MOTIVO_ANULACION_MIN_LENGTH} and ${MOTIVO_ANULACION_MAX_LENGTH} characters after trimming`,
+      400,
+    );
+  }
+
+  return uow.run(async (txRepos) => {
+    // The serialization point (design.md): a concurrent second anulación
+    // attempt blocks on this row's own UPDATE, then sees 0 rows once this
+    // one commits — never a SELECT ... FOR UPDATE followed by a plain SET.
+    const venta = await txRepos.ventas.marcarAnulada({
+      ventaId: input.ventaId,
+      anuladaPor: input.actorId,
+      motivoAnulacion: input.motivoAnulacion,
+    });
+
+    if (!venta) {
+      // D4 classify-on-undefined (rechazarVenta precedent): a second read
+      // inside the same transaction distinguishes "no such venta" (404) from
+      // "venta exists but the guard rejected it — already anulada" (409).
+      const existing = await txRepos.ventas.findById(input.ventaId);
+      if (!existing) {
+        throw saleNotFound();
+      }
+      throw saleAlreadyVoided();
+    }
+
+    // v1 is total-only (spec.md's "Anulación Is Total, Not Partial"): every
+    // item on the venta reverses, no selection param exists on this
+    // function's signature.
+    const items = await txRepos.ventas.findItems(venta.id);
+
+    for (const item of items) {
+      const stockResultante = await txRepos.productos.revertirStockPorAnulacion(
+        item.productoId,
+        item.cantidad,
+      );
+
+      // A8: tipo 'anulacion', positive cantidad — the reversal's mirror of
+      // confirmarVenta's tipo 'venta' negative-cantidad row. motivo: null,
+      // ventaId set — the venta row is the single home of the reason (design
+      // decision, no duplication across N movimientos rows).
+      await txRepos.movimientos.create({
+        productoId: item.productoId,
+        tipo: 'anulacion',
+        cantidad: item.cantidad,
+        motivo: null,
+        esDiscrepancia: false,
+        esMerma: false,
+        usuarioId: input.actorId,
+        ventaId: venta.id,
+        stockResultante,
+      });
+    }
+
+    const pagos = await txRepos.ventas.revertirPagos(venta.id);
 
     return { venta, items, pagos };
   });

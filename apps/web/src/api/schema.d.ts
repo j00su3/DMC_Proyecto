@@ -2804,6 +2804,161 @@ export interface paths {
                                 total: string;
                                 /** Format: date-time */
                                 creadoEn: string;
+                                anuladaPor: string | null;
+                                /** Format: date-time */
+                                anuladaEn: string | null;
+                                motivoAnulacion: string | null;
+                            };
+                            items: {
+                                id: string;
+                                ventaId: string;
+                                productoId: string;
+                                cantidad: number;
+                                precioUnitario: string;
+                                subtotal: string;
+                            }[];
+                            pagos: {
+                                id: string;
+                                ventaId: string;
+                                /** @enum {string} */
+                                medio: "efectivo" | "tarjeta" | "transferencia" | "qr";
+                                monto: string;
+                                vuelto: string;
+                                /** @enum {string} */
+                                estado: "registrado" | "revertido";
+                            }[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ventas/{id}/anular": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        motivoAnulacion: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            venta: {
+                                id: string;
+                                numeroCorrelativo: number;
+                                usuarioId: string;
+                                /** @enum {string} */
+                                estado: "confirmada" | "anulada";
+                                total: string;
+                                /** Format: date-time */
+                                creadoEn: string;
+                                anuladaPor: string | null;
+                                /** Format: date-time */
+                                anuladaEn: string | null;
+                                motivoAnulacion: string | null;
                             };
                             items: {
                                 id: string;
@@ -3028,6 +3183,10 @@ export interface paths {
                                 total: string;
                                 /** Format: date-time */
                                 creadoEn: string;
+                                anuladaPor: string | null;
+                                /** Format: date-time */
+                                anuladaEn: string | null;
+                                motivoAnulacion: string | null;
                             };
                             cajero: {
                                 id: string;
@@ -3144,6 +3303,10 @@ export interface paths {
                                 total: string;
                                 /** Format: date-time */
                                 creadoEn: string;
+                                anuladaPor: string | null;
+                                /** Format: date-time */
+                                anuladaEn: string | null;
+                                motivoAnulacion: string | null;
                             };
                             cajero: {
                                 id: string;

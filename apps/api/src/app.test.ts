@@ -91,6 +91,7 @@ function fakeRepos() {
       update: unusedRepoMethod,
       setActivo: unusedRepoMethod,
       aplicarDelta: unusedRepoMethod,
+      revertirStockPorAnulacion: unusedRepoMethod,
     } satisfies ProductosRepo,
     movimientos: {
       create: unusedRepoMethod,
@@ -104,6 +105,8 @@ function fakeRepos() {
       findByNumeroCorrelativo: unusedRepoMethod,
       findItems: unusedRepoMethod,
       findPagos: unusedRepoMethod,
+      marcarAnulada: unusedRepoMethod,
+      revertirPagos: unusedRepoMethod,
     } satisfies VentasRepo,
   };
 }

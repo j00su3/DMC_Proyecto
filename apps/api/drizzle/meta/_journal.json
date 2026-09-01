@@ -50,6 +50,13 @@
       "when": 1788188364077,
       "tag": "0006_magical_mandarin",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788284087636,
+      "tag": "0007_giant_cerebro",
+      "breakpoints": true
     }
   ]
 }

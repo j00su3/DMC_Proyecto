@@ -14,6 +14,12 @@ const BASE_RECIBO: ReciboData = {
     estado: 'confirmada',
     total: '150.00',
     creadoEn: '2026-08-31T15:30:00.000Z',
+    // backlog #9 (anulacion-venta) PR1's contract regen widens ventaDto with
+    // these 3 nullable fields; Recibo.tsx itself stays untouched (PD-4) —
+    // this fixture just needs to satisfy the wider generated type.
+    anuladaPor: null,
+    anuladaEn: null,
+    motivoAnulacion: null,
   },
   cajero: { id: 'usr-1', nombre: 'Ana Torres' },
   items: [

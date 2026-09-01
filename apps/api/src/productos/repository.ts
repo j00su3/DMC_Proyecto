@@ -67,6 +67,15 @@ export interface ProductosRepo {
   // service maps undefined to a domain error; it never means "row missing"
   // alone, because the caller has already read the row.
   aplicarDelta(id: string, delta: number): Promise<number | undefined>;
+  // backlog #9 (anulacion-venta) design.md's A8 decision: unconditional
+  // UPDATE, no `activo` predicate — a now-inactive product's stock must
+  // still revert on anulación. `cantidad` is positive-only (adds only); a
+  // decrement is unrepresentable through this seam, which is the real
+  // anti-backdoor guarantee (proposal risk row 3). Never returns
+  // `undefined`: with `activo` unchecked and `cantidad` positive, the only
+  // zero-row cause would be a missing product, impossible behind the
+  // `items_venta` FK — a zero-row result throws instead (expectOneRow idiom).
+  revertirStockPorAnulacion(id: string, cantidad: number): Promise<number>;
   // No findBySku, deliberately (D5's folding rule, mirroring
   // proveedores/repository.ts's no-findByNombre precedent): any future SKU
   // selector must be written `where lower(sku) = lower($1)` at the call
@@ -239,5 +248,27 @@ export class DrizzleProductosRepo implements ProductosRepo {
       )
       .returning({ stockActual: productos.stockActual });
     return rows[0]?.stockActual;
+  }
+
+  // backlog #9 (anulacion-venta) design.md's A8 decision: exactly one
+  // unconditional UPDATE, no `activo`/`>= 0` guard — the WHERE clause is
+  // `eq(productos.id, id)` alone. `expectOneRow` throws on zero rows rather
+  // than returning `undefined` (see the interface doc comment above).
+  async revertirStockPorAnulacion(
+    id: string,
+    cantidad: number,
+  ): Promise<number> {
+    const rows = await this.db
+      .update(productos)
+      .set({ stockActual: sql`${productos.stockActual} + ${cantidad}` })
+      .where(eq(productos.id, id))
+      .returning({ stockActual: productos.stockActual });
+    const row = rows[0];
+    if (!row) {
+      throw new Error(
+        `revertirStockPorAnulacion: no row returned for producto ${id}`,
+      );
+    }
+    return row.stockActual;
   }
 }

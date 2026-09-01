@@ -294,16 +294,33 @@ export const ventas = pgTable(
     usuarioId: uuid('usuario_id')
       .notNull()
       .references(() => usuarios.id, { onDelete: 'restrict' }),
-    // D10 — `anulada_por` / `anulada_en` / `motivo_anulacion` are deferred
-    // to backlog #9; only the state column ships now.
     estado: ventaEstado('estado').notNull().default('confirmada'),
     total: numeric('total', { precision: 12, scale: 2 }).notNull(),
     creadoEn: timestamp('creado_en', { withTimezone: true, mode: 'date' })
       .notNull()
       .defaultNow(),
+    // backlog #9 (anulacion-venta) design.md's File Changes table. `restrict`
+    // matches every other FK to usuarios in this file except sesiones — a
+    // venta is append-only and its anulación actor is never lost to a
+    // cascade delete.
+    anuladaPor: uuid('anulada_por').references(() => usuarios.id, {
+      onDelete: 'restrict',
+    }),
+    anuladaEn: timestamp('anulada_en', { withTimezone: true, mode: 'date' }),
+    motivoAnulacion: text('motivo_anulacion'),
   },
   (table) => [
     uniqueIndex('ventas_numero_correlativo_unique').on(table.numeroCorrelativo),
+    // Mirrors auditoria_datos_previos_solo_en_crear's per-field equivalence
+    // idiom (design.md task 1.1): each of the three anulación fields is
+    // present iff estado = 'anulada' — never partially set on a confirmada
+    // row, never partially missing on an anulada one.
+    check(
+      'ventas_anulacion_datos_solo_anulada',
+      sql`(${table.anuladaPor} is not null) = (${table.estado} = 'anulada'::venta_estado)
+        and (${table.anuladaEn} is not null) = (${table.estado} = 'anulada'::venta_estado)
+        and (${table.motivoAnulacion} is not null) = (${table.estado} = 'anulada'::venta_estado)`,
+    ),
   ],
 );
 

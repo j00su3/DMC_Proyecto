@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { DbExecutor } from '../db/client.js';
 import { itemsVenta, pagos, ventas } from '../db/schema.js';
 
@@ -13,6 +13,18 @@ export interface Venta {
   estado: VentaEstado;
   total: string;
   creadoEn: Date;
+  // backlog #9 (anulacion-venta) design.md's File Changes table. All three
+  // null on every `confirmada` row (schema.ts's
+  // ventas_anulacion_datos_solo_anulada CHECK enforces this).
+  anuladaPor: string | null;
+  anuladaEn: Date | null;
+  motivoAnulacion: string | null;
+}
+
+export interface MarcarAnuladaInput {
+  ventaId: string;
+  anuladaPor: string;
+  motivoAnulacion: string;
 }
 
 export interface NuevaVenta {
@@ -72,6 +84,16 @@ export interface VentasRepo {
   ): Promise<Venta | undefined>;
   findItems(ventaId: string): Promise<ItemVenta[]>;
   findPagos(ventaId: string): Promise<Pago[]>;
+  // backlog #9 (anulacion-venta) design.md's Interfaces/Contracts. One
+  // conditional UPDATE (`where id = :id and estado = 'confirmada'`) — the
+  // serialization point (design.md's ADR-0005 precedent). `undefined` means
+  // "the guard rejected" (not confirmada, or missing), never "row missing"
+  // alone; the service classifies which via a second read (rechazarVenta-
+  // style, mirrors D4's rechazarVenta precedent).
+  marcarAnulada(input: MarcarAnuladaInput): Promise<Venta | undefined>;
+  // where estado = 'registrado' — every matching row moves to 'revertido'
+  // and is returned; an empty array means there was nothing left to revert.
+  revertirPagos(ventaId: string): Promise<Pago[]>;
 }
 
 // Mirrors proveedores/repository.ts's expectOneRow precedent.
@@ -169,5 +191,36 @@ export class DrizzleVentasRepo implements VentasRepo {
 
   async findPagos(ventaId: string): Promise<Pago[]> {
     return this.db.select().from(pagos).where(eq(pagos.ventaId, ventaId));
+  }
+
+  // backlog #9 (anulacion-venta) design.md: the ONE conditional UPDATE that
+  // makes a concurrent second anulación attempt serialize on this row and
+  // then see 0 rows, instead of both transactions racing through full stock
+  // work before one loses (ADR-0005 idiom). `anuladaEn` is set via SQL
+  // `now()`, never a JS-computed timestamp.
+  async marcarAnulada(input: MarcarAnuladaInput): Promise<Venta | undefined> {
+    const rows = await this.db
+      .update(ventas)
+      .set({
+        estado: 'anulada',
+        anuladaPor: input.anuladaPor,
+        anuladaEn: sql`now()`,
+        motivoAnulacion: input.motivoAnulacion,
+      })
+      .where(and(eq(ventas.id, input.ventaId), eq(ventas.estado, 'confirmada')))
+      .returning();
+    return rows[0];
+  }
+
+  // backlog #9 (anulacion-venta): bulk revert, scoped to `registrado` rows
+  // only — a second anulación attempt (already refused by marcarAnulada's
+  // guard before this ever runs) would otherwise re-touch already-revertido
+  // rows.
+  async revertirPagos(ventaId: string): Promise<Pago[]> {
+    return this.db
+      .update(pagos)
+      .set({ estado: 'revertido' })
+      .where(and(eq(pagos.ventaId, ventaId), eq(pagos.estado, 'registrado')))
+      .returning();
   }
 }

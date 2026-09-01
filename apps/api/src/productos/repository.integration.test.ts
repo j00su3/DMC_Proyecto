@@ -265,6 +265,26 @@ describe('productos repository (integration, real Postgres)', () => {
       expect(row?.stockActual).toBe(5);
     });
 
+    // backlog #9 (anulacion-venta) tasks.md 5.1's A8-exemption scenario,
+    // proven here at the repository level (design.md's Testing Strategy
+    // row): unlike aplicarDelta, an inactive product's stock still reverts.
+    it.each([true, false])(
+      'reverts stock by the positive cantidad even when activo = %s',
+      async (activo) => {
+        const producto = await insertProducto(proveedorId, {
+          stockActual: 10,
+          activo,
+        });
+
+        const result = await repo.revertirStockPorAnulacion(producto.id, 3);
+
+        expect(result).toBe(13);
+        const row = await repo.findById(producto.id);
+        expect(row?.stockActual).toBe(13);
+        expect(row?.activo).toBe(activo);
+      },
+    );
+
     // The proof named by tasks.md task 2.1: the single UPDATE statement is
     // what makes concurrent calls serialize on the row itself, never a
     // SELECT ... FOR UPDATE followed by a plain SET. Twenty concurrent +1
