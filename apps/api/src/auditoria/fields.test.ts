@@ -28,6 +28,22 @@ describe('FIELD_CLASSIFICATION', () => {
     expect(excludedFields).toContain('hashContrasena');
   });
 
+  // backlog #2.5 / SEC-012: `pseudonymizedFields` sits outside the
+  // exclude/auditable partition above — `email` stays listed in
+  // `auditableFields` (it is NOT omitted), so the exhaustiveness assertion
+  // above needs no change. This just proves `pseudonymizedFields` names a
+  // real subset of it, so `recordAudit` never gets asked to pseudonymize a
+  // field it also excludes.
+  it('lists usuarios pseudonymizedFields as a subset of auditableFields, including email', () => {
+    const { auditableFields, pseudonymizedFields } =
+      FIELD_CLASSIFICATION.usuarios;
+
+    expect(pseudonymizedFields).toEqual(['email']);
+    for (const field of pseudonymizedFields ?? []) {
+      expect(auditableFields).toContain(field);
+    }
+  });
+
   // design.md D5: the proposal's "call site, nothing more" claim about the
   // audit trail was wrong — `AuditableEntidad = keyof typeof
   // FIELD_CLASSIFICATION` has exactly one key before this entry exists, so
