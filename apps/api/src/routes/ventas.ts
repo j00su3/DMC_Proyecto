@@ -11,7 +11,7 @@ import type {
   Pago,
   Venta,
 } from '../ventas/repository.js';
-import { confirmarVenta, getRecibo } from '../ventas/service.js';
+import { anularVenta, confirmarVenta, getRecibo } from '../ventas/service.js';
 import type { ReciboItem } from '../ventas/service.js';
 
 // design.md D11: both routes live here, registered in app.ts with
@@ -73,7 +73,22 @@ const ventaDto = z.object({
   estado: z.enum(['confirmada', 'anulada']),
   total: z.string(),
   creadoEn: z.date(),
+  // backlog #9 (anulacion-venta) design.md's Open Question 2 (resolved as
+  // widened-but-unused): all three null on every confirmada row.
+  // Recibo.tsx renders none of them (PD-4) — this only widens the contract.
+  anuladaPor: z.string().nullable(),
+  anuladaEn: z.date().nullable(),
+  motivoAnulacion: z.string().nullable(),
 });
+
+// backlog #9 (anulacion-venta) design.md's ratified Open Question 1:
+// trim().min(3).max(500), mirroring movimientos.ts's
+// MOTIVO_MIN_LENGTH/MOTIVO_MAX_LENGTH.
+const anularVentaBody = z
+  .object({
+    motivoAnulacion: z.string().trim().min(3).max(500),
+  })
+  .strict();
 
 const okVenta = z.object({
   venta: ventaDto,
@@ -129,6 +144,9 @@ function toVentaDto(venta: Venta) {
     estado: venta.estado,
     total: venta.total,
     creadoEn: venta.creadoEn,
+    anuladaPor: venta.anuladaPor,
+    anuladaEn: venta.anuladaEn,
+    motivoAnulacion: venta.motivoAnulacion,
   };
 }
 
@@ -211,6 +229,42 @@ const ventasRoutes: FastifyPluginAsync = async (app) => {
         actor,
       });
       reply.status(201);
+      return {
+        venta: toVentaDto(venta),
+        items: items.map(toItemVentaDto),
+        pagos: pagos.map(toPagoDto),
+      };
+    },
+  );
+
+  // backlog #9 (anulacion-venta) design.md's decision: action-style, first
+  // encargado-only route in this file. `roles: ['encargado']` — a `deposito`
+  // session is refused 403 by the auth plugin before this handler ever runs
+  // (spec.md's "Anulación Is Encargado-Only").
+  typed.post(
+    '/ventas/:id/anular',
+    {
+      config: { roles: ['encargado'] },
+      schema: {
+        params: idParams,
+        body: anularVentaBody,
+        response: {
+          200: okVenta,
+          400: errorEnvelopeSchema,
+          401: errorEnvelopeSchema,
+          403: errorEnvelopeSchema,
+          404: errorEnvelopeSchema,
+          409: errorEnvelopeSchema,
+        },
+      },
+    },
+    async (request) => {
+      const actor = requireActor(request.user);
+      const { venta, items, pagos } = await anularVenta(app.uow, {
+        ventaId: request.params.id,
+        actorId: actor.id,
+        motivoAnulacion: request.body.motivoAnulacion,
+      });
       return {
         venta: toVentaDto(venta),
         items: items.map(toItemVentaDto),

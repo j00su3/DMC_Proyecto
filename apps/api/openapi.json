@@ -5757,6 +5757,19 @@
                         "creadoEn": {
                           "type": "string",
                           "format": "date-time"
+                        },
+                        "anuladaPor": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "anuladaEn": {
+                          "nullable": true,
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "motivoAnulacion": {
+                          "nullable": true,
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -5765,7 +5778,369 @@
                         "usuarioId",
                         "estado",
                         "total",
-                        "creadoEn"
+                        "creadoEn",
+                        "anuladaPor",
+                        "anuladaEn",
+                        "motivoAnulacion"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "ventaId": {
+                            "type": "string"
+                          },
+                          "productoId": {
+                            "type": "string"
+                          },
+                          "cantidad": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "precioUnitario": {
+                            "type": "string"
+                          },
+                          "subtotal": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "ventaId",
+                          "productoId",
+                          "cantidad",
+                          "precioUnitario",
+                          "subtotal"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "pagos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "ventaId": {
+                            "type": "string"
+                          },
+                          "medio": {
+                            "type": "string",
+                            "enum": [
+                              "efectivo",
+                              "tarjeta",
+                              "transferencia",
+                              "qr"
+                            ]
+                          },
+                          "monto": {
+                            "type": "string"
+                          },
+                          "vuelto": {
+                            "type": "string"
+                          },
+                          "estado": {
+                            "type": "string",
+                            "enum": [
+                              "registrado",
+                              "revertido"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "ventaId",
+                          "medio",
+                          "monto",
+                          "vuelto",
+                          "estado"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "venta",
+                    "items",
+                    "pagos"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {}
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {}
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {}
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {}
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {}
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ventas/{id}/anular": {
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "motivoAnulacion": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "motivoAnulacion"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "venta": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "numeroCorrelativo": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "usuarioId": {
+                          "type": "string"
+                        },
+                        "estado": {
+                          "type": "string",
+                          "enum": [
+                            "confirmada",
+                            "anulada"
+                          ]
+                        },
+                        "total": {
+                          "type": "string"
+                        },
+                        "creadoEn": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "anuladaPor": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "anuladaEn": {
+                          "nullable": true,
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "motivoAnulacion": {
+                          "nullable": true,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "numeroCorrelativo",
+                        "usuarioId",
+                        "estado",
+                        "total",
+                        "creadoEn",
+                        "anuladaPor",
+                        "anuladaEn",
+                        "motivoAnulacion"
                       ],
                       "additionalProperties": false
                     },
@@ -6267,6 +6642,19 @@
                         "creadoEn": {
                           "type": "string",
                           "format": "date-time"
+                        },
+                        "anuladaPor": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "anuladaEn": {
+                          "nullable": true,
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "motivoAnulacion": {
+                          "nullable": true,
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -6275,7 +6663,10 @@
                         "usuarioId",
                         "estado",
                         "total",
-                        "creadoEn"
+                        "creadoEn",
+                        "anuladaPor",
+                        "anuladaEn",
+                        "motivoAnulacion"
                       ],
                       "additionalProperties": false
                     },
@@ -6545,6 +6936,19 @@
                         "creadoEn": {
                           "type": "string",
                           "format": "date-time"
+                        },
+                        "anuladaPor": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "anuladaEn": {
+                          "nullable": true,
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "motivoAnulacion": {
+                          "nullable": true,
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -6553,7 +6957,10 @@
                         "usuarioId",
                         "estado",
                         "total",
-                        "creadoEn"
+                        "creadoEn",
+                        "anuladaPor",
+                        "anuladaEn",
+                        "motivoAnulacion"
                       ],
                       "additionalProperties": false
                     },

@@ -73,6 +73,9 @@ function makeVenta(overrides: Partial<Venta> = {}): Venta {
     estado: 'confirmada',
     total: '10.00',
     creadoEn: new Date('2026-02-01T00:00:00.000Z'),
+    anuladaPor: null,
+    anuladaEn: null,
+    motivoAnulacion: null,
     ...overrides,
   };
 }
@@ -152,6 +155,9 @@ interface Spies {
   movimientosCreateCalls: unknown[][];
   ventasCreateCalls: unknown[][];
   productosListCalls: unknown[][];
+  revertirStockPorAnulacionCalls: unknown[][];
+  marcarAnuladaCalls: unknown[][];
+  revertirPagosCalls: unknown[][];
 }
 
 function fakeRepos(
@@ -188,6 +194,10 @@ function fakeRepos(
         spies.aplicarDeltaCalls.push(args);
         return 9;
       },
+      revertirStockPorAnulacion: async (...args: unknown[]) => {
+        spies.revertirStockPorAnulacionCalls.push(args);
+        return 9;
+      },
       ...productosOverrides,
     } as ProductosRepo,
     movimientos: {
@@ -222,6 +232,19 @@ function fakeRepos(
       findByNumeroCorrelativo: async () => makeVenta(),
       findItems: async () => [makeItemVenta()],
       findPagos: async () => [makePago()],
+      marcarAnulada: async (input) => {
+        spies.marcarAnuladaCalls.push([input]);
+        return makeVenta({
+          anuladaPor: input.anuladaPor,
+          anuladaEn: new Date('2026-02-02T00:00:00.000Z'),
+          motivoAnulacion: input.motivoAnulacion,
+          estado: 'anulada',
+        });
+      },
+      revertirPagos: async (ventaId: string) => {
+        spies.revertirPagosCalls.push([ventaId]);
+        return [makePago({ estado: 'revertido' })];
+      },
       ...ventasOverrides,
     } as VentasRepo,
   };
@@ -273,6 +296,9 @@ function emptySpies(): Spies {
     movimientosCreateCalls: [],
     ventasCreateCalls: [],
     productosListCalls: [],
+    revertirStockPorAnulacionCalls: [],
+    marcarAnuladaCalls: [],
+    revertirPagosCalls: [],
   };
 }
 
@@ -281,6 +307,7 @@ const routes = {
   catalogo: () => '/api/ventas/catalogo',
   detalle: (id: string) => `/api/ventas/${id}`,
   porNumero: (numero: number | string) => `/api/ventas/numero/${numero}`,
+  anular: (id: string) => `/api/ventas/${id}/anular`,
 };
 
 const validPayload = {
@@ -821,6 +848,208 @@ describe('GET /api/ventas/:id and .../numero/:n — param validation', () => {
     const response = await app.inject({
       method: 'GET',
       url: routes.porNumero('abc'),
+      cookies,
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('VALIDATION_ERROR');
+  });
+});
+
+// backlog #9 (anulacion-venta) tasks.md 4.1, design.md's "action-style,
+// first encargado-only route in this file".
+describe('POST /api/ventas/:id/anular — role gate', () => {
+  let app: FastifyInstance | undefined;
+
+  afterEach(async () => {
+    await app?.close();
+    app = undefined;
+  });
+
+  it('returns 401 UNAUTHORIZED without a session', async () => {
+    app = await buildWithSession(undefined, emptySpies());
+
+    const response = await app.inject({
+      method: 'POST',
+      url: routes.anular(VALID_VENTA_UUID),
+      payload: { motivoAnulacion: 'Cliente canceló el pedido' },
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json().error.code).toBe('UNAUTHORIZED');
+  });
+
+  it('returns 403 FORBIDDEN for rol = deposito, and writes nothing', async () => {
+    const spies = emptySpies();
+    app = await buildWithSession(makeUsuario({ rol: 'deposito' }), spies);
+    const cookies = { sid: app.signCookie('valid-token') };
+
+    const response = await app.inject({
+      method: 'POST',
+      url: routes.anular(VALID_VENTA_UUID),
+      payload: { motivoAnulacion: 'Cliente canceló el pedido' },
+      cookies,
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json().error.code).toBe('FORBIDDEN');
+    // Assert the DB (via the repo spies), not just the status code
+    // (CLAUDE.md's rule): a 403 must write nothing.
+    expect(spies.marcarAnuladaCalls).toHaveLength(0);
+    expect(spies.revertirStockPorAnulacionCalls).toHaveLength(0);
+    expect(spies.revertirPagosCalls).toHaveLength(0);
+  });
+
+  it('returns 200 for rol = encargado with a valid body', async () => {
+    const spies = emptySpies();
+    app = await buildWithSession(makeUsuario({ rol: 'encargado' }), spies);
+    const cookies = { sid: app.signCookie('valid-token') };
+
+    const response = await app.inject({
+      method: 'POST',
+      url: routes.anular(VALID_VENTA_UUID),
+      payload: { motivoAnulacion: 'Cliente canceló el pedido' },
+      cookies,
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.venta).toMatchObject({ estado: 'anulada' });
+    expect(spies.marcarAnuladaCalls).toHaveLength(1);
+  });
+});
+
+describe('POST /api/ventas/:id/anular — motivoAnulacion validation (3-500 after trim)', () => {
+  let app: FastifyInstance | undefined;
+
+  afterEach(async () => {
+    await app?.close();
+    app = undefined;
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['empty', ''],
+    ['whitespace-only', '   '],
+    ['too short (2 chars)', 'ab'],
+    ['too long (501 chars)', 'a'.repeat(501)],
+  ])(
+    'rejects %s motivoAnulacion with 400 VALIDATION_ERROR',
+    async (_label, motivoAnulacion) => {
+      const spies = emptySpies();
+      app = await buildWithSession(makeUsuario({ rol: 'encargado' }), spies);
+      const cookies = { sid: app.signCookie('valid-token') };
+
+      const payload = motivoAnulacion === undefined ? {} : { motivoAnulacion };
+
+      const response = await app.inject({
+        method: 'POST',
+        url: routes.anular(VALID_VENTA_UUID),
+        payload,
+        cookies,
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().error.code).toBe('VALIDATION_ERROR');
+      expect(spies.marcarAnuladaCalls).toHaveLength(0);
+    },
+  );
+
+  it('accepts a motivo at exactly 3 and exactly 500 characters', async () => {
+    for (const motivoAnulacion of ['abc', 'a'.repeat(500)]) {
+      const spies = emptySpies();
+      const localApp = await buildWithSession(
+        makeUsuario({ rol: 'encargado' }),
+        spies,
+      );
+      const cookies = { sid: localApp.signCookie('valid-token') };
+
+      const response = await localApp.inject({
+        method: 'POST',
+        url: routes.anular(VALID_VENTA_UUID),
+        payload: { motivoAnulacion },
+        cookies,
+      });
+
+      expect(response.statusCode).toBe(200);
+      await localApp.close();
+    }
+  });
+});
+
+describe('POST /api/ventas/:id/anular — domain error mapping', () => {
+  let app: FastifyInstance | undefined;
+
+  afterEach(async () => {
+    await app?.close();
+    app = undefined;
+  });
+
+  it('returns 404 SALE_NOT_FOUND when marcarAnulada is refused and findById is absent', async () => {
+    const spies = emptySpies();
+    app = await buildWithSession(
+      makeUsuario({ rol: 'encargado' }),
+      spies,
+      {},
+      {
+        marcarAnulada: async (input) => {
+          spies.marcarAnuladaCalls.push([input]);
+          return undefined;
+        },
+        findById: async () => undefined,
+      },
+    );
+    const cookies = { sid: app.signCookie('valid-token') };
+
+    const response = await app.inject({
+      method: 'POST',
+      url: routes.anular(VALID_VENTA_UUID),
+      payload: { motivoAnulacion: 'Cliente canceló el pedido' },
+      cookies,
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json().error.code).toBe('SALE_NOT_FOUND');
+  });
+
+  it('returns 409 SALE_ALREADY_VOIDED when marcarAnulada is refused and the venta already exists, writing nothing further', async () => {
+    const spies = emptySpies();
+    app = await buildWithSession(
+      makeUsuario({ rol: 'encargado' }),
+      spies,
+      {},
+      {
+        marcarAnulada: async (input) => {
+          spies.marcarAnuladaCalls.push([input]);
+          return undefined;
+        },
+        findById: async () => makeVenta({ estado: 'anulada' }),
+      },
+    );
+    const cookies = { sid: app.signCookie('valid-token') };
+
+    const response = await app.inject({
+      method: 'POST',
+      url: routes.anular(VALID_VENTA_UUID),
+      payload: { motivoAnulacion: 'Cliente canceló el pedido' },
+      cookies,
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('SALE_ALREADY_VOIDED');
+    expect(spies.revertirStockPorAnulacionCalls).toHaveLength(0);
+    expect(spies.revertirPagosCalls).toHaveLength(0);
+  });
+
+  it('rejects a non-uuid :id with 400 VALIDATION_ERROR', async () => {
+    const spies = emptySpies();
+    app = await buildWithSession(makeUsuario({ rol: 'encargado' }), spies);
+    const cookies = { sid: app.signCookie('valid-token') };
+
+    const response = await app.inject({
+      method: 'POST',
+      url: routes.anular('not-a-uuid'),
+      payload: { motivoAnulacion: 'Cliente canceló el pedido' },
       cookies,
     });
 

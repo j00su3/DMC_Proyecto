@@ -523,3 +523,347 @@ describe('concurrent ventas do not deadlock (integration, real app + real Postgr
     expect(await stockActualFor(productoY.id)).toBe(48);
   });
 });
+
+// backlog #9 (anulacion-venta) tasks.md 5.1/5.2, design.md's Testing
+// Strategy row: real Postgres + real createUnitOfWork, overriding only the
+// failing dep for the rollback scenario — the atomicity/A8/race properties
+// this cycle adds are only provable here, never against fakes.
+async function ventaRowFor(id: string) {
+  const [row] = await db.select().from(ventas).where(eq(ventas.id, id));
+  if (!row) {
+    throw new Error('ventaRowFor: venta vanished');
+  }
+  return row;
+}
+
+async function pagosFor(ventaId: string) {
+  return db.select().from(pagos).where(eq(pagos.ventaId, ventaId));
+}
+
+async function movimientosCountByTipo(ventaId: string, tipo: string) {
+  const rows = await db
+    .select()
+    .from(movimientos)
+    .where(eq(movimientos.ventaId, ventaId));
+  return rows.filter((r) => r.tipo === tipo).length;
+}
+
+describe('POST /api/ventas/:id/anular (integration, real app + real Postgres)', () => {
+  let app: Awaited<ReturnType<typeof buildApp>> | undefined;
+
+  beforeEach(async () => {
+    await db.execute(
+      sql`truncate table pagos, items_venta, ventas, movimientos, auditoria, productos, sesiones, proveedores, usuarios cascade`,
+    );
+  });
+
+  afterEach(async () => {
+    await app?.close();
+    app = undefined;
+  });
+
+  it('full atomic reversal on success: stock restored, 2 anulacion movimientos, pago revertido, venta anulada with all 3 fields set, correlativo unchanged', async () => {
+    const encargado = await seedUsuario('encargado');
+    const proveedor = await seedProveedor();
+    const productoA = await seedProducto(proveedor.id, {
+      nombre: 'Producto A',
+      precio: '10.00',
+      stockActual: 10,
+    });
+    const productoB = await seedProducto(proveedor.id, {
+      nombre: 'Producto B',
+      precio: '5.00',
+      stockActual: 20,
+    });
+
+    app = await buildApp({ cookieSecret: COOKIE_SECRET });
+    await app.ready();
+    const sid = await loginAs(app, encargado.email);
+
+    const confirmar = await app.inject({
+      method: 'POST',
+      url: '/api/ventas',
+      payload: {
+        items: [
+          {
+            productoId: productoA.id,
+            cantidad: 2,
+            precioUnitarioEsperado: productoA.precio,
+          },
+          {
+            productoId: productoB.id,
+            cantidad: 3,
+            precioUnitarioEsperado: productoB.precio,
+          },
+        ],
+        pagos: [{ medio: 'efectivo', monto: '35.00' }],
+      },
+      cookies: { sid },
+    });
+    expect(confirmar.statusCode).toBe(201);
+    const ventaId: string = confirmar.json().venta.id;
+    const correlativoAntes: number = confirmar.json().venta.numeroCorrelativo;
+
+    expect(await stockActualFor(productoA.id)).toBe(8);
+    expect(await stockActualFor(productoB.id)).toBe(17);
+
+    const anular = await app.inject({
+      method: 'POST',
+      url: `/api/ventas/${ventaId}/anular`,
+      payload: { motivoAnulacion: 'Cliente canceló el pedido' },
+      cookies: { sid },
+    });
+
+    expect(anular.statusCode).toBe(200);
+    const body = anular.json();
+    expect(body.venta.estado).toBe('anulada');
+    expect(body.venta.numeroCorrelativo).toBe(correlativoAntes);
+
+    expect(await stockActualFor(productoA.id)).toBe(10);
+    expect(await stockActualFor(productoB.id)).toBe(20);
+
+    expect(await movimientosCountByTipo(ventaId, 'anulacion')).toBe(2);
+
+    const pagosRows = await pagosFor(ventaId);
+    expect(pagosRows).toHaveLength(1);
+    expect(pagosRows[0]?.estado).toBe('revertido');
+
+    const ventaRow = await ventaRowFor(ventaId);
+    expect(ventaRow.estado).toBe('anulada');
+    expect(ventaRow.anuladaPor).toBe(encargado.id);
+    expect(ventaRow.anuladaEn).toBeInstanceOf(Date);
+    expect(ventaRow.motivoAnulacion).toBe('Cliente canceló el pedido');
+    expect(ventaRow.numeroCorrelativo).toBe(correlativoAntes);
+  });
+
+  it('a now-inactive product (activo = false) still reverses its stock', async () => {
+    const encargado = await seedUsuario('encargado');
+    const proveedor = await seedProveedor();
+    const producto = await seedProducto(proveedor.id, {
+      precio: '10.00',
+      stockActual: 5,
+    });
+
+    app = await buildApp({ cookieSecret: COOKIE_SECRET });
+    await app.ready();
+    const sid = await loginAs(app, encargado.email);
+
+    const confirmar = await app.inject({
+      method: 'POST',
+      url: '/api/ventas',
+      payload: {
+        items: [
+          {
+            productoId: producto.id,
+            cantidad: 2,
+            precioUnitarioEsperado: producto.precio,
+          },
+        ],
+        pagos: [{ medio: 'efectivo', monto: '20.00' }],
+      },
+      cookies: { sid },
+    });
+    expect(confirmar.statusCode).toBe(201);
+    const ventaId: string = confirmar.json().venta.id;
+    expect(await stockActualFor(producto.id)).toBe(3);
+
+    await db
+      .update(productos)
+      .set({ activo: false })
+      .where(eq(productos.id, producto.id));
+
+    const anular = await app.inject({
+      method: 'POST',
+      url: `/api/ventas/${ventaId}/anular`,
+      payload: { motivoAnulacion: 'Producto discontinuado, se revierte' },
+      cookies: { sid },
+    });
+
+    expect(anular.statusCode).toBe(200);
+    expect(await stockActualFor(producto.id)).toBe(5);
+    const row = await db
+      .select({ activo: productos.activo })
+      .from(productos)
+      .where(eq(productos.id, producto.id));
+    expect(row[0]?.activo).toBe(false);
+  });
+
+  it('a failure partway through the transaction rolls back everything — no stock/pagos/movimientos/state change, venta stays confirmada', async () => {
+    const encargado = await seedUsuario('encargado');
+    const proveedor = await seedProveedor();
+    const producto = await seedProducto(proveedor.id, {
+      precio: '10.00',
+      stockActual: 10,
+    });
+
+    const confirmApp = await buildApp({ cookieSecret: COOKIE_SECRET });
+    await confirmApp.ready();
+    const sidConfirm = await loginAs(confirmApp, encargado.email);
+    const confirmar = await confirmApp.inject({
+      method: 'POST',
+      url: '/api/ventas',
+      payload: {
+        items: [
+          {
+            productoId: producto.id,
+            cantidad: 2,
+            precioUnitarioEsperado: producto.precio,
+          },
+        ],
+        pagos: [{ medio: 'efectivo', monto: '20.00' }],
+      },
+      cookies: { sid: sidConfirm },
+    });
+    expect(confirmar.statusCode).toBe(201);
+    const ventaId: string = confirmar.json().venta.id;
+    await confirmApp.close();
+
+    expect(await stockActualFor(producto.id)).toBe(8);
+
+    const realUow = createUnitOfWork(db);
+    const failingUow: UnitOfWork = {
+      run: (work) =>
+        realUow.run((repos) =>
+          work({
+            ...repos,
+            ventas: {
+              ...repos.ventas,
+              revertirPagos: async () => {
+                throw new Error('forced pagos-revert failure');
+              },
+            },
+          }),
+        ),
+    };
+
+    app = await buildApp({ cookieSecret: COOKIE_SECRET, uow: failingUow });
+    await app.ready();
+    const sid = await loginAs(app, encargado.email);
+
+    const anular = await app.inject({
+      method: 'POST',
+      url: `/api/ventas/${ventaId}/anular`,
+      payload: { motivoAnulacion: 'Este intento debe fallar entero' },
+      cookies: { sid },
+    });
+
+    expect(anular.statusCode).toBe(500);
+    expect(await stockActualFor(producto.id)).toBe(8);
+    expect(await movimientosCountByTipo(ventaId, 'anulacion')).toBe(0);
+    const pagosRows = await pagosFor(ventaId);
+    expect(pagosRows[0]?.estado).toBe('registrado');
+    const ventaRow = await ventaRowFor(ventaId);
+    expect(ventaRow.estado).toBe('confirmada');
+    expect(ventaRow.anuladaPor).toBeNull();
+    expect(ventaRow.anuladaEn).toBeNull();
+    expect(ventaRow.motivoAnulacion).toBeNull();
+  });
+
+  it('403 for rol = deposito writes nothing', async () => {
+    const deposito = await seedUsuario('deposito');
+    const encargado = await seedUsuario('encargado');
+    const proveedor = await seedProveedor();
+    const producto = await seedProducto(proveedor.id, {
+      precio: '10.00',
+      stockActual: 10,
+    });
+
+    app = await buildApp({ cookieSecret: COOKIE_SECRET });
+    await app.ready();
+    const sidEncargado = await loginAs(app, encargado.email);
+    const confirmar = await app.inject({
+      method: 'POST',
+      url: '/api/ventas',
+      payload: {
+        items: [
+          {
+            productoId: producto.id,
+            cantidad: 2,
+            precioUnitarioEsperado: producto.precio,
+          },
+        ],
+        pagos: [{ medio: 'efectivo', monto: '20.00' }],
+      },
+      cookies: { sid: sidEncargado },
+    });
+    expect(confirmar.statusCode).toBe(201);
+    const ventaId: string = confirmar.json().venta.id;
+    expect(await stockActualFor(producto.id)).toBe(8);
+
+    const sidDeposito = await loginAs(app, deposito.email);
+    const anular = await app.inject({
+      method: 'POST',
+      url: `/api/ventas/${ventaId}/anular`,
+      payload: { motivoAnulacion: 'Intento no autorizado' },
+      cookies: { sid: sidDeposito },
+    });
+
+    expect(anular.statusCode).toBe(403);
+    expect(await stockActualFor(producto.id)).toBe(8);
+    expect(await movimientosCountByTipo(ventaId, 'anulacion')).toBe(0);
+    const ventaRow = await ventaRowFor(ventaId);
+    expect(ventaRow.estado).toBe('confirmada');
+    const pagosRows = await pagosFor(ventaId);
+    expect(pagosRows[0]?.estado).toBe('registrado');
+  });
+
+  // tasks.md 5.2, ADR-0005 precedent (aplicarDelta's conditional-UPDATE race
+  // guard, D2's marcarAnulada serialization point).
+  it('two concurrent anulación requests on the same confirmada venta — exactly one succeeds, the other gets 409', async () => {
+    const encargado = await seedUsuario('encargado');
+    const proveedor = await seedProveedor();
+    const producto = await seedProducto(proveedor.id, {
+      precio: '10.00',
+      stockActual: 10,
+    });
+
+    app = await buildApp({ cookieSecret: COOKIE_SECRET });
+    await app.ready();
+    const sid = await loginAs(app, encargado.email);
+
+    const confirmar = await app.inject({
+      method: 'POST',
+      url: '/api/ventas',
+      payload: {
+        items: [
+          {
+            productoId: producto.id,
+            cantidad: 2,
+            precioUnitarioEsperado: producto.precio,
+          },
+        ],
+        pagos: [{ medio: 'efectivo', monto: '20.00' }],
+      },
+      cookies: { sid },
+    });
+    expect(confirmar.statusCode).toBe(201);
+    const ventaId: string = confirmar.json().venta.id;
+
+    const anularA = app.inject({
+      method: 'POST',
+      url: `/api/ventas/${ventaId}/anular`,
+      payload: { motivoAnulacion: 'Primer intento concurrente' },
+      cookies: { sid },
+    });
+    const anularB = app.inject({
+      method: 'POST',
+      url: `/api/ventas/${ventaId}/anular`,
+      payload: { motivoAnulacion: 'Segundo intento concurrente' },
+      cookies: { sid },
+    });
+
+    const [responseA, responseB] = await Promise.all([anularA, anularB]);
+    const statuses = [responseA.statusCode, responseB.statusCode].sort();
+
+    expect(statuses).toEqual([200, 409]);
+    const conflictResponse =
+      responseA.statusCode === 409 ? responseA : responseB;
+    expect(conflictResponse.json().error.code).toBe('SALE_ALREADY_VOIDED');
+
+    // Only ONE reversal took effect — never both.
+    expect(await stockActualFor(producto.id)).toBe(10);
+    expect(await movimientosCountByTipo(ventaId, 'anulacion')).toBe(1);
+    const pagosRows = await pagosFor(ventaId);
+    expect(pagosRows[0]?.estado).toBe('revertido');
+  });
+});
