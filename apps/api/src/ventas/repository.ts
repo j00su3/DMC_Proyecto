@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm';
 import type { DbExecutor } from '../db/client.js';
 import { itemsVenta, pagos, ventas } from '../db/schema.js';
 
@@ -57,10 +58,20 @@ export interface NuevoPago {
 // MovimientosRepo states. findCatalogo does NOT live here (D11): the POS
 // catalog read is an additive `opts.soloActivos` on `ProductosRepo.list`
 // (tasks.md task 3.1, a later PR), not a VentasRepo method.
+// recibo-interno (backlog #8) design.md D7: four narrow read methods, no
+// join. `getRecibo` (ventas/service.ts) composes cajero/item names from
+// UsuariosRepo/ProductosRepo per-row (accepted N+1, matches confirmarVenta's
+// existing pattern), so this repo never needs to reach across domains.
 export interface VentasRepo {
   create(input: NuevaVenta): Promise<Venta>;
   createItems(items: NuevoItemVenta[]): Promise<ItemVenta[]>;
   createPagos(pagos: NuevoPago[]): Promise<Pago[]>;
+  findById(id: string): Promise<Venta | undefined>;
+  findByNumeroCorrelativo(
+    numeroCorrelativo: number,
+  ): Promise<Venta | undefined>;
+  findItems(ventaId: string): Promise<ItemVenta[]>;
+  findPagos(ventaId: string): Promise<Pago[]>;
 }
 
 // Mirrors proveedores/repository.ts's expectOneRow precedent.
@@ -127,5 +138,36 @@ export class DrizzleVentasRepo implements VentasRepo {
         })),
       )
       .returning();
+  }
+
+  async findById(id: string): Promise<Venta | undefined> {
+    const rows = await this.db
+      .select()
+      .from(ventas)
+      .where(eq(ventas.id, id))
+      .limit(1);
+    return rows[0];
+  }
+
+  async findByNumeroCorrelativo(
+    numeroCorrelativo: number,
+  ): Promise<Venta | undefined> {
+    const rows = await this.db
+      .select()
+      .from(ventas)
+      .where(eq(ventas.numeroCorrelativo, numeroCorrelativo))
+      .limit(1);
+    return rows[0];
+  }
+
+  async findItems(ventaId: string): Promise<ItemVenta[]> {
+    return this.db
+      .select()
+      .from(itemsVenta)
+      .where(eq(itemsVenta.ventaId, ventaId));
+  }
+
+  async findPagos(ventaId: string): Promise<Pago[]> {
+    return this.db.select().from(pagos).where(eq(pagos.ventaId, ventaId));
   }
 }

@@ -100,6 +100,10 @@ function fakeRepos() {
       create: unusedRepoMethod,
       createItems: unusedRepoMethod,
       createPagos: unusedRepoMethod,
+      findById: unusedRepoMethod,
+      findByNumeroCorrelativo: unusedRepoMethod,
+      findItems: unusedRepoMethod,
+      findPagos: unusedRepoMethod,
     } satisfies VentasRepo,
   };
 }

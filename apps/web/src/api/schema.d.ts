@@ -2994,6 +2994,238 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ventas/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            venta: {
+                                id: string;
+                                numeroCorrelativo: number;
+                                usuarioId: string;
+                                /** @enum {string} */
+                                estado: "confirmada" | "anulada";
+                                total: string;
+                                /** Format: date-time */
+                                creadoEn: string;
+                            };
+                            cajero: {
+                                id: string;
+                                nombre: string;
+                            };
+                            items: {
+                                id: string;
+                                ventaId: string;
+                                productoId: string;
+                                cantidad: number;
+                                precioUnitario: string;
+                                subtotal: string;
+                                nombre: string;
+                            }[];
+                            pagos: {
+                                id: string;
+                                ventaId: string;
+                                /** @enum {string} */
+                                medio: "efectivo" | "tarjeta" | "transferencia" | "qr";
+                                monto: string;
+                                vuelto: string;
+                                /** @enum {string} */
+                                estado: "registrado" | "revertido";
+                            }[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ventas/numero/{numeroCorrelativo}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    numeroCorrelativo: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            venta: {
+                                id: string;
+                                numeroCorrelativo: number;
+                                usuarioId: string;
+                                /** @enum {string} */
+                                estado: "confirmada" | "anulada";
+                                total: string;
+                                /** Format: date-time */
+                                creadoEn: string;
+                            };
+                            cajero: {
+                                id: string;
+                                nombre: string;
+                            };
+                            items: {
+                                id: string;
+                                ventaId: string;
+                                productoId: string;
+                                cantidad: number;
+                                precioUnitario: string;
+                                subtotal: string;
+                                nombre: string;
+                            }[];
+                            pagos: {
+                                id: string;
+                                ventaId: string;
+                                /** @enum {string} */
+                                medio: "efectivo" | "tarjeta" | "transferencia" | "qr";
+                                monto: string;
+                                vuelto: string;
+                                /** @enum {string} */
+                                estado: "registrado" | "revertido";
+                            }[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {

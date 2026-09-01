@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { UnitOfWork } from '../db/uow.js';
 import type { Repos } from '../plugins/repos.js';
 import type { Producto } from '../productos/repository.js';
+import type { UsuarioResumen } from '../usuarios/repository.js';
 import type {
   ItemVenta,
   NuevaVenta,
@@ -16,6 +17,7 @@ import {
   type ItemVentaInput,
   type PagoInput,
   confirmarVenta,
+  getRecibo,
   ordenarItems,
 } from './service.js';
 
@@ -124,6 +126,13 @@ function harness(options: HarnessOptions = {}) {
         };
       }),
     ) as unknown as VentasRepo['createPagos'],
+    findById: spy('ventas.findById', async (_id: string) => undefined),
+    findByNumeroCorrelativo: spy(
+      'ventas.findByNumeroCorrelativo',
+      async (_numero: number) => undefined,
+    ),
+    findItems: spy('ventas.findItems', async (_ventaId: string) => []),
+    findPagos: spy('ventas.findPagos', async (_ventaId: string) => []),
   };
 
   const repos = { productos, movimientos, ventas } as unknown as Repos & {
@@ -586,4 +595,178 @@ describe('confirmarVenta — atomicity and ledger shape', () => {
       }),
     );
   });
+});
+
+// recibo-interno (backlog #8) — tasks.md Task 1.3, design.md D2/D7.
+const CAJERO_ID = '44444444-4444-4444-8444-444444444444';
+
+function venta(over: Partial<Venta> = {}): Venta {
+  return {
+    id: 'venta-1',
+    numeroCorrelativo: 1,
+    usuarioId: CAJERO_ID,
+    estado: 'confirmada',
+    total: '10.00',
+    creadoEn: new Date('2026-01-01T00:00:00.000Z'),
+    ...over,
+  };
+}
+
+function itemVenta(over: Partial<ItemVenta> = {}): ItemVenta {
+  return {
+    id: 'item-1',
+    ventaId: 'venta-1',
+    productoId: PRODUCT_A_ID,
+    cantidad: 1,
+    precioUnitario: '10.00',
+    subtotal: '10.00',
+    ...over,
+  };
+}
+
+function pagoRow(over: Partial<Pago> = {}): Pago {
+  return {
+    id: 'pago-1',
+    ventaId: 'venta-1',
+    medio: 'efectivo',
+    monto: '10.00',
+    vuelto: '0',
+    estado: 'registrado',
+    ...over,
+  };
+}
+
+function usuarioResumen(over: Partial<UsuarioResumen> = {}): UsuarioResumen {
+  return {
+    id: CAJERO_ID,
+    nombre: 'Cajera Uno',
+    email: 'cajera@example.com',
+    rol: 'encargado',
+    activo: true,
+    debeCambiarPassword: false,
+    creadoEn: new Date('2026-01-01T00:00:00.000Z'),
+    ...over,
+  };
+}
+
+interface ReciboHarnessOptions {
+  venta?: Venta | undefined;
+  items?: ItemVenta[];
+  pagos?: Pago[];
+  usuario?: UsuarioResumen | undefined;
+  productos?: Producto[];
+}
+
+function reciboHarness(options: ReciboHarnessOptions = {}) {
+  const ventaRow =
+    options.venta === undefined && !('venta' in options)
+      ? venta()
+      : options.venta;
+  const items = options.items ?? [itemVenta()];
+  const pagosRows = options.pagos ?? [pagoRow()];
+  const usuario =
+    options.usuario === undefined && !('usuario' in options)
+      ? usuarioResumen()
+      : options.usuario;
+  const productosById = new Map(
+    (options.productos ?? [producto()]).map((p) => [p.id, p]),
+  );
+
+  const ventas = {
+    findById: vi.fn(async (_id: string) => ventaRow),
+    findByNumeroCorrelativo: vi.fn(
+      async (_numeroCorrelativo: number) => ventaRow,
+    ),
+    findItems: vi.fn(async (_ventaId: string) => items),
+    findPagos: vi.fn(async (_ventaId: string) => pagosRows),
+  } as unknown as VentasRepo;
+
+  const usuarios = {
+    findById: vi.fn(async (_id: string) => usuario),
+  };
+
+  const productos = {
+    findById: vi.fn(async (id: string) => productosById.get(id)),
+  };
+
+  const repos = { ventas, usuarios, productos } as unknown as Repos;
+
+  return { repos, ventas, usuarios, productos };
+}
+
+describe('getRecibo — not found (design.md D2, both selectors)', () => {
+  it('throws saleNotFound() (SALE_NOT_FOUND, 404) when no venta matches the id', async () => {
+    const h = reciboHarness({ venta: undefined });
+
+    await expect(getRecibo(h.repos, { id: 'nope' })).rejects.toMatchObject({
+      code: 'SALE_NOT_FOUND',
+      status: 404,
+    });
+  });
+
+  it('throws saleNotFound() (SALE_NOT_FOUND, 404) when no venta matches the numeroCorrelativo', async () => {
+    const h = reciboHarness({ venta: undefined });
+
+    await expect(
+      getRecibo(h.repos, { numeroCorrelativo: 999 }),
+    ).rejects.toMatchObject({
+      code: 'SALE_NOT_FOUND',
+      status: 404,
+    });
+  });
+});
+
+describe('getRecibo — composes cajero and per-item current names (design.md D7)', () => {
+  it('resolves the cajero via UsuariosRepo.findById and every item via ProductosRepo.findById', async () => {
+    const h = reciboHarness({
+      usuario: usuarioResumen({ nombre: 'Cajera Actual' }),
+      productos: [producto({ id: PRODUCT_A_ID, nombre: 'Nombre Actual' })],
+      items: [itemVenta({ productoId: PRODUCT_A_ID })],
+    });
+
+    const recibo = await getRecibo(h.repos, { id: 'venta-1' });
+
+    expect(h.usuarios.findById).toHaveBeenCalledWith(CAJERO_ID);
+    expect(h.productos.findById).toHaveBeenCalledWith(PRODUCT_A_ID);
+    expect(recibo.cajero).toMatchObject({
+      id: CAJERO_ID,
+      nombre: 'Cajera Actual',
+    });
+    expect(recibo.items[0]).toMatchObject({
+      productoId: PRODUCT_A_ID,
+      nombre: 'Nombre Actual',
+    });
+  });
+});
+
+describe('getRecibo — returns every pagos row unfiltered (PROD-F, deferred)', () => {
+  it('includes a revertido row without filtering it out', async () => {
+    const h = reciboHarness({
+      pagos: [
+        pagoRow({ id: 'pago-1', estado: 'registrado' }),
+        pagoRow({ id: 'pago-2', estado: 'revertido' }),
+      ],
+    });
+
+    const recibo = await getRecibo(h.repos, { id: 'venta-1' });
+
+    expect(recibo.pagos).toHaveLength(2);
+    expect(recibo.pagos.map((p) => p.estado)).toEqual([
+      'registrado',
+      'revertido',
+    ]);
+  });
+});
+
+describe('getRecibo — estado passes through verbatim (design.md D2)', () => {
+  it.each(['confirmada', 'anulada'] as const)(
+    'returns estado %s unchanged',
+    async (estado) => {
+      const h = reciboHarness({ venta: venta({ estado }) });
+
+      const recibo = await getRecibo(h.repos, { id: 'venta-1' });
+
+      expect(recibo.venta.estado).toBe(estado);
+    },
+  );
 });

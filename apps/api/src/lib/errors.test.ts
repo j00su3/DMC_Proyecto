@@ -16,6 +16,7 @@ import {
   passwordChangeRequired,
   productInactive,
   productNotFound,
+  saleNotFound,
   skuAlreadyInUse,
   supplierInactive,
   supplierNameInUse,
@@ -396,5 +397,25 @@ describe('toErrorEnvelope — rate limit mapping', () => {
 
     expect(result.status).toBe(429);
     expect(result.body.error.code).toBe('RATE_LIMITED');
+  });
+});
+
+describe('sale-detail error factory (recibo-interno, design.md D2)', () => {
+  it('saleNotFound() is a 404 AppError with code SALE_NOT_FOUND and no details', () => {
+    const error = saleNotFound();
+
+    expect(error).toBeInstanceOf(AppError);
+    expect(error.status).toBe(404);
+    expect(error.code).toBe('SALE_NOT_FOUND');
+    expect(error.details).toBeUndefined();
+  });
+
+  it('toErrorEnvelope() maps saleNotFound() to a 404 { error: { code: "SALE_NOT_FOUND" } } envelope', () => {
+    const result = toErrorEnvelope(saleNotFound());
+
+    expect(result.status).toBe(404);
+    expect(result.body).toEqual({
+      error: { code: 'SALE_NOT_FOUND', message: expect.any(String) },
+    });
   });
 });

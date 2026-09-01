@@ -7,7 +7,11 @@ import type { UnitOfWork } from '../db/uow.js';
 import type { MovimientosRepo } from '../movimientos/repository.js';
 import type { Repos } from '../plugins/repos.js';
 import type { Producto, ProductosRepo } from '../productos/repository.js';
-import type { Usuario } from '../usuarios/repository.js';
+import type {
+  Usuario,
+  UsuarioResumen,
+  UsuariosRepo,
+} from '../usuarios/repository.js';
 import type {
   ItemVenta,
   NuevaVenta,
@@ -24,6 +28,10 @@ import type {
 
 const COOKIE_SECRET = 'test-cookie-secret-at-least-32-characters-long';
 const PRODUCT_ID = '11111111-1111-4111-8111-111111111111';
+// The fakes below never use the URL's :id to select a row — every route
+// test that reaches the handler returns makeVenta() regardless. This
+// constant only has to satisfy `idParams`'s `z.string().uuid()`.
+const VALID_VENTA_UUID = '55555555-5555-4555-8555-555555555555';
 
 function makeUsuario(overrides: Partial<Usuario> = {}): Usuario {
   return {
@@ -93,6 +101,52 @@ function makePago(overrides: Partial<Pago> = {}): Pago {
   };
 }
 
+const CAJERO_ID = 'u1';
+
+function makeUsuarioResumen(
+  overrides: Partial<UsuarioResumen> = {},
+): UsuarioResumen {
+  return {
+    id: CAJERO_ID,
+    nombre: 'Test User',
+    email: 'test@example.com',
+    rol: 'encargado',
+    activo: true,
+    debeCambiarPassword: false,
+    creadoEn: new Date('2026-01-01T00:00:00.000Z'),
+    ...overrides,
+  };
+}
+
+// recibo-interno (backlog #8): the only member these route tests ever
+// exercise on UsuariosRepo is findById (the cajero-name composition).
+// Everything else stays unreachable-by-construction, same technique as
+// app.test.ts's unusedRepoMethod.
+function unusedUsuariosMethod(): never {
+  throw new Error(
+    'routes/ventas.test.ts fake: this UsuariosRepo method is outside this suite',
+  );
+}
+
+function fakeUsuariosRepo(overrides: Partial<UsuariosRepo> = {}): UsuariosRepo {
+  return {
+    findByEmail: unusedUsuariosMethod,
+    registerFailedAttempt: unusedUsuariosMethod,
+    resetAttempts: unusedUsuariosMethod,
+    updatePassword: unusedUsuariosMethod,
+    list: unusedUsuariosMethod,
+    findById: async () => makeUsuarioResumen(),
+    findByIdForUpdate: unusedUsuariosMethod,
+    lockActiveEncargados: unusedUsuariosMethod,
+    findLockoutState: unusedUsuariosMethod,
+    create: unusedUsuariosMethod,
+    update: unusedUsuariosMethod,
+    setActivo: unusedUsuariosMethod,
+    resetPassword: unusedUsuariosMethod,
+    ...overrides,
+  };
+}
+
 interface Spies {
   aplicarDeltaCalls: unknown[][];
   movimientosCreateCalls: unknown[][];
@@ -105,9 +159,10 @@ function fakeRepos(
   productosOverrides: Partial<ProductosRepo> = {},
   ventasOverrides: Partial<VentasRepo> = {},
   sesionesOverrides: Partial<SesionesRepo> = {},
+  usuariosOverrides: Partial<UsuariosRepo> = {},
 ) {
   return {
-    usuarios: {} as never,
+    usuarios: fakeUsuariosRepo(usuariosOverrides),
     sesiones: {
       create: async () => {},
       findValid: async () => undefined,
@@ -163,6 +218,10 @@ function fakeRepos(
         items.map((item) => makeItemVenta({ ...item })),
       createPagos: async (pagos: NuevoPago[]) =>
         pagos.map((pago) => makePago({ ...pago, vuelto: pago.vuelto ?? '0' })),
+      findById: async () => makeVenta(),
+      findByNumeroCorrelativo: async () => makeVenta(),
+      findItems: async () => [makeItemVenta()],
+      findPagos: async () => [makePago()],
       ...ventasOverrides,
     } as VentasRepo,
   };
@@ -195,10 +254,15 @@ async function buildWithSession(
   spies: Spies,
   productosOverrides: Partial<ProductosRepo> = {},
   ventasOverrides: Partial<VentasRepo> = {},
+  usuariosOverrides: Partial<UsuariosRepo> = {},
 ) {
-  const repos = fakeRepos(spies, productosOverrides, ventasOverrides, {
-    findValid: async () => sesion,
-  });
+  const repos = fakeRepos(
+    spies,
+    productosOverrides,
+    ventasOverrides,
+    { findValid: async () => sesion },
+    usuariosOverrides,
+  );
   const app = await buildTestApp({ repos, uow: fakeUow(repos) });
   return app;
 }
@@ -215,6 +279,8 @@ function emptySpies(): Spies {
 const routes = {
   confirmar: () => '/api/ventas',
   catalogo: () => '/api/ventas/catalogo',
+  detalle: (id: string) => `/api/ventas/${id}`,
+  porNumero: (numero: number | string) => `/api/ventas/numero/${numero}`,
 };
 
 const validPayload = {
@@ -548,5 +614,217 @@ describe('GET /api/ventas/catalogo — D11 soloActivos forwarding', () => {
     expect(pageSize).toBe(20);
     expect(q).toBeUndefined();
     expect(opts).toEqual({ soloActivos: true });
+  });
+});
+
+// recibo-interno (backlog #8) — tasks.md Task 1.4, design.md D1. This is
+// the RED test that resolves design.md's flagged "assumption to verify at
+// apply time, not asserted here": `GET /api/ventas/catalogo` must still
+// reach the catalog handler once `GET /ventas/:id` is registered in the
+// same plugin, never falling into the `:id` handler with `id="catalogo"`.
+describe('Route-shadowing — GET /api/ventas/catalogo is not captured by GET /ventas/:id (design.md D1)', () => {
+  let app: FastifyInstance | undefined;
+
+  afterEach(async () => {
+    await app?.close();
+    app = undefined;
+  });
+
+  it('still resolves to the catalog handler, not the detail handler with id="catalogo"', async () => {
+    const spies = emptySpies();
+    app = await buildWithSession(makeUsuario({ rol: 'encargado' }), spies);
+    const cookies = { sid: app.signCookie('valid-token') };
+
+    const response = await app.inject({
+      method: 'GET',
+      url: routes.catalogo(),
+      cookies,
+    });
+
+    // If Fastify had routed this to `GET /ventas/:id` instead, the params
+    // schema (`id: z.string().uuid()`) would reject the literal string
+    // "catalogo" with a 400 VALIDATION_ERROR, not the paginated envelope
+    // `GET /ventas/catalogo` actually returns — so a 400 here would fail
+    // for the wrong reason (proving shadowing), and this assertion on the
+    // real 200 envelope shape proves it passes for the right one.
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body).toMatchObject({ page: 1, pageSize: 20 });
+    expect(Array.isArray(body.data)).toBe(true);
+    expect(body).not.toHaveProperty('venta');
+  });
+});
+
+describe('GET /api/ventas/:id and GET /api/ventas/numero/:numeroCorrelativo — role gate', () => {
+  let app: FastifyInstance | undefined;
+
+  afterEach(async () => {
+    await app?.close();
+    app = undefined;
+  });
+
+  it('returns 401 UNAUTHORIZED without a session on both routes', async () => {
+    app = await buildWithSession(undefined, emptySpies());
+
+    for (const url of [routes.detalle(VALID_VENTA_UUID), routes.porNumero(1)]) {
+      const response = await app.inject({ method: 'GET', url });
+      expect(response.statusCode).toBe(401);
+      expect(response.json().error.code).toBe('UNAUTHORIZED');
+    }
+  });
+
+  it.each(['encargado', 'deposito'] as const)(
+    '%s gets 200 on both routes (PD-4 audit-style, not own-sale-only)',
+    async (rol) => {
+      const spies = emptySpies();
+      app = await buildWithSession(makeUsuario({ rol }), spies);
+      const cookies = { sid: app.signCookie('valid-token') };
+
+      const detalle = await app.inject({
+        method: 'GET',
+        url: routes.detalle(VALID_VENTA_UUID),
+        cookies,
+      });
+      expect(detalle.statusCode).toBe(200);
+
+      const porNumero = await app.inject({
+        method: 'GET',
+        url: routes.porNumero(1),
+        cookies,
+      });
+      expect(porNumero.statusCode).toBe(200);
+    },
+  );
+});
+
+describe('GET /api/ventas/:id — 200 body shape (design.md D7, okRecibo)', () => {
+  let app: FastifyInstance | undefined;
+
+  afterEach(async () => {
+    await app?.close();
+    app = undefined;
+  });
+
+  it('returns { venta, cajero, items, pagos } with the item name composed from ProductosRepo', async () => {
+    const spies = emptySpies();
+    app = await buildWithSession(
+      makeUsuario({ rol: 'encargado' }),
+      spies,
+      { findById: async () => makeProducto({ nombre: 'Nombre Actual' }) },
+      {},
+      { findById: async () => makeUsuarioResumen({ nombre: 'Cajera Uno' }) },
+    );
+    const cookies = { sid: app.signCookie('valid-token') };
+
+    const response = await app.inject({
+      method: 'GET',
+      url: routes.detalle(VALID_VENTA_UUID),
+      cookies,
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.venta).toMatchObject({
+      numeroCorrelativo: 1,
+      estado: 'confirmada',
+    });
+    expect(body.cajero).toMatchObject({ nombre: 'Cajera Uno' });
+    expect(body.items[0]).toMatchObject({ nombre: 'Nombre Actual' });
+    expect(body.pagos).toHaveLength(1);
+    // spec.md "Detail Read Path Excludes Store Configuration Data": no
+    // store name/address field anywhere in the response.
+    expect(JSON.stringify(body)).not.toMatch(/tienda|store/i);
+  });
+});
+
+describe('GET /api/ventas/:id and .../numero/:n — 404 SALE_NOT_FOUND', () => {
+  let app: FastifyInstance | undefined;
+
+  afterEach(async () => {
+    await app?.close();
+    app = undefined;
+  });
+
+  it('returns 404 SALE_NOT_FOUND for a nonexistent id', async () => {
+    const spies = emptySpies();
+    app = await buildWithSession(
+      makeUsuario({ rol: 'encargado' }),
+      spies,
+      {},
+      {
+        findById: async () => undefined,
+      },
+    );
+    const cookies = { sid: app.signCookie('valid-token') };
+
+    const response = await app.inject({
+      method: 'GET',
+      url: routes.detalle('00000000-0000-4000-8000-000000000000'),
+      cookies,
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json().error.code).toBe('SALE_NOT_FOUND');
+  });
+
+  it('returns 404 SALE_NOT_FOUND for a nonexistent numeroCorrelativo', async () => {
+    const spies = emptySpies();
+    app = await buildWithSession(
+      makeUsuario({ rol: 'encargado' }),
+      spies,
+      {},
+      {
+        findByNumeroCorrelativo: async () => undefined,
+      },
+    );
+    const cookies = { sid: app.signCookie('valid-token') };
+
+    const response = await app.inject({
+      method: 'GET',
+      url: routes.porNumero(999),
+      cookies,
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json().error.code).toBe('SALE_NOT_FOUND');
+  });
+});
+
+describe('GET /api/ventas/:id and .../numero/:n — param validation', () => {
+  let app: FastifyInstance | undefined;
+
+  afterEach(async () => {
+    await app?.close();
+    app = undefined;
+  });
+
+  it('rejects a non-uuid :id with 400 VALIDATION_ERROR', async () => {
+    const spies = emptySpies();
+    app = await buildWithSession(makeUsuario({ rol: 'encargado' }), spies);
+    const cookies = { sid: app.signCookie('valid-token') };
+
+    const response = await app.inject({
+      method: 'GET',
+      url: routes.detalle('not-a-uuid'),
+      cookies,
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('rejects a non-integer :numeroCorrelativo with 400 VALIDATION_ERROR', async () => {
+    const spies = emptySpies();
+    app = await buildWithSession(makeUsuario({ rol: 'encargado' }), spies);
+    const cookies = { sid: app.signCookie('valid-token') };
+
+    const response = await app.inject({
+      method: 'GET',
+      url: routes.porNumero('abc'),
+      cookies,
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('VALIDATION_ERROR');
   });
 });

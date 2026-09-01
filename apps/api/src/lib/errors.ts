@@ -338,6 +338,17 @@ export function saleAmountOutOfRange(): AppError {
   );
 }
 
+// design.md D2 (recibo-interno, backlog #8). Same shape as
+// productNotFound()/supplierNotFound(): no `details`, English UPPER_SNAKE
+// per the two-naming-families rule — `SALE` is already this repo's English
+// noun for `venta` (DUPLICATE_SALE_ITEM, SALE_AMOUNT_OUT_OF_RANGE above).
+// One code serves both the `:id` and `:numeroCorrelativo` lookups (PD-5).
+// Thrown by the service, never the repository (productos/service.ts's
+// getProducto precedent).
+export function saleNotFound(): AppError {
+  return new AppError('SALE_NOT_FOUND', 'Sale not found', 404);
+}
+
 export function toErrorEnvelope(error: unknown): MappedError {
   if (hasValidationErrors(error)) {
     return {
