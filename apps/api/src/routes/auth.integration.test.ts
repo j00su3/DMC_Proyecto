@@ -139,16 +139,17 @@ describe('auth routes (integration, real Postgres, real argon2)', () => {
     await app.close();
     app = await buildApp({ cookieSecret: COOKIE_SECRET });
 
-    // A WRONG password is what proves the counter survived the restart.
-    // This assertion used to be made with the CORRECT password, which meant
-    // the test was asserting SEC-001 itself: the legitimate holder locked out
-    // of their own account. Verifying the password first (ADR-0007
-    // § Actualizado 2026-08-29) makes that case a success, so the persistence
-    // claim has to be proven by someone who is actually still guessing.
+    // SECURITY-REPORT.md S01, owner-ratified 2026-09-01: a wrong password now
+    // ALWAYS gets 401, locked or not (that distinction was the enumeration
+    // oracle S01 closed), so a wrong password can no longer prove the lock
+    // survived the restart. The CORRECT password is the only submission that
+    // still tells the two states apart: 423 here (not the 200 a fresh account
+    // would give) proves `bloqueadoHasta` was read back from Postgres, not
+    // reset by the new process's memory.
     const stillLocked = await app.inject({
       method: 'POST',
       url: '/api/auth/login',
-      payload: { email: usuario.email, password: 'wrong-password' },
+      payload: { email: usuario.email, password: PASSWORD },
     });
 
     expect(stillLocked.statusCode).toBe(423);
@@ -157,8 +158,14 @@ describe('auth routes (integration, real Postgres, real argon2)', () => {
 
   // SEC-001, end to end against real Postgres and real argon2. This is the
   // test docs/BACKLOG.md row 2.3 names: "tras cinco fallos, el titular con la
-  // contraseña correcta entra".
-  it('lets the legitimate holder log in after five failed attempts, clearing the lock (SEC-001)', async () => {
+  // contraseña correcta entra" — read today as "once the lock has actually
+  // elapsed", per S01's 2026-09-01 amendment: a correct password no longer
+  // clears the lock immediately after the fifth failure (that silent bypass
+  // is exactly what S01 closed, see routes/auth.integration.test.ts's
+  // sibling assertion above and auth/service.ts's `passwordOk` branch) — the
+  // legitimate holder gets the informative 423 first, same as everyone else
+  // who has not waited it out.
+  it('lets the legitimate holder log in once the lock has actually elapsed, clearing it (SEC-001)', async () => {
     const usuario = await insertUsuario();
     app = await buildApp({ cookieSecret: COOKIE_SECRET });
 
@@ -175,6 +182,25 @@ describe('auth routes (integration, real Postgres, real argon2)', () => {
       .from(usuarios)
       .where(eq(usuarios.id, usuario.id));
     expect(locked?.bloqueadoHasta).not.toBeNull();
+
+    // Immediately after the fifth failure, even the correct password is
+    // refused with the informative 423 — S01's fix, proven end to end here
+    // before moving the clock forward to reach the case this test is named
+    // for.
+    const stillLocked = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email: usuario.email, password: PASSWORD },
+    });
+    expect(stillLocked.statusCode).toBe(423);
+
+    // No code path clears a lock before its window elapses (12h fixed TTL
+    // sessions aside) — force it into the past directly in the DB, same
+    // technique as the expired-session test above.
+    await db
+      .update(usuarios)
+      .set({ bloqueadoHasta: new Date(Date.now() - 1_000) })
+      .where(eq(usuarios.id, usuario.id));
 
     const response = await app.inject({
       method: 'POST',
