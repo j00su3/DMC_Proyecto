@@ -5,17 +5,17 @@ import { NavItem } from './NavItem.js';
 
 /**
  * Sidebar nav entries, labels verbatim from docs/design.md's "Sidebar"
- * table. Only "Usuarios" and, from productos-ledger-base S6a on,
- * "Inventario" have a shipped destination — `to="/inventario"` etc. would
- * be a type error against the registered router until those screens exist,
- * so the remaining five stay destination-less and render as inert markers
- * through the same `NavItem` component/class, never a bare `<span>`
- * (app-layout spec, "Sidebar Items Render As Navigation Links").
+ * table. "Usuarios", "Inventario" and, from here on, "Punto de venta" have
+ * a shipped destination — `to="/inventario"` etc. would be a type error
+ * against the registered router until those screens exist, so the
+ * remaining four stay destination-less and render as inert markers through
+ * the same `NavItem` component/class, never a bare `<span>` (app-layout
+ * spec, "Sidebar Items Render As Navigation Links").
  */
 const NAV_ITEMS: { label: string; to?: string }[] = [
   { label: 'Panel general' },
   { label: 'Inventario', to: '/inventario' },
-  { label: 'Punto de venta' },
+  { label: 'Punto de venta', to: '/pos' },
   { label: 'Movimientos' },
   { label: 'Proveedores' },
   { label: 'Reportes' },

@@ -150,6 +150,25 @@ describe('AppShell', () => {
     },
   );
 
+  it.each([
+    ['encargado', encargado],
+    ['deposito', deposito],
+  ])(
+    'renders the Punto de venta nav item as a link to /pos for a %s session — both roles reach POST /api/ventas',
+    async (_label, usuario) => {
+      renderShell({
+        usuario,
+        onLogout: vi.fn(),
+        isLoggingOut: false,
+        children: <p>content</p>,
+      });
+
+      expect(
+        await screen.findByRole('link', { name: 'Punto de venta' }),
+      ).toHaveAttribute('href', '/pos');
+    },
+  );
+
   it('gives the logout control a class the print stylesheet can target', async () => {
     renderShell({
       usuario: encargado,
