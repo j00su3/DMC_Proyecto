@@ -552,6 +552,102 @@ describe('POST /api/auth/password', () => {
 
     expect(response.statusCode).toBe(200);
   });
+
+  // SECURITY-REPORT.md S02: two argon2 operations (verify + hash) per
+  // request, reachable by any authenticated session including `deposito`,
+  // with no rate limit. Exercises the REAL @fastify/rate-limit plugin
+  // (max: 1 on this instance), not the error-envelope builder in isolation —
+  // same approach as /auth/login's own 429 test above.
+  it('returns 429 RATE_LIMITED when the per-session rate limit is exceeded', async () => {
+    const hash = await hashPassword(PASSWORD);
+    const usuario = makeUsuario({ hashContrasena: hash });
+    const repos = fakeRepos(
+      { updatePassword: async () => {} },
+      { findValid: async () => usuario, deleteOthers: async () => {} },
+    );
+    app = await buildApp({
+      repos,
+      uow: fakeUow(repos),
+      cookieSecret: COOKIE_SECRET,
+      rateLimitMax: 1,
+    });
+    await app.ready();
+    const signed = app.signCookie('valid-token');
+
+    const first = await app.inject({
+      method: 'POST',
+      url: '/api/auth/password',
+      cookies: { sid: signed },
+      payload: {
+        currentPassword: PASSWORD,
+        newPassword: 'a-brand-new-password',
+      },
+    });
+    expect(first.statusCode).toBe(200);
+
+    const second = await app.inject({
+      method: 'POST',
+      url: '/api/auth/password',
+      cookies: { sid: signed },
+      payload: {
+        currentPassword: PASSWORD,
+        newPassword: 'another-new-password',
+      },
+    });
+
+    expect(second.statusCode).toBe(429);
+    expect(second.json().error.code).toBe('RATE_LIMITED');
+  });
+
+  // The whole point of S02's fix: keyed by session, not IP. Two DIFFERENT
+  // sessions from the same address must not share one bucket, or a shared
+  // office/NAT would let one deposito account's traffic lock out another's.
+  it('keys the limit by session, not IP — a second session is unaffected', async () => {
+    const hash = await hashPassword(PASSWORD);
+    const usuarioA = makeUsuario({ id: 'u1', hashContrasena: hash });
+    const usuarioB = makeUsuario({ id: 'u2', hashContrasena: hash });
+    const sessionsById: Record<string, Usuario> = {
+      'token-a': usuarioA,
+      'token-b': usuarioB,
+    };
+    const repos = fakeRepos(
+      { updatePassword: async () => {} },
+      {
+        findValid: async (token: string) => sessionsById[token],
+        deleteOthers: async () => {},
+      },
+    );
+    app = await buildApp({
+      repos,
+      uow: fakeUow(repos),
+      cookieSecret: COOKIE_SECRET,
+      rateLimitMax: 1,
+    });
+    await app.ready();
+
+    const first = await app.inject({
+      method: 'POST',
+      url: '/api/auth/password',
+      cookies: { sid: app.signCookie('token-a') },
+      payload: {
+        currentPassword: PASSWORD,
+        newPassword: 'a-brand-new-password',
+      },
+    });
+    expect(first.statusCode).toBe(200);
+
+    const secondSessionSameIp = await app.inject({
+      method: 'POST',
+      url: '/api/auth/password',
+      cookies: { sid: app.signCookie('token-b') },
+      payload: {
+        currentPassword: PASSWORD,
+        newPassword: 'yet-another-password',
+      },
+    });
+
+    expect(secondSessionSameIp.statusCode).toBe(200);
+  });
 });
 
 describe('forced-password-change allowlist reaches routes.ts', () => {
