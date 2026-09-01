@@ -106,6 +106,35 @@ describe('POST /api/auth/login', () => {
     expect(cookieStr).not.toMatch(/Domain=/i);
   });
 
+  // SECURITY-REPORT.md S05: `secure` used to default to `false` whenever
+  // NODE_ENV was not exactly 'production' — including when it was simply
+  // unset, e.g. a manual deploy or a platform migration that forgets the
+  // variable. It now defaults to `true` unconditionally.
+  it('still emits Secure on the session cookie when NODE_ENV is unset', async () => {
+    vi.stubEnv('NODE_ENV', undefined);
+    try {
+      const hash = await hashPassword(PASSWORD);
+      const usuario = makeUsuario({ hashContrasena: hash });
+      app = await buildApp({
+        repos: fakeRepos({ findByEmail: async () => usuario }),
+        cookieSecret: COOKIE_SECRET,
+      });
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/auth/login',
+        payload: { email: usuario.email, password: PASSWORD },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const setCookie = response.headers['set-cookie'];
+      const cookieStr = Array.isArray(setCookie) ? setCookie[0] : setCookie;
+      expect(cookieStr).toMatch(/Secure/i);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('returns 401 INVALID_CREDENTIALS for a wrong password', async () => {
     const hash = await hashPassword(PASSWORD);
     const usuario = makeUsuario({ hashContrasena: hash });

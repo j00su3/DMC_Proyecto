@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   SESSION_COOKIE,
   createToken,
@@ -31,6 +31,7 @@ describe('sessionCookieOptions', () => {
 
   afterEach(() => {
     process.env.NODE_ENV = originalNodeEnv;
+    vi.unstubAllEnvs();
   });
 
   it('never includes a domain key, in any environment (ADR-0010 guard)', () => {
@@ -41,12 +42,38 @@ describe('sessionCookieOptions', () => {
     expect(sessionCookieOptions()).not.toHaveProperty('domain');
   });
 
-  it('sets secure=true only when NODE_ENV is production', () => {
+  // SECURITY-REPORT.md S05: `secure` used to fail open to `false` whenever
+  // NODE_ENV was not exactly 'production', including unset. It now defaults
+  // to `true` unconditionally — NODE_ENV plays no part any more — and only
+  // an explicit ALLOW_INSECURE_COOKIES=true opt-out turns it off.
+  it('defaults secure=true regardless of NODE_ENV, including unset', () => {
+    vi.stubEnv('ALLOW_INSECURE_COOKIES', undefined);
+
     process.env.NODE_ENV = 'production';
     expect(sessionCookieOptions().secure).toBe(true);
 
     process.env.NODE_ENV = 'development';
+    expect(sessionCookieOptions().secure).toBe(true);
+
+    vi.stubEnv('NODE_ENV', undefined);
+    expect(sessionCookieOptions().secure).toBe(true);
+
+    vi.unstubAllEnvs();
+    process.env.NODE_ENV = originalNodeEnv;
+  });
+
+  it('sets secure=false only when ALLOW_INSECURE_COOKIES=true is set explicitly', () => {
+    process.env.NODE_ENV = 'development';
+    vi.stubEnv('ALLOW_INSECURE_COOKIES', 'true');
     expect(sessionCookieOptions().secure).toBe(false);
+
+    // Anything other than the exact string 'true' stays secure — this is a
+    // deliberate opt-in, not a generic truthy check.
+    vi.stubEnv('ALLOW_INSECURE_COOKIES', '1');
+    expect(sessionCookieOptions().secure).toBe(true);
+
+    vi.unstubAllEnvs();
+    process.env.NODE_ENV = originalNodeEnv;
   });
 
   it('matches the fixed 12h session shape from design.md', () => {
