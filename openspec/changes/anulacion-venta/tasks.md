@@ -151,14 +151,14 @@ green; `pnpm test:integration` green against Docker Postgres.
 
 Depends on: Phase 4 (needs `schema.d.ts` types for the new route/dto fields).
 
-- [ ] 6.1 RED+GREEN: `apps/web/src/features/recibo/schemas.ts` (extend or create) —
+- [x] 6.1 RED+GREEN: `apps/web/src/features/recibo/schemas.ts` (extend or create) —
   `anularVentaFormSchema`: `motivoAnulacion: z.string().trim().min(3).max(500)`; tests for blank,
   whitespace-only, 2-char, 501-char, and a valid motivo.
-- [ ] 6.2 RED+GREEN: `apps/web/src/features/recibo/useAnularVenta.ts` — mutation hook calling
+- [x] 6.2 RED+GREEN: `apps/web/src/features/recibo/useAnularVenta.ts` — mutation hook calling
   `POST /api/ventas/:id/anular`; `onSuccess` invalidates `reciboKeys.detail(id)` +
   `productosKeys.all` (design's Data Flow). Test: successful mutate invalidates both keys; server
   error surfaces as an `ApiError`.
-- [ ] 6.3 `apps/web/src/features/recibo/errorMessages.ts` — add `SALE_ALREADY_VOIDED` copy
+- [x] 6.3 `apps/web/src/features/recibo/errorMessages.ts` — add `SALE_ALREADY_VOIDED` copy
   mapping. RED test: code maps to the new copy; unchanged codes unaffected.
 
 **Satisfies**: recibo-ui spec "Anulación Entry Point On The Venta/Receipt View" (mandatory motivo
@@ -168,16 +168,16 @@ input, data-layer half).
 
 Depends on: Phase 6. This is the last slice — no downstream phase depends on it.
 
-- [ ] 7.1 `apps/web/src/features/recibo/AnularVentaModal.tsx` + `.module.css` (new) — form with
+- [x] 7.1 `apps/web/src/features/recibo/AnularVentaModal.tsx` + `.module.css` (new) — form with
   motivo textarea, submit disabled until valid per `anularVentaFormSchema`, no second
   confirmation step beyond the typed motivo (design's stated working assumption, `MovimientoModal`
   precedent). RED tests: submit blocked with no/blank motivo; valid motivo enables submit and
   calls the mutation.
-- [ ] 7.2 `apps/web/src/routes/recibo.tsx` (modify) — render the anulación trigger only when
+- [x] 7.2 `apps/web/src/routes/recibo.tsx` (modify) — render the anulación trigger only when
   `rol === 'encargado' && venta.estado === 'confirmada'`; host `AnularVentaModal`; map
   `SALE_ALREADY_VOIDED`/`VALIDATION_ERROR` through Phase 6.3's error messages. `Recibo.tsx` itself
   is NOT touched (PD-4) — the trigger and modal live only in the route component.
-- [ ] 7.3 RED tests, route level (`await router.load()` first, per CLAUDE.md): `encargado` sees
+- [x] 7.3 RED tests, route level (`await router.load()` first, per CLAUDE.md): `encargado` sees
   and can open the trigger on a `confirmada` venta; `deposito` sees no trigger; an `anulada` venta
   shows no trigger; submitting without a motivo does not fire the request; a successful anulación
   reflects `estado = 'anulada'` via `Recibo.tsx`'s existing plain-text field, no new banner/
@@ -193,13 +193,32 @@ Depends on: Phase 6. This is the last slice — no downstream phase depends on i
 
 Depends on: Phases 1–7 all green.
 
-- [ ] 8.1 `docs/BACKLOG.md` — flip row 9, deferred to `sdd-archive` per #6/#7 precedent (do not do
-  this during apply).
-- [ ] 8.2 Release checklist note: `pnpm db:migrate` must run against Neon before/with deploy, same
-  manual-migration pattern as #6/#7/#8 (CLAUDE.md Deployment section).
-- [ ] 8.3 Mutation-probe the atomicity rollback test (5.1), the A8-exemption query (2.1/2.2), and
-  the concurrency guard (5.2) before trusting them — these are the load-bearing, easy-to-fake-green
-  assertions in this cycle (CLAUDE.md: "a test you have never seen fail is not evidence").
+- [x] 8.1 `docs/BACKLOG.md` — flip row 9, deferred to `sdd-archive` per #6/#7 precedent (do not do
+  this during apply). Confirmed: git history for #6/#7/#8 shows the BACKLOG.md flip lands in its
+  own `chore(sdd): archive <cycle>...` commit, never inside an apply/feature commit — row 9 was
+  left untouched here on purpose, matching that convention.
+- [x] 8.2 Release checklist note: `pnpm db:migrate` must run against Neon before/with deploy, same
+  manual-migration pattern as #6/#7/#8 (CLAUDE.md Deployment section). No new migration ships in
+  this PR (PR2 is web-only, Phase 1's migration already shipped with PR1) — the note is already on
+  record in design.md's Migration/Rollout section and PR1's apply-progress; nothing new to write.
+- [x] 8.3 Mutation-probed the atomicity rollback test (5.1), the A8-exemption query (2.1/2.2), and
+  the concurrency guard (5.2) against a real local Docker Postgres container. A8 (2.1/2.2) and the
+  concurrency guard (5.2) are genuinely load-bearing: injecting the mutation each test is meant to
+  catch made it fail for the right reason, then the mutation was reverted. The atomicity test (5.1)
+  surfaced a real fidelity gap, NOT introduced by this PR — reported as a finding, not silently
+  fixed, since fixing `apps/api` test code is outside PR2's web-only scope: its injected-failure
+  override (`{ ...repos.ventas, revertirPagos: () => throw }`) spreads a class instance, which only
+  copies OWN enumerable properties, silently dropping every prototype method
+  (`marcarAnulada`/`findItems`/etc.). The transaction actually fails at the FIRST repo call
+  (`marcarAnulada is not a function`), not at the intended final `revertirPagos` step the test's
+  name and comments describe. The DB-state assertions still hold either way (nothing commits), so
+  the test is not a false positive about atomicity itself, but it does not prove what it claims to
+  prove. A corrected override (`Object.create(Object.getPrototypeOf(...))` + `Object.assign`,
+  verified locally, not committed) confirms the underlying atomicity guarantee IS real: with the
+  fix reaching the true failure point, an unmutated `anularVenta` still rolls back correctly, and
+  the same production mutation this task probed (swallowing `revertirPagos`'s error) is caught
+  (500 expected, 200 observed) only once the override is corrected. See the final apply report's
+  Risks section for the recommended follow-up.
 
 ---
 

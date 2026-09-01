@@ -1,8 +1,12 @@
 import { createRoute } from '@tanstack/react-router';
+import { useState } from 'react';
 import { isApiError } from '../api/errors.js';
+import { Button } from '../components/ui/Button.js';
 import { FormError } from '../components/ui/FormError.js';
+import { AnularVentaModal } from '../features/recibo/AnularVentaModal.js';
 import { Recibo } from '../features/recibo/Recibo.js';
 import { reciboErrorMessage } from '../features/recibo/errorMessages.js';
+import { useAnularVenta } from '../features/recibo/useAnularVenta.js';
 import { useRecibo } from '../features/recibo/useRecibo.js';
 import { shellLayout } from './shellLayout.js';
 
@@ -22,6 +26,14 @@ import { shellLayout } from './shellLayout.js';
  * route does not exist in `routeTree` yet in this slice, so a typed
  * `to="/ventas/recibo"` would fail `tsc` before Phase 4 lands — the design
  * explicitly says not to gate this task on Phase 4.
+ *
+ * Phase 7 (backlog #9, anulación de venta) adds the anulación trigger + its
+ * modal here, on the ROUTE component, per design's "UI entry point on the
+ * receipt route" decision and PD-4 — `Recibo.tsx` itself is NOT touched.
+ * The trigger is a UX affordance only, gated on `usuario.rol === 'encargado'
+ * && venta.estado === 'confirmada'`; the server's `roles: ['encargado']` on
+ * `POST /api/ventas/:id/anular` (and its `SALE_ALREADY_VOIDED` 409) remain
+ * the real boundary (CLAUDE.md's "Authorization is server-side" rule).
  */
 export const reciboRoute = createRoute({
   getParentRoute: () => shellLayout,
@@ -32,7 +44,10 @@ export const reciboRoute = createRoute({
 function ReciboScreen() {
   const { id } = reciboRoute.useParams();
   const navigate = reciboRoute.useNavigate();
+  const { usuario } = reciboRoute.useRouteContext();
   const query = useRecibo(id);
+  const anular = useAnularVenta(id);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   if (query.isError) {
     const message = isApiError(query.error)
@@ -53,7 +68,37 @@ function ReciboScreen() {
     return <h1>Recibo</h1>;
   }
 
+  const { venta } = query.data;
+  const canAnular =
+    usuario.rol === 'encargado' && venta.estado === 'confirmada';
+  const anularServerError = anular.error
+    ? isApiError(anular.error)
+      ? reciboErrorMessage(anular.error)
+      : 'Ocurrió un error inesperado. Intente de nuevo.'
+    : undefined;
+
   return (
-    <Recibo recibo={query.data} onVolver={() => navigate({ to: '/pos' })} />
+    <>
+      <Recibo recibo={query.data} onVolver={() => navigate({ to: '/pos' })} />
+
+      {canAnular ? (
+        <Button variant="secondary" onClick={() => setIsModalOpen(true)}>
+          Anular venta
+        </Button>
+      ) : null}
+
+      {isModalOpen ? (
+        <AnularVentaModal
+          onClose={() => setIsModalOpen(false)}
+          onSubmit={(values) =>
+            anular.mutate(values, {
+              onSuccess: () => setIsModalOpen(false),
+            })
+          }
+          isPending={anular.isPending}
+          serverError={anularServerError}
+        />
+      ) : null}
+    </>
   );
 }
