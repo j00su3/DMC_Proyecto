@@ -17,8 +17,11 @@ import {
   productInactive,
   productNotFound,
   saleAmountOutOfRange,
+  saleNotFound,
 } from '../lib/errors.js';
 import type { Repos } from '../plugins/repos.js';
+import type { ProductosRepo } from '../productos/repository.js';
+import type { UsuariosRepo } from '../usuarios/repository.js';
 import type {
   ItemVenta,
   MedioPago,
@@ -26,6 +29,7 @@ import type {
   NuevoPago,
   Pago,
   Venta,
+  VentasRepo,
 } from './repository.js';
 
 export type { MedioPago } from './repository.js';
@@ -266,4 +270,75 @@ export async function confirmarVenta(
 
     return { venta, items, pagos };
   });
+}
+
+// recibo-interno (backlog #8) — design.md D2/D7. Read-only shape, mirroring
+// productos/service.ts's ReadRepos: no write path needs any of these repos
+// outside a transaction, so a narrow interface documents the actual
+// dependency instead of accepting the full `Repos`.
+export interface GetReciboRepos {
+  ventas: VentasRepo;
+  usuarios: UsuariosRepo;
+  productos: ProductosRepo;
+}
+
+export type ReciboSelector = { id: string } | { numeroCorrelativo: number };
+
+export interface ReciboItem extends ItemVenta {
+  nombre: string;
+}
+
+export interface Recibo {
+  venta: Venta;
+  cajero: { id: string; nombre: string };
+  items: ReciboItem[];
+  pagos: Pago[];
+}
+
+// design.md D2: one code (`SALE_NOT_FOUND`) for both selectors, thrown here
+// (never the repository) — mirrors productos/service.ts's getProducto
+// precedent. D7: no repo join — cajero and per-item names are resolved with
+// a per-item ProductosRepo.findById, the same accepted N+1 confirmarVenta
+// already runs (Pass A above). Every pagos row is returned unfiltered
+// (PROD-F, deferred to backlog #9).
+export async function getRecibo(
+  repos: GetReciboRepos,
+  selector: ReciboSelector,
+): Promise<Recibo> {
+  const venta =
+    'id' in selector
+      ? await repos.ventas.findById(selector.id)
+      : await repos.ventas.findByNumeroCorrelativo(selector.numeroCorrelativo);
+  if (!venta) {
+    throw saleNotFound();
+  }
+
+  const [cajero, items, pagos] = await Promise.all([
+    repos.usuarios.findById(venta.usuarioId),
+    repos.ventas.findItems(venta.id),
+    repos.ventas.findPagos(venta.id),
+  ]);
+  // `usuarioId` is an FK to a row `confirmarVenta` always writes with the
+  // confirming actor's real id — a missing cajero here is a broken
+  // invariant, not a user-facing 404 (mirrors repository.ts's
+  // expectOneRow idiom for "should never happen" states).
+  if (!cajero) {
+    throw new Error(`getRecibo: cajero ${venta.usuarioId} not found`);
+  }
+
+  const reciboItems: ReciboItem[] = [];
+  for (const item of items) {
+    const producto = await repos.productos.findById(item.productoId);
+    reciboItems.push({
+      ...item,
+      nombre: producto?.nombre ?? '',
+    });
+  }
+
+  return {
+    venta,
+    cajero: { id: cajero.id, nombre: cajero.nombre },
+    items: reciboItems,
+    pagos,
+  };
 }

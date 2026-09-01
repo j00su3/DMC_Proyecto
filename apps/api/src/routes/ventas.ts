@@ -11,7 +11,8 @@ import type {
   Pago,
   Venta,
 } from '../ventas/repository.js';
-import { confirmarVenta } from '../ventas/service.js';
+import { confirmarVenta, getRecibo } from '../ventas/service.js';
+import type { ReciboItem } from '../ventas/service.js';
 
 // design.md D11: both routes live here, registered in app.ts with
 // `{ prefix: '/api' }` alongside every other route plugin. Neither path
@@ -80,6 +81,26 @@ const okVenta = z.object({
   pagos: z.array(pagoDto),
 });
 
+// recibo-interno (backlog #8) — design.md D1's per-file precedent, not
+// shared (matches productos.ts:50, movimientos.ts:22, usuarios.ts:49,
+// proveedores.ts:35).
+const idParams = z.object({ id: z.string().uuid() });
+
+const numeroCorrelativoParams = z.object({
+  numeroCorrelativo: z.coerce.number().int().positive(),
+});
+
+// design.md's Interfaces/Contracts: `ventaDto` is REUSED as-is, never
+// duplicated.
+const reciboItemDto = itemVentaDto.extend({ nombre: z.string() });
+
+const okRecibo = z.object({
+  venta: ventaDto,
+  cajero: z.object({ id: z.string(), nombre: z.string() }),
+  items: z.array(reciboItemDto),
+  pagos: z.array(pagoDto),
+});
+
 const catalogoProductoDto = z.object({
   id: z.string(),
   nombre: z.string(),
@@ -130,6 +151,18 @@ function toPagoDto(pago: Pago) {
     monto: pago.monto,
     vuelto: pago.vuelto,
     estado: pago.estado,
+  };
+}
+
+function toReciboItemDto(item: ReciboItem) {
+  return {
+    id: item.id,
+    ventaId: item.ventaId,
+    productoId: item.productoId,
+    cantidad: item.cantidad,
+    precioUnitario: item.precioUnitario,
+    subtotal: item.subtotal,
+    nombre: item.nombre,
   };
 }
 
@@ -211,6 +244,64 @@ const ventasRoutes: FastifyPluginAsync = async (app) => {
         { soloActivos: true },
       );
       return paginated(rows.map(toCatalogoProductoDto), page, pageSize, total);
+    },
+  );
+
+  // recibo-interno (backlog #8) — design.md D1: this is registered AFTER
+  // `/ventas/catalogo` on purpose, so the route-shadowing RED test
+  // (routes/ventas.test.ts) proves the static segment still wins under the
+  // real registration order this file uses, not merely the order Fastify's
+  // radix-tree matcher happens to prefer. `GET /ventas/numero/:n` (3
+  // segments) cannot collide with either.
+  typed.get(
+    '/ventas/:id',
+    {
+      config: { roles: ['encargado', 'deposito'] },
+      schema: {
+        params: idParams,
+        response: {
+          200: okRecibo,
+          401: errorEnvelopeSchema,
+          403: errorEnvelopeSchema,
+          404: errorEnvelopeSchema,
+        },
+      },
+    },
+    async (request) => {
+      const recibo = await getRecibo(app.repos, { id: request.params.id });
+      return {
+        venta: toVentaDto(recibo.venta),
+        cajero: recibo.cajero,
+        items: recibo.items.map(toReciboItemDto),
+        pagos: recibo.pagos.map(toPagoDto),
+      };
+    },
+  );
+
+  typed.get(
+    '/ventas/numero/:numeroCorrelativo',
+    {
+      config: { roles: ['encargado', 'deposito'] },
+      schema: {
+        params: numeroCorrelativoParams,
+        response: {
+          200: okRecibo,
+          401: errorEnvelopeSchema,
+          403: errorEnvelopeSchema,
+          404: errorEnvelopeSchema,
+        },
+      },
+    },
+    async (request) => {
+      const recibo = await getRecibo(app.repos, {
+        numeroCorrelativo: request.params.numeroCorrelativo,
+      });
+      return {
+        venta: toVentaDto(recibo.venta),
+        cajero: recibo.cajero,
+        items: recibo.items.map(toReciboItemDto),
+        pagos: recibo.pagos.map(toPagoDto),
+      };
     },
   );
 };
