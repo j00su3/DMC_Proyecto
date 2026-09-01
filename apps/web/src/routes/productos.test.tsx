@@ -122,6 +122,37 @@ describe('productos routes', () => {
     expect(screen.getByText('Producto 2')).toBeInTheDocument();
   });
 
+  it('renders a link to /inventario/nuevo — the create route existed with zero entry point from this list', async () => {
+    stubFetchAsDepositoWithList({
+      data: [productoRow('1')],
+      page: 1,
+      pageSize: PAGE_SIZE,
+      total: 1,
+    });
+    await loadAndRenderProductos('/inventario');
+
+    expect(
+      await screen.findByRole('link', { name: 'Nuevo producto' }),
+    ).toHaveAttribute('href', '/inventario/nuevo');
+  });
+
+  it('navigates to /inventario/$id when a row\'s "Ver" button is clicked — the detail screen (and movimientos, D10) had zero entry point from this list', async () => {
+    const user = userEvent.setup();
+    stubFetchAsDepositoWithList({
+      data: [productoRow('1')],
+      page: 1,
+      pageSize: PAGE_SIZE,
+      total: 1,
+    });
+    const router = await loadAndRenderProductos('/inventario');
+
+    await user.click(await screen.findByRole('button', { name: 'Ver' }));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/inventario/1');
+    });
+  });
+
   it("derives the pagination footer from the envelope's page/pageSize/total", async () => {
     stubFetchAsDepositoWithList({
       data: [productoRow('1')],

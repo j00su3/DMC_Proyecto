@@ -201,6 +201,32 @@ describe('usuarios routes', () => {
     ).toHaveAttribute('href', '/usuarios/nuevo');
   });
 
+  it('navigates to /usuarios/$id when a row\'s "Ver" button is clicked — the detail screen had zero entry point from this list', async () => {
+    const user = userEvent.setup();
+    stubFetchAsEncargadoWithList({
+      data: [usuarioRow('1')],
+      page: 1,
+      pageSize: PAGE_SIZE,
+      total: 1,
+    });
+    const { router, queryClient } =
+      buildAuthenticatedRouterWithQueryClient('/usuarios');
+
+    render(
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(RouterProvider, { router }),
+      ),
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'Ver' }));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/usuarios/1');
+    });
+  });
+
   it('renders the empty state when total===0, not a blank/errored table', async () => {
     stubFetchAsEncargadoWithList({
       data: [],
