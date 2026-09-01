@@ -3,6 +3,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { errorEnvelopeSchema, unauthorized } from '../lib/errors.js';
 import { pageQuerySchema, paginated } from '../lib/pagination.js';
+import { resolveSessionRateLimitKey } from '../plugins/sessionRateLimit.js';
 import type { UsuarioResumen } from '../usuarios/repository.js';
 import {
   createUsuario,
@@ -163,7 +164,20 @@ const usuariosRoutes: FastifyPluginAsync = async (app) => {
   typed.post(
     '/usuarios',
     {
-      config: { roles: ['encargado'] },
+      // SECURITY-REPORT.md S02: runs one full-cost `hashPassword` per
+      // request. Smaller exposure than /auth/password (requires
+      // `encargado`), but unlimited before this fix. Keyed by session, not
+      // IP — same reasoning as auth.ts's /auth/password (see
+      // sessionRateLimit.ts).
+      config: {
+        roles: ['encargado'],
+        rateLimit: {
+          max: app.rateLimitMax,
+          timeWindow: '1 minute',
+          keyGenerator: (request) =>
+            resolveSessionRateLimitKey(request.user, request.ip),
+        },
+      },
       schema: {
         body: crearUsuarioBody,
         response: {
@@ -172,6 +186,7 @@ const usuariosRoutes: FastifyPluginAsync = async (app) => {
           401: errorEnvelopeSchema,
           403: errorEnvelopeSchema,
           409: errorEnvelopeSchema,
+          429: errorEnvelopeSchema,
           500: errorEnvelopeSchema,
         },
       },
@@ -193,7 +208,16 @@ const usuariosRoutes: FastifyPluginAsync = async (app) => {
   typed.post(
     '/usuarios/:id/password-reset',
     {
-      config: { roles: ['encargado'] },
+      // SECURITY-REPORT.md S02: same reasoning as POST /usuarios above.
+      config: {
+        roles: ['encargado'],
+        rateLimit: {
+          max: app.rateLimitMax,
+          timeWindow: '1 minute',
+          keyGenerator: (request) =>
+            resolveSessionRateLimitKey(request.user, request.ip),
+        },
+      },
       schema: {
         params: idParams,
         response: {
@@ -201,6 +225,7 @@ const usuariosRoutes: FastifyPluginAsync = async (app) => {
           401: errorEnvelopeSchema,
           403: errorEnvelopeSchema,
           404: errorEnvelopeSchema,
+          429: errorEnvelopeSchema,
           500: errorEnvelopeSchema,
         },
       },

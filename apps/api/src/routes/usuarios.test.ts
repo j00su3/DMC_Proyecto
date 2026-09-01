@@ -106,6 +106,7 @@ async function buildWithSession(
   sesion: Usuario | undefined,
   usuarios: Partial<UsuariosRepo> = {},
   auditoria: Partial<AuditoriaRepo> = {},
+  rateLimitMax?: number,
 ) {
   const repos = fakeRepos(usuarios, { findValid: async () => sesion });
   if (auditoria.record) {
@@ -115,6 +116,28 @@ async function buildWithSession(
     repos,
     uow: fakeUow(repos),
     cookieSecret: COOKIE_SECRET,
+    rateLimitMax,
+  });
+  await app.ready();
+  return app;
+}
+
+// `sesionesById` lets a single app instance resolve two DIFFERENT sessions
+// (the `sid` cookie value chooses which), so a per-session rate-limit test
+// can prove one session's bucket does not affect another's.
+async function buildWithSessions(
+  sesionesById: Record<string, Usuario | undefined>,
+  usuarios: Partial<UsuariosRepo> = {},
+  rateLimitMax?: number,
+) {
+  const repos = fakeRepos(usuarios, {
+    findValid: async (token: string) => sesionesById[token],
+  });
+  const app = await buildApp({
+    repos,
+    uow: fakeUow(repos),
+    cookieSecret: COOKIE_SECRET,
+    rateLimitMax,
   });
   await app.ready();
   return app;
@@ -452,6 +475,63 @@ describe('POST /api/usuarios', () => {
     expect(response.statusCode).toBe(400);
     expect(response.json().error.code).toBe('VALIDATION_ERROR');
   });
+
+  // SECURITY-REPORT.md S02: each call runs one full-cost `hashPassword`.
+  // Smaller exposure than /auth/password (requires `encargado`), but still
+  // unlimited before this fix. Same real-plugin approach as /auth/login's
+  // own 429 test.
+  it('returns 429 RATE_LIMITED when the per-session rate limit is exceeded', async () => {
+    app = await buildWithSession(makeUsuario(), {}, {}, 1);
+
+    const cookies = { sid: app.signCookie('valid-token') };
+    const first = await app.inject({
+      method: 'POST',
+      url: '/api/usuarios',
+      payload: body,
+      cookies,
+    });
+    expect(first.statusCode).toBe(201);
+
+    const second = await app.inject({
+      method: 'POST',
+      url: '/api/usuarios',
+      payload: body,
+      cookies,
+    });
+
+    expect(second.statusCode).toBe(429);
+    expect(second.json().error.code).toBe('RATE_LIMITED');
+  });
+
+  // The point of S02's fix: keyed by session, not IP. A second encargado
+  // session behind the same address must not share the first one's bucket.
+  it('keys the limit by session, not IP — a second session is unaffected', async () => {
+    app = await buildWithSessions(
+      {
+        'token-a': makeUsuario({ id: 'e1' }),
+        'token-b': makeUsuario({ id: 'e2' }),
+      },
+      {},
+      1,
+    );
+
+    const first = await app.inject({
+      method: 'POST',
+      url: '/api/usuarios',
+      payload: body,
+      cookies: { sid: app.signCookie('token-a') },
+    });
+    expect(first.statusCode).toBe(201);
+
+    const secondSessionSameIp = await app.inject({
+      method: 'POST',
+      url: '/api/usuarios',
+      payload: body,
+      cookies: { sid: app.signCookie('token-b') },
+    });
+
+    expect(secondSessionSameIp.statusCode).toBe(201);
+  });
 });
 
 describe('POST /api/usuarios/:id/password-reset', () => {
@@ -539,6 +619,48 @@ describe('POST /api/usuarios/:id/password-reset', () => {
     // the transaction rolled back, so the credential it names does not exist
     // in the database and handing it over would be a lie the user acts on.
     expect(response.body).not.toContain('passwordTemporal');
+  });
+
+  // SECURITY-REPORT.md S02: one full-cost `hashPassword` per call, unlimited
+  // before this fix. Same real-plugin approach as /auth/login's 429 test.
+  it('returns 429 RATE_LIMITED when the per-session rate limit is exceeded', async () => {
+    app = await buildWithSession(makeUsuario(), {}, {}, 1);
+
+    const cookies = { sid: app.signCookie('valid-token') };
+    const first = await app.inject({ method: 'POST', url, cookies });
+    expect(first.statusCode).toBe(200);
+
+    const second = await app.inject({ method: 'POST', url, cookies });
+
+    expect(second.statusCode).toBe(429);
+    expect(second.json().error.code).toBe('RATE_LIMITED');
+  });
+
+  // The point of S02's fix: keyed by session, not IP.
+  it('keys the limit by session, not IP — a second session is unaffected', async () => {
+    app = await buildWithSessions(
+      {
+        'token-a': makeUsuario({ id: 'e1' }),
+        'token-b': makeUsuario({ id: 'e2' }),
+      },
+      {},
+      1,
+    );
+
+    const first = await app.inject({
+      method: 'POST',
+      url,
+      cookies: { sid: app.signCookie('token-a') },
+    });
+    expect(first.statusCode).toBe(200);
+
+    const secondSessionSameIp = await app.inject({
+      method: 'POST',
+      url,
+      cookies: { sid: app.signCookie('token-b') },
+    });
+
+    expect(secondSessionSameIp.statusCode).toBe(200);
   });
 });
 

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { changePassword, login, logout } from '../auth/service.js';
 import { SESSION_COOKIE, sessionCookieOptions } from '../auth/session.js';
 import { errorEnvelopeSchema, unauthorized } from '../lib/errors.js';
+import { resolveSessionRateLimitKey } from '../plugins/sessionRateLimit.js';
 
 const loginBody = z.object({
   email: z.string().email(),
@@ -127,13 +128,29 @@ const authRoutes: FastifyPluginAsync = async (app) => {
     {
       // Opts in to the forced-change allowlist (design.md D3): this is the
       // only route a flagged user can reach to clear the flag.
-      config: { allowPasswordChangePending: true },
+      //
+      // SECURITY-REPORT.md S02: runs TWO full-cost argon2 operations per
+      // request (verify + hash) and is reachable by any authenticated
+      // session, including the lowest-privilege `deposito` role. Keyed by
+      // session (sessionRateLimit.ts), not IP — S12 leaves real-IP
+      // resolution only partially verifiable, and this route always has a
+      // resolved session by the time the rate-limit hook runs.
+      config: {
+        allowPasswordChangePending: true,
+        rateLimit: {
+          max: app.rateLimitMax,
+          timeWindow: '1 minute',
+          keyGenerator: (request) =>
+            resolveSessionRateLimitKey(request.user, request.ip),
+        },
+      },
       schema: {
         body: changePasswordBody,
         response: {
           200: z.object({ ok: z.literal(true) }),
           400: errorEnvelopeSchema,
           401: errorEnvelopeSchema,
+          429: errorEnvelopeSchema,
         },
       },
     },
