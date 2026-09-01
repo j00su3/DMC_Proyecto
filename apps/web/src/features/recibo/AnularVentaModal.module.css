@@ -1,0 +1,39 @@
+.fieldLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 20px;
+}
+
+.body textarea {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  padding: 9px 14px;
+  font-size: 14px;
+  font-family: inherit;
+  min-height: 96px;
+  resize: vertical;
+}
+
+.error {
+  font-size: 12px;
+  color: var(--color-danger);
+}
+
+.warning {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--color-text-muted-strong);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
