@@ -56,6 +56,9 @@ function PosScreen() {
           >
             Ver recibo
           </Link>
+          <Link to="/ventas/recibo" className={styles.verReciboLink}>
+            Buscar recibo
+          </Link>
           <Button
             type="button"
             variant="secondary"
