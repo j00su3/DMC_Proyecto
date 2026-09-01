@@ -134,6 +134,28 @@ describe('Recibo', () => {
     expect(screen.queryByText(/Vuelto \$0\.00/)).not.toBeInTheDocument();
   });
 
+  it('calls onVolver when Volver is activated, instead of relying on browser history', async () => {
+    const onVolver = vi.fn();
+    const user = userEvent.setup();
+    render(<Recibo recibo={BASE_RECIBO} onVolver={onVolver} />);
+
+    await user.click(screen.getByRole('button', { name: 'Volver' }));
+
+    expect(onVolver).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to window.history.back() when no onVolver is supplied', async () => {
+    const backSpy = vi.fn();
+    vi.stubGlobal('history', { ...window.history, back: backSpy });
+    const user = userEvent.setup();
+    render(<Recibo recibo={BASE_RECIBO} />);
+
+    await user.click(screen.getByRole('button', { name: 'Volver' }));
+
+    expect(backSpy).toHaveBeenCalledTimes(1);
+    vi.unstubAllGlobals();
+  });
+
   it('calls window.print() directly when Imprimir is activated, no auto-print on mount (PD-9)', async () => {
     const printSpy = vi.fn();
     vi.stubGlobal('print', printSpy);
