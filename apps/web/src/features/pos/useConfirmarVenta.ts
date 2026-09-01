@@ -5,8 +5,11 @@ import { productosKeys } from '../productos/queries.js';
 
 type ConfirmarVentaInput =
   paths['/api/ventas']['post']['requestBody']['content']['application/json'];
-type ConfirmarVentaResponse =
+export type ConfirmarVentaResponse =
   paths['/api/ventas']['post']['responses']['201']['content']['application/json'];
+/** The confirmed sale record, per PD-10's success screen (correlativo +
+ * total) and the "Ver recibo" link target (`id`). */
+export type VentaConfirmada = ConfirmarVentaResponse['venta'];
 
 /**
  * `POST /api/ventas`. On success (design.md's Data Flow): empty the cart

@@ -281,7 +281,7 @@ testable even before Phase 5 wires the POS link to it). **DONE**
 Depends on: Phase 3 (links to `/ventas/$id/recibo`). Independent of Phase 4 — may run in parallel
 with it once Phase 3 is merged.
 
-### Task 5.1 — `PagoPanel` per-call success callback
+### Task 5.1 — `PagoPanel` per-call success callback [x]
 - **File**: `apps/web/src/features/pos/PagoPanel.tsx` (modify)
 - **Satisfies**: pos-ui spec, "Post-Confirmation Success State" (response retained), "Cart Clears
   On Confirmed Sale Or Explicit Empty Action, Success State Follows Confirmation" (D5's resolution
@@ -297,7 +297,7 @@ with it once Phase 3 is merged.
 - RED test (hook/component level): `onVentaConfirmada` is called with the confirmed venta payload
   on a successful `mutate`.
 
-### Task 5.2 — `pos.tsx` success screen + "Nueva venta"
+### Task 5.2 — `pos.tsx` success screen + "Nueva venta" [x]
 - **File**: `apps/web/src/routes/pos.tsx` (modify), `apps/web/src/routes/pos.module.css` (modify,
   if new styles are needed for the success screen)
 - Depends on: 5.1, Task 3.2 (link target must exist).
@@ -320,7 +320,11 @@ with it once Phase 3 is merged.
     on the unchanged half of the modified requirement)
 
 **Phase 5 exit criteria**: full POS → success screen → receipt flow works end to end for both
-roles. `pnpm -r test`, `pnpm typecheck`, `pnpm lint` green.
+roles. `pnpm -r test`, `pnpm typecheck`, `pnpm lint` green. **DONE**
+(`feat/recibo-pr5-exito`, not pushed). `pnpm --filter web test` (408/408), `pnpm typecheck`,
+`pnpm lint` all green.
+
+**All five phases of this change are now complete.**
 
 ---
 

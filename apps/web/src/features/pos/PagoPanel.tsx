@@ -8,7 +8,10 @@ import styles from './PagoPanel.module.css';
 import type { CarritoLinea } from './carrito.js';
 import { posErrorMessage } from './errorMessages.js';
 import type { MedioPago } from './schemas.js';
-import { useConfirmarVenta } from './useConfirmarVenta.js';
+import {
+  type VentaConfirmada,
+  useConfirmarVenta,
+} from './useConfirmarVenta.js';
 
 const MEDIOS: { value: MedioPago; label: string }[] = [
   { value: 'efectivo', label: 'Efectivo' },
@@ -61,6 +64,13 @@ export interface PagoPanelProps {
    * docblock) — this component does not own cart state and never imports
    * `useCarrito` directly. */
   vaciarCarrito: () => void;
+  /** Invoked with the confirmed venta once `mutation.mutate` succeeds
+   * (D5 — `pos.tsx` holds the success-screen state; this component does
+   * not). Fired via a per-call `onSuccess` passed to `mutate`, the
+   * precedent already in `routes/productosDetalle.tsx`'s
+   * `handleSubmitMovimiento`, on both the initial confirmation and the
+   * `PRICE_CHANGED` re-confirmation path. */
+  onVentaConfirmada: (venta: VentaConfirmada) => void;
 }
 
 /**
@@ -74,7 +84,11 @@ export interface PagoPanelProps {
  * ONLY path that resubmits after that error, and it exists solely as an
  * explicit control the cashier must click.
  */
-export function PagoPanel({ items, vaciarCarrito }: PagoPanelProps) {
+export function PagoPanel({
+  items,
+  vaciarCarrito,
+  onVentaConfirmada,
+}: PagoPanelProps) {
   const [medioSeleccionado, setMedioSeleccionado] =
     useState<MedioPago>('efectivo');
   const [montoInput, setMontoInput] = useState('');
@@ -153,7 +167,9 @@ export function PagoPanel({ items, vaciarCarrito }: PagoPanelProps) {
   }
 
   function confirmar() {
-    mutation.mutate(buildInput(precioOverrides));
+    mutation.mutate(buildInput(precioOverrides), {
+      onSuccess: (data) => onVentaConfirmada(data.venta),
+    });
   }
 
   function reconfirmar() {
@@ -163,7 +179,9 @@ export function PagoPanel({ items, vaciarCarrito }: PagoPanelProps) {
       nextOverrides[mismatch.productoId] = mismatch.precioActual;
     }
     setPrecioOverrides(nextOverrides);
-    mutation.mutate(buildInput(nextOverrides));
+    mutation.mutate(buildInput(nextOverrides), {
+      onSuccess: (data) => onVentaConfirmada(data.venta),
+    });
   }
 
   const puedeConfirmar =
