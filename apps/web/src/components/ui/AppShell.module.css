@@ -1,6 +1,13 @@
 .shell {
   display: flex;
-  min-height: 100vh;
+  /*
+   * A fixed viewport height (not min-height) is what lets the sidebar stay
+   * put: with min-height, a long table pushed the whole document taller,
+   * so scrolling to see the rest of the table scrolled the sidebar out of
+   * view along with it. `.main`'s own overflow-y below is what actually
+   * turns that into an internal scrollbar.
+   */
+  height: 100vh;
   background: var(--color-bg-app);
 }
 
@@ -12,6 +19,7 @@
   display: flex;
   flex-direction: column;
   padding: 16px 12px;
+  overflow-y: auto;
 }
 
 .brandMark {
@@ -104,6 +112,8 @@
 .main {
   flex: 1;
   padding: 24px;
+  overflow-y: auto;
+  min-width: 0;
 }
 
 .logoutButton {
