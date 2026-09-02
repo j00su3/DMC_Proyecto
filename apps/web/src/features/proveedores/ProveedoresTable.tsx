@@ -25,6 +25,20 @@ type ProveedoresTableProps = {
    * precedent).
    */
   onSelect?: (id: string) => void;
+  /**
+   * Gates the "Crear proveedor nuevo" trigger (PD-5, D5's UX-affordance-only
+   * pattern — the server's 403 remains the real boundary). Undefined hides
+   * the trigger, the same safe default the rest of this feature uses.
+   */
+  actorRol?: 'encargado' | 'deposito';
+  /**
+   * Route owns the `isCreating` state (D6) — this only requests the
+   * transition. Lives here, not in `ProveedorDetallePanel`, because PD-5
+   * says literally "the master pane MUST offer" this action; the previous
+   * placement inside the detail pane's placeholder made it unreachable once
+   * any supplier was selected (verify-report.md WARNING).
+   */
+  onStartCreate?: () => void;
 };
 
 /**
@@ -75,16 +89,23 @@ function buildColumns(
  * navigation back to the route. Inactive suppliers are never filtered out:
  * PD-1 requires the full catalog, active and inactive, visible in one
  * unpaginated fetch.
+ *
+ * Also owns the "Crear proveedor nuevo" trigger (PD-5) — this is the actual
+ * master pane, so the trigger renders here regardless of what the detail
+ * pane shows, staying reachable even once a supplier is selected.
  */
 export function ProveedoresTable({
   proveedores,
   'aria-busy': ariaBusy,
   onSelect,
+  actorRol,
+  onStartCreate,
 }: ProveedoresTableProps) {
   const [q, setQ] = useState('');
   const filtered = proveedores.filter((proveedor) =>
     matchesFilter(proveedor, q),
   );
+  const isDeposito = actorRol !== 'encargado';
 
   return (
     <div>
@@ -94,6 +115,11 @@ export function ProveedoresTable({
         value={q}
         onChange={(event) => setQ(event.target.value)}
       />
+      {isDeposito ? null : (
+        <Button variant="primary" onClick={() => onStartCreate?.()}>
+          Crear proveedor nuevo
+        </Button>
+      )}
       {filtered.length === 0 ? (
         <p>No se encontraron proveedores que coincidan con la búsqueda.</p>
       ) : (

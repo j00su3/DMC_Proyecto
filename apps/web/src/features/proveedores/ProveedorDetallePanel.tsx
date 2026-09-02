@@ -23,7 +23,6 @@ type ProveedorDetallePanelProps = {
   proveedor: ProveedorDetalle | null;
   /** D6: local `isCreating` state owned by the route, not a `?selected=nuevo` sentinel. */
   isCreating?: boolean;
-  onStartCreate?: () => void;
   onCreate?: (input: CrearProveedorInput) => void;
   onUpdate?: (input: ActualizarProveedorInput) => void;
   onDeactivate?: () => void;
@@ -37,15 +36,19 @@ type ProveedorDetallePanelProps = {
  * Presentational (route-module boundary, `productosDetalle.tsx` precedent,
  * bundled here as one component since Phase 2 ships no route yet). Pane
  * precedence mirrors D6: `isCreating` → create form; else `proveedor` →
- * detail (read-only for deposito, D5); else the empty placeholder, which is
- * also where the "Crear proveedor nuevo" trigger lives (PD-5), hidden for
- * deposito (D5's "+ Nuevo proveedor hidden for deposito" rule).
+ * detail (read-only for deposito, D5); else the empty placeholder.
+ *
+ * The "Crear proveedor nuevo" trigger lives in `ProveedoresTable` (the
+ * actual master pane), not here — PD-5 says literally "the master pane MUST
+ * offer" that action, and verify-report.md flagged this placeholder's
+ * previous ownership of the trigger as a WARNING: it made the trigger
+ * unreachable once any supplier was selected, since this screen has no
+ * deselect/back control.
  */
 export function ProveedorDetallePanel({
   actorRol,
   proveedor,
   isCreating,
-  onStartCreate,
   onCreate,
   onUpdate,
   onDeactivate,
@@ -74,11 +77,6 @@ export function ProveedorDetallePanel({
     return (
       <div>
         <p>Seleccione un proveedor de la lista para ver su detalle.</p>
-        {isDeposito ? null : (
-          <Button variant="primary" onClick={() => onStartCreate?.()}>
-            Crear proveedor nuevo
-          </Button>
-        )}
       </div>
     );
   }
