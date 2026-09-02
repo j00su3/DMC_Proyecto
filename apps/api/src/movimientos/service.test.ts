@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { UnitOfWork } from '../db/uow.js';
+import type { TxControl, UnitOfWork } from '../db/uow.js';
 import type { Repos } from '../plugins/repos.js';
 import type { Producto } from '../productos/repository.js';
 import {
@@ -44,6 +44,8 @@ function harness(
     // read (on the rejection path) and for D2's response read (on the
     // success path). `undefined` here is a meaningful case (product gone).
     productoActual?: Producto | undefined;
+    alertCreateResult?: unknown;
+    alertAutoResolveResult?: unknown;
   } = {},
 ) {
   let transactionOpen = false;
@@ -75,20 +77,56 @@ function harness(
 
   const auditoria = { record: spy('auditoria.record', async () => {}) };
 
-  const repos = { productos, movimientos, auditoria } as unknown as Repos;
+  // Phase 2 (backlog #10): a fake alertas repo, defaulting to "no open
+  // alert exists" (undefined) — the evaluator's dedup no-op path — so
+  // pre-existing tests unrelated to alerts stay green without asserting
+  // anything about alert rows.
+  const alertas = {
+    create: spy('alertas.create', async () => options.alertCreateResult),
+    autoResolve: spy(
+      'alertas.autoResolve',
+      async () => options.alertAutoResolveResult,
+    ),
+  };
 
-  const run = vi.fn(async (work: (repos: Repos) => Promise<unknown>) => {
-    transactionOpen = true;
-    try {
-      return await work(repos);
-    } finally {
-      transactionOpen = false;
-    }
-  });
+  const repos = {
+    productos,
+    movimientos,
+    auditoria,
+    alertas,
+  } as unknown as Repos;
+
+  // Fake TxControl: runs `work` and, on failure, swallows it and returns
+  // undefined — mirrors the real savepoint()'s never-rethrow contract
+  // (design.md D1/D2) without opening a real Postgres SAVEPOINT.
+  const savepoint = vi.fn(
+    async <T>(
+      _name: string,
+      work: () => Promise<T>,
+    ): Promise<T | undefined> => {
+      try {
+        return await work();
+      } catch {
+        return undefined;
+      }
+    },
+  );
+  const tx = { savepoint } as unknown as TxControl;
+
+  const run = vi.fn(
+    async (work: (repos: Repos, tx: TxControl) => Promise<unknown>) => {
+      transactionOpen = true;
+      try {
+        return await work(repos, tx);
+      } finally {
+        transactionOpen = false;
+      }
+    },
+  );
 
   const uow = { run } as unknown as UnitOfWork;
 
-  return { repos, uow, productos, movimientos, auditoria, calls };
+  return { repos, uow, productos, movimientos, auditoria, alertas, tx, calls };
 }
 
 function baseInput(
@@ -441,5 +479,53 @@ describe('registrarMovimiento — D2 transaction shape', () => {
 
     expect(h.calls.length).toBeGreaterThan(0);
     expect(h.calls.every((c) => c.insideTransaction)).toBe(true);
+  });
+});
+
+// Phase 2 (backlog #10), task 2.4: the evaluator runs at the SEAM after the
+// post-movement producto re-read, wrapped in tx.savepoint('alertas', ...).
+describe('registrarMovimiento — alert evaluator wiring (SEAM)', () => {
+  it('invokes tx.savepoint and calls alertas.create with the RE-READ product stockMinimo', async () => {
+    // salida cantidad=5 -> delta=-5, aplicarDelta drops stock to 3, so
+    // stockPrevio = 3 - (-5) = 8. The re-read producto carries
+    // stockMinimo=5, so the crossing (previo=8 -> resultante=3) fires
+    // stock_bajo. stockActual on the re-read row is deliberately different
+    // (12) from stockResultante (3) — proves the evaluator uses stockMinimo
+    // from the re-read, not a recomputed/derived value.
+    const h = harness({
+      aplicarDeltaResult: 3,
+      productoActual: producto({ stockMinimo: 5, stockActual: 12 }),
+    });
+
+    await registrarMovimiento(
+      h.uow,
+      baseInput({ operacion: 'salida', cantidad: 5 }),
+    );
+
+    expect(h.tx.savepoint).toHaveBeenCalledWith(
+      'alertas',
+      expect.any(Function),
+    );
+    expect(h.alertas.create).toHaveBeenCalledWith(
+      expect.objectContaining({ productoId: PRODUCT_ID, tipo: 'stock_bajo' }),
+    );
+  });
+
+  it('does not create an alert when the movement does not cross any threshold', async () => {
+    const h = harness({
+      aplicarDeltaResult: 20,
+      productoActual: producto({ stockMinimo: 5, stockActual: 20 }),
+    });
+
+    await registrarMovimiento(
+      h.uow,
+      baseInput({ operacion: 'entrada', cantidad: 5 }),
+    );
+
+    expect(h.tx.savepoint).toHaveBeenCalledWith(
+      'alertas',
+      expect.any(Function),
+    );
+    expect(h.alertas.create).not.toHaveBeenCalled();
   });
 });

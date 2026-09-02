@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { UnitOfWork } from '../db/uow.js';
+import type { TxControl, UnitOfWork } from '../db/uow.js';
 import type { Repos } from '../plugins/repos.js';
 import type { Proveedor } from '../proveedores/repository.js';
 import type { Producto } from './repository.js';
@@ -64,6 +64,8 @@ function harness(
     // `undefined` here is itself a meaningful test case (product not found)
     // rather than "use the default".
     productoActual?: Producto | undefined;
+    alertCreateResult?: unknown;
+    alertAutoResolveResult?: unknown;
   } = {},
 ) {
   let transactionOpen = false;
@@ -120,25 +122,60 @@ function harness(
 
   const auditoria = { record: spy('auditoria.record', async () => {}) };
 
+  const alertas = {
+    create: spy('alertas.create', async () => options.alertCreateResult),
+    autoResolve: spy(
+      'alertas.autoResolve',
+      async () => options.alertAutoResolveResult,
+    ),
+  };
+
   const repos = {
     proveedores,
     productos,
     movimientos,
     auditoria,
+    alertas,
   } as unknown as Repos;
 
-  const run = vi.fn(async (work: (repos: Repos) => Promise<unknown>) => {
-    transactionOpen = true;
-    try {
-      return await work(repos);
-    } finally {
-      transactionOpen = false;
-    }
-  });
+  const savepoint = vi.fn(
+    async <T>(
+      _name: string,
+      work: () => Promise<T>,
+    ): Promise<T | undefined> => {
+      try {
+        return await work();
+      } catch {
+        return undefined;
+      }
+    },
+  );
+  const tx = { savepoint } as unknown as TxControl;
+
+  const run = vi.fn(
+    async (work: (repos: Repos, tx: TxControl) => Promise<unknown>) => {
+      transactionOpen = true;
+      try {
+        return await work(repos, tx);
+      } finally {
+        transactionOpen = false;
+      }
+    },
+  );
 
   const uow = { run } as unknown as UnitOfWork;
 
-  return { repos, uow, proveedores, productos, movimientos, auditoria, calls };
+  return {
+    repos,
+    uow,
+    proveedores,
+    productos,
+    movimientos,
+    auditoria,
+    alertas,
+    tx,
+    calls,
+  };
 }
 
 function baseInput(overrides: Record<string, unknown> = {}) {
@@ -394,6 +431,113 @@ describe('actualizarProducto', () => {
     );
     expect(writeCalls).toHaveLength(2);
     expect(writeCalls.every((c) => c.insideTransaction)).toBe(true);
+  });
+});
+
+// Phase 2 (backlog #10), task 2.5: crearProducto invokes the evaluator after
+// movimientos.create in the stockInicial > 0 branch.
+describe('crearProducto — alert evaluator wiring', () => {
+  // DISCOVERED CONFLICT (documented, not silently resolved — see this PR's
+  // apply-progress report): design.md's evaluator math computes
+  // `stockPrevio = movimiento.stockResultante - movimiento.cantidad`,
+  // verbatim and universal, no call-site special-case. For a brand-new
+  // product, `cantidad === stockInicial` and `stockResultante === stockInicial`
+  // (aplicarDelta starts from stockActual=0), so `stockPrevio` is ALWAYS
+  // exactly 0 for this call site, regardless of stockInicial's value. The
+  // downward-crossing guard (`stockPrevio > stockMinimo`) can therefore never
+  // be satisfied here (stockMinimo is never negative), so `crearProducto`
+  // can never fire `stock_bajo` through the generic evaluator — even though
+  // spec.md's "Stock inicial on product creation can trigger an alert"
+  // scenario describes exactly that case. This test proves the WIRING
+  // (registrarSiCorresponde/tx.savepoint runs) per task 2.5's literal ask;
+  // it does not — and per the math above, cannot — assert an alert row is
+  // created.
+  it('with stockInicial > 0, invokes tx.savepoint (evaluator wiring runs)', async () => {
+    const h = harness({
+      productoCreado: producto({ stockMinimo: 20, stockActual: 0 }),
+      aplicarDeltaResult: 15,
+    });
+
+    await crearProducto(
+      h.repos,
+      h.uow,
+      // biome-ignore lint/suspicious/noExplicitAny: test harness fixture
+      baseInput({ stockInicial: 15 }) as any,
+    );
+
+    expect(h.tx.savepoint).toHaveBeenCalledWith(
+      'alertas',
+      expect.any(Function),
+    );
+  });
+
+  it('with stockInicial === 0, never invokes the evaluator (known v1 limitation)', async () => {
+    const h = harness({
+      productoCreado: producto({ stockMinimo: 20, stockActual: 0 }),
+    });
+
+    // biome-ignore lint/suspicious/noExplicitAny: test harness fixture
+    await crearProducto(h.repos, h.uow, baseInput({ stockInicial: 0 }) as any);
+
+    expect(h.tx.savepoint).not.toHaveBeenCalled();
+    expect(h.alertas.create).not.toHaveBeenCalled();
+  });
+});
+
+// Phase 2 (backlog #10), task 2.6 / D7: actualizarProducto auto-resolves an
+// open stock_bajo alert when stockMinimo changes from non-null to null — no
+// SAVEPOINT (D7's own-safety rationale: a single already-safe repo call).
+describe('actualizarProducto — D7 stock_bajo auto-resolve on stockMinimo -> null', () => {
+  it('non-null -> null calls repos.alertas.autoResolve(productoId, stock_bajo) inside uow.run, no savepoint', async () => {
+    const h = harness({ productoActual: producto({ stockMinimo: 10 }) });
+
+    await actualizarProducto(h.repos, h.uow, {
+      id: PRODUCT_ID,
+      cambios: { stockMinimo: null },
+      actor: { id: ACTOR_ENCARGADO_ID, rol: 'encargado' },
+    });
+
+    expect(h.alertas.autoResolve).toHaveBeenCalledWith(
+      PRODUCT_ID,
+      'stock_bajo',
+    );
+    expect(h.tx.savepoint).not.toHaveBeenCalled();
+  });
+
+  it('non-null -> non-null does NOT trigger auto-resolve', async () => {
+    const h = harness({ productoActual: producto({ stockMinimo: 10 }) });
+
+    await actualizarProducto(h.repos, h.uow, {
+      id: PRODUCT_ID,
+      cambios: { stockMinimo: 5 },
+      actor: { id: ACTOR_ENCARGADO_ID, rol: 'encargado' },
+    });
+
+    expect(h.alertas.autoResolve).not.toHaveBeenCalled();
+  });
+
+  it('null -> non-null does NOT trigger auto-resolve', async () => {
+    const h = harness({ productoActual: producto({ stockMinimo: null }) });
+
+    await actualizarProducto(h.repos, h.uow, {
+      id: PRODUCT_ID,
+      cambios: { stockMinimo: 10 },
+      actor: { id: ACTOR_ENCARGADO_ID, rol: 'encargado' },
+    });
+
+    expect(h.alertas.autoResolve).not.toHaveBeenCalled();
+  });
+
+  it('a cambios payload with no stockMinimo key does NOT trigger auto-resolve', async () => {
+    const h = harness({ productoActual: producto({ stockMinimo: 10 }) });
+
+    await actualizarProducto(h.repos, h.uow, {
+      id: PRODUCT_ID,
+      cambios: { nombre: 'Nombre Corregido' },
+      actor: { id: ACTOR_ENCARGADO_ID, rol: 'encargado' },
+    });
+
+    expect(h.alertas.autoResolve).not.toHaveBeenCalled();
   });
 });
 
