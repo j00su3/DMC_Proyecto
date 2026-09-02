@@ -82,26 +82,26 @@ export function AppShell({
           ))}
         </nav>
         <div className={styles.userCard}>
-          <span className={styles.avatar} aria-hidden="true">
-            {initials}
-          </span>
-          <div>
-            <div className={styles.userName}>{usuario.nombre}</div>
-            <div className={styles.userRole}>{ROL_LABEL[usuario.rol]}</div>
+          <div className={styles.userIdentity}>
+            <span className={styles.avatar} aria-hidden="true">
+              {initials}
+            </span>
+            <div>
+              <div className={styles.userName}>{usuario.nombre}</div>
+              <div className={styles.userRole}>{ROL_LABEL[usuario.rol]}</div>
+            </div>
           </div>
+          <button
+            type="button"
+            className={styles.logoutButton}
+            onClick={onLogout}
+            disabled={isLoggingOut}
+          >
+            Cerrar sesión
+          </button>
         </div>
       </aside>
-      <main className={styles.main}>
-        {children}
-        <button
-          type="button"
-          className={styles.logoutButton}
-          onClick={onLogout}
-          disabled={isLoggingOut}
-        >
-          Cerrar sesión
-        </button>
-      </main>
+      <main className={styles.main}>{children}</main>
     </div>
   );
 }

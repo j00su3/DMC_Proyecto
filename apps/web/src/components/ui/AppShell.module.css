@@ -63,11 +63,17 @@
 
 .userCard {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 8px;
   padding: 8px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.06);
+}
+
+.userIdentity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .avatar {
@@ -102,6 +108,24 @@
 
 .logoutButton {
   cursor: pointer;
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: transparent;
+  color: var(--color-sidebar-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.logoutButton:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-sidebar-text-active);
+}
+
+.logoutButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 /**
