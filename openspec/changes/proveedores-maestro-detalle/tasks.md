@@ -50,15 +50,15 @@ proposal's own Risks table), plus a mandatory route-level test file covering 5+ 
 
 ## Phase 3: Route Wiring & Integration
 
-- [ ] 3.1 RED: `routes/proveedores.test.tsx` — deep link with valid `?selected=<uuid>` resolves that supplier's detail (`await router.load()` before render)
-- [ ] 3.2 RED (same file): well-formed but unresolvable uuid shows PD-2 not-found, not the placeholder; no `?selected` shows placeholder; deposito sees no write affordance; successful create selects the new row; `AppShell` nav entry reaches `/proveedores`
-- [ ] 3.3 GREEN: create `routes/proveedores.tsx` — `validateSearch` = `z.object({ selected: z.string().uuid().optional().catch(undefined) })`, loader `ensureQueryData().catch()`, pane precedence `isCreating` → `selected` → placeholder, `navigate({ search, replace: true })` on select/create-success
-- [ ] 3.4 GREEN: create `routes/proveedores.module.css` (`grid-template-columns: 340px 1fr`)
-- [ ] 3.5 GREEN: register `proveedoresRoute` in `routeTree.ts` under `shellLayout` (never `encargadoLayout`)
-- [ ] 3.6 GREEN: modify `AppShell.tsx` line 20 — `{ label: 'Proveedores', to: '/proveedores' }`
-- [ ] 3.7 Verify: `pnpm -r test`, `pnpm typecheck`, `pnpm lint`; confirm `ProveedorSelector.tsx`/`useProveedoresActivos.ts` remain byte-unchanged
+- [x] 3.1 RED: `routes/proveedores.test.tsx` — deep link with valid `?selected=<uuid>` resolves that supplier's detail (`await router.load()` before render)
+- [x] 3.2 RED (same file): well-formed but unresolvable uuid shows PD-2 not-found, not the placeholder; no `?selected` shows placeholder; deposito sees no write affordance; successful create selects the new row; `AppShell` nav entry reaches `/proveedores`
+- [x] 3.3 GREEN: create `routes/proveedores.tsx` — `validateSearch` = `z.object({ selected: z.string().uuid().optional().catch(undefined) })`, loader `ensureQueryData().catch()`, pane precedence `isCreating` → `selected` → placeholder, `navigate({ search, replace: true })` on select/create-success
+- [x] 3.4 GREEN: create `routes/proveedores.module.css` (`grid-template-columns: 340px 1fr`)
+- [x] 3.5 GREEN: register `proveedoresRoute` in `routeTree.ts` under `shellLayout` (never `encargadoLayout`)
+- [x] 3.6 GREEN: modify `AppShell.tsx` line 20 — `{ label: 'Proveedores', to: '/proveedores' }`
+- [x] 3.7 Verify: `pnpm -r test`, `pnpm typecheck`, `pnpm lint`; confirm `ProveedorSelector.tsx`/`useProveedoresActivos.ts` remain byte-unchanged
 
 ## Phase 4: Cleanup
 
-- [ ] 4.1 Remove unused imports/dead code across new `features/proveedores/*` files
-- [ ] 4.2 Update `docs/BACKLOG.md` marking #4.1 status per this repo's SDD workflow convention
+- [x] 4.1 Remove unused imports/dead code across new `features/proveedores/*` files
+- [x] 4.2 Update `docs/BACKLOG.md` marking #4.1 status per this repo's SDD workflow convention
