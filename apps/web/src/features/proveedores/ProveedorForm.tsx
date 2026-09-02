@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '../../components/ui/Button.js';
 import { TextField } from '../../components/ui/TextField.js';
@@ -58,11 +59,22 @@ export function ProveedorForm<M extends 'create' | 'edit' = 'create'>({
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors, dirtyFields },
   } = useForm<ProveedorFormValues>({
     resolver: zodResolver(proveedorFormSchema),
     defaultValues: proveedor,
   });
+
+  // `defaultValues` only applies at mount. Whether this component instance
+  // survives a `proveedor` prop change (rather than being unmounted and
+  // remounted fresh) depends on React's incidental reconciliation of
+  // ProveedorDetallePanel's conditional JSX, not on the data — so the fields
+  // must be reset explicitly whenever the record identity changes, or a
+  // reused instance keeps showing the PREVIOUS proveedor's values.
+  useEffect(() => {
+    reset(proveedor);
+  }, [proveedor, reset]);
 
   if (readonly) {
     return <ProveedorDetails proveedor={proveedor} />;
