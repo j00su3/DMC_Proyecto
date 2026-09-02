@@ -4,6 +4,7 @@ import { isApiError } from '../api/errors.js';
 import buttonStyles from '../components/ui/Button.module.css';
 import { FormError } from '../components/ui/FormError.js';
 import { Pagination } from '../components/ui/Pagination.js';
+import stackStyles from '../components/ui/screenStack.module.css';
 import { CredentialDialog } from '../features/usuarios/CredentialDialog.js';
 import { UsuariosTable } from '../features/usuarios/UsuariosTable.js';
 import { usuariosErrorMessage } from '../features/usuarios/errorMessages.js';
@@ -100,7 +101,7 @@ function UsuariosListScreen() {
       ? usuariosErrorMessage(query.error)
       : 'Ocurrió un error inesperado. Intente de nuevo.';
     return (
-      <div>
+      <div className={stackStyles.stack}>
         <h1>Usuarios</h1>
         <CrearUsuarioLink />
         <FormError message={message} />
@@ -112,7 +113,7 @@ function UsuariosListScreen() {
 
   if (data && data.total === 0) {
     return (
-      <div>
+      <div className={stackStyles.stack}>
         <h1>Usuarios</h1>
         <CrearUsuarioLink />
         <p>No hay usuarios registrados.</p>
@@ -128,7 +129,7 @@ function UsuariosListScreen() {
   const mutationError = estado.deactivate.error ?? estado.reactivate.error;
 
   return (
-    <div>
+    <div className={stackStyles.stack}>
       <h1>Usuarios</h1>
       <CrearUsuarioLink />
       {mutationError ? (

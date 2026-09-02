@@ -1,0 +1,11 @@
+/*
+ * Shared vertical rhythm for a screen's root wrapper: a heading, an action
+ * link/button, and a table stacked directly, with no margin of their own
+ * (Button/TextField/DataTable carry none) touch with zero gap otherwise —
+ * reported live against the deployed usuarios and productos screens.
+ */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}

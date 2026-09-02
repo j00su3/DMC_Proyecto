@@ -5,6 +5,7 @@ import buttonStyles from '../components/ui/Button.module.css';
 import { FormError } from '../components/ui/FormError.js';
 import { Pagination } from '../components/ui/Pagination.js';
 import { TextField } from '../components/ui/TextField.js';
+import stackStyles from '../components/ui/screenStack.module.css';
 import { ProductosTable } from '../features/productos/ProductosTable.js';
 import { productosErrorMessage } from '../features/productos/errorMessages.js';
 import {
@@ -85,7 +86,7 @@ function ProductosListScreen() {
       ? productosErrorMessage(query.error)
       : 'Ocurrió un error inesperado. Intente de nuevo.';
     return (
-      <div>
+      <div className={stackStyles.stack}>
         <h1>Inventario</h1>
         <NuevoProductoLink />
         <FormError message={message} />
@@ -97,7 +98,7 @@ function ProductosListScreen() {
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
 
   return (
-    <div>
+    <div className={stackStyles.stack}>
       <h1>Inventario</h1>
       <NuevoProductoLink />
       <TextField
