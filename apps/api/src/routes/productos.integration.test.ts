@@ -177,16 +177,19 @@ describe('POST /api/productos — atomicity proof (integration, real app + real 
     const realUow = createUnitOfWork(db);
     const failingUow: UnitOfWork = {
       run: (work) =>
-        realUow.run((repos) =>
-          work({
-            ...repos,
-            movimientos: {
-              create: async () => {
-                throw new Error('forced movimientos failure');
+        realUow.run((repos, tx) =>
+          work(
+            {
+              ...repos,
+              movimientos: {
+                create: async () => {
+                  throw new Error('forced movimientos failure');
+                },
+                listByProducto: async () => ({ rows: [], total: 0 }),
               },
-              listByProducto: async () => ({ rows: [], total: 0 }),
             },
-          }),
+            tx,
+          ),
         ),
     };
     app = await buildApp({ cookieSecret: COOKIE_SECRET, uow: failingUow });
@@ -218,15 +221,18 @@ describe('POST /api/productos — atomicity proof (integration, real app + real 
     const realUow = createUnitOfWork(db);
     const failingUow: UnitOfWork = {
       run: (work) =>
-        realUow.run((repos) =>
-          work({
-            ...repos,
-            auditoria: {
-              record: async () => {
-                throw new Error('forced audit failure');
+        realUow.run((repos, tx) =>
+          work(
+            {
+              ...repos,
+              auditoria: {
+                record: async () => {
+                  throw new Error('forced audit failure');
+                },
               },
             },
-          }),
+            tx,
+          ),
         ),
     };
     app = await buildApp({ cookieSecret: COOKIE_SECRET, uow: failingUow });

@@ -131,7 +131,7 @@ function harness(
       runCount.value += 1;
       hoisted.transactionOpen = true;
       try {
-        return await work(repos);
+        return await work(repos, { savepoint: async (_name, fn) => fn() });
       } finally {
         hoisted.transactionOpen = false;
       }

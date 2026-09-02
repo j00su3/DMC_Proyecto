@@ -358,6 +358,37 @@ export function saleAlreadyVoided(): AppError {
   return new AppError('SALE_ALREADY_VOIDED', 'Sale is already voided', 409);
 }
 
+// design.md Interfaces/Contracts (backlog #10, motor-alertas). Same shape as
+// productNotFound()/saleNotFound(): no `details`, English UPPER_SNAKE per
+// the two-naming-families rule. Thrown by the service (routes/alertas.ts's
+// resolver route), classify-on-undefined per the rechazarVenta precedent —
+// never thrown by the repository itself.
+export function alertNotFound(): AppError {
+  return new AppError('ALERT_NOT_FOUND', 'Alert not found', 404);
+}
+
+// 409 not 422 — same reasoning as saleAlreadyVoided(): the request is
+// valid, but the alert's current state (already resuelta) conflicts with
+// it.
+export function alertAlreadyResolved(): AppError {
+  return new AppError(
+    'ALERT_ALREADY_RESOLVED',
+    'Alert is already resolved',
+    409,
+  );
+}
+
+// design.md's Routes table (PD-3): `stock_bajo`/`quiebre` alerts only
+// auto-resolve; a manual POST /alertas/:id/resolver on one of them is
+// refused with this code rather than silently succeeding.
+export function alertNotManuallyResolvable(): AppError {
+  return new AppError(
+    'ALERT_NOT_MANUALLY_RESOLVABLE',
+    'This alert type cannot be manually resolved',
+    409,
+  );
+}
+
 export function toErrorEnvelope(error: unknown): MappedError {
   if (hasValidationErrors(error)) {
     return {

@@ -77,4 +77,25 @@ export const FIELD_CLASSIFICATION = {
     excludedFields: ['stockActual'],
     pseudonymizedFields: [],
   },
+  // #10 (motor-alertas) design.md's Audit Wiring (PD-5): unlocks the
+  // compile gate for `recordAudit({ entidad: 'alertas' })`. Creation and
+  // manual resolution are audited (`'crear'`/`'actualizar'`, no new
+  // AuditAccion value); the bulk `marcarVistas` UPDATE is deliberately NOT
+  // audited — it has no single actor-attributable row (design.md's Audit
+  // Wiring section). Nothing here is secret: no excluded/pseudonymized
+  // field, same shape as proveedores.
+  alertas: {
+    auditableFields: [
+      'id',
+      'productoId',
+      'tipo',
+      'estado',
+      'movimientoId',
+      'creadaEn',
+      'resueltaEn',
+      'resueltaPor',
+    ],
+    excludedFields: [],
+    pseudonymizedFields: [],
+  },
 } as const satisfies Record<string, EntityFieldClassification>;

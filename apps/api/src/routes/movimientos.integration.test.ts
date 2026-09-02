@@ -122,16 +122,19 @@ function failingMovimientosUow(): UnitOfWork {
   const realUow = createUnitOfWork(db);
   return {
     run: (work) =>
-      realUow.run((repos) =>
-        work({
-          ...repos,
-          movimientos: {
-            create: async () => {
-              throw new Error('forced movimientos failure');
+      realUow.run((repos, tx) =>
+        work(
+          {
+            ...repos,
+            movimientos: {
+              create: async () => {
+                throw new Error('forced movimientos failure');
+              },
+              listByProducto: async () => ({ rows: [], total: 0 }),
             },
-            listByProducto: async () => ({ rows: [], total: 0 }),
           },
-        }),
+          tx,
+        ),
       ),
   };
 }

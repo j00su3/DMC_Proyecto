@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import fp from 'fastify-plugin';
+import { type AlertasRepo, DrizzleAlertasRepo } from '../alertas/repository.js';
 import {
   type AuditoriaRepo,
   DrizzleAuditoriaRepo,
@@ -34,6 +35,7 @@ export interface Repos {
   productos: ProductosRepo;
   movimientos: MovimientosRepo;
   ventas: VentasRepo;
+  alertas: AlertasRepo;
 }
 
 // Binds every repo to the same executor (design.md D1/D2). Called with the
@@ -50,6 +52,7 @@ export function buildRepos(executor: DbExecutor): Repos {
     productos: new DrizzleProductosRepo(executor),
     movimientos: new DrizzleMovimientosRepo(executor),
     ventas: new DrizzleVentasRepo(executor),
+    alertas: new DrizzleAlertasRepo(executor),
   };
 }
 
@@ -70,5 +73,5 @@ export default fp<ReposPluginOptions>(async function reposPlugin(
   opts: ReposPluginOptions,
 ) {
   app.decorate('repos', opts.repos ?? buildRepos(getDb()));
-  app.decorate('uow', opts.uow ?? createUnitOfWork(getDb()));
+  app.decorate('uow', opts.uow ?? createUnitOfWork(getDb(), app.log));
 });

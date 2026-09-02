@@ -321,14 +321,17 @@ describe('auth routes (integration, real Postgres, real argon2)', () => {
       run: (work) =>
         db.transaction((tx) => {
           const repos = buildRepos(tx);
-          return work({
-            ...repos,
-            auditoria: {
-              record: async () => {
-                throw new Error('forced audit write failure');
+          return work(
+            {
+              ...repos,
+              auditoria: {
+                record: async () => {
+                  throw new Error('forced audit write failure');
+                },
               },
             },
-          });
+            { savepoint: async (_name, fn) => fn() },
+          );
         }),
     };
     app = await buildApp({ cookieSecret: COOKIE_SECRET, uow: brokenAuditUow });
