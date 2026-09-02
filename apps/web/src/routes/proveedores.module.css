@@ -4,3 +4,20 @@
   gap: 16px;
   align-items: start;
 }
+
+/*
+ * A grid item's default `min-width` is `auto`, which means it refuses to
+ * shrink below its content's natural width — the master pane's table (or
+ * the detail pane's form) can force the 340px track wider than intended
+ * instead of respecting it, and DataTable.module.css's `.card { overflow:
+ * hidden }` then silently clips whatever didn't fit (this is exactly what
+ * cut off the Estado/Acciones columns before this fix). `min-width: 0`
+ * lets each pane actually honor its grid track; `overflow-x: auto` is a
+ * safety net so any content that still doesn't fit scrolls instead of
+ * disappearing.
+ */
+.masterPane,
+.detailPane {
+  min-width: 0;
+  overflow-x: auto;
+}

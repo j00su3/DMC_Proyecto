@@ -62,11 +62,6 @@ function buildColumns(
   return [
     { key: 'nombre', header: 'Nombre', render: (row) => row.nombre },
     {
-      key: 'contacto',
-      header: 'Contacto',
-      render: (row) => row.contacto ?? '—',
-    },
-    {
       key: 'estado',
       header: 'Estado',
       render: (row) => <StatusChip activo={row.activo} />,
