@@ -99,6 +99,7 @@ export const entidadAuditoria = pgEnum('entidad_auditoria', [
   'usuarios',
   'proveedores',
   'productos',
+  'alertas',
 ]);
 
 export const auditoria = pgTable(
@@ -385,5 +386,63 @@ export const pagos = pgTable(
       'pagos_vuelto_solo_efectivo',
       sql`${table.vuelto} = 0 OR ${table.medio} = 'efectivo'::medio_pago`,
     ),
+  ],
+);
+
+// Alert engine (backlog #10). See design.md D4-D5. `sugerencia_reposicion`
+// is carried in the pgEnum from day one (D5, PD-1) so backlog #11 needs no
+// enum migration; `TipoAlertaEvaluada` in alertas/repository.ts excludes it
+// from the type this cycle's evaluator can emit — a compile gate, not a
+// convention.
+export const alertaTipo = pgEnum('alerta_tipo', [
+  'stock_bajo',
+  'quiebre',
+  'discrepancia',
+  'sugerencia_reposicion',
+]);
+
+export const alertaEstado = pgEnum('alerta_estado', [
+  'activa',
+  'vista',
+  'resuelta',
+]);
+
+export const alertas = pgTable(
+  'alertas',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    productoId: uuid('producto_id')
+      .notNull()
+      .references(() => productos.id, { onDelete: 'restrict' }),
+    // Nullable: a `stock_bajo`/`quiebre` alert traces back to the movimiento
+    // that crossed the threshold, but D7's stockMinimo->null auto-resolve
+    // path has no triggering movimiento at all.
+    movimientoId: uuid('movimiento_id').references(() => movimientos.id, {
+      onDelete: 'restrict',
+    }),
+    tipo: alertaTipo('tipo').notNull(),
+    estado: alertaEstado('estado').notNull().default('activa'),
+    creadaEn: timestamp('creada_en', { withTimezone: true, mode: 'date' })
+      .notNull()
+      .defaultNow(),
+    resueltaEn: timestamp('resuelta_en', {
+      withTimezone: true,
+      mode: 'date',
+    }),
+    // Null on auto-resolution (A10 rule 3); set to the resolving encargado's
+    // id on manual resolution only.
+    resueltaPor: uuid('resuelta_por').references(() => usuarios.id, {
+      onDelete: 'restrict',
+    }),
+  },
+  (table) => [
+    // D4 — the only dedup authority: at most one non-`resuelta` row per
+    // (producto_id, tipo). The insert's `ON CONFLICT ... WHERE estado <>
+    // 'resuelta' DO NOTHING` (alertas/repository.ts) targets this exact
+    // index, mirroring proveedores_nombre_lower_unique's named-partial-index
+    // precedent.
+    uniqueIndex('alertas_producto_tipo_abierta_unique')
+      .on(table.productoId, table.tipo)
+      .where(sql`${table.estado} <> 'resuelta'::alerta_estado`),
   ],
 );

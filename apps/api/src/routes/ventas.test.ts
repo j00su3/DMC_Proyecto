@@ -253,7 +253,9 @@ function fakeRepos(
 function fakeUow(repos: ReturnType<typeof fakeRepos>): UnitOfWork {
   return {
     async run(work) {
-      return work(repos as never);
+      return work(repos as never, {
+        savepoint: async (_name, fn) => fn(),
+      });
     },
   };
 }

@@ -1,8 +1,10 @@
 import Fastify from 'fastify';
 import { describe, expect, it } from 'vitest';
+import type { AlertasRepo } from '../alertas/repository.js';
 import type { AuditoriaRepo } from '../auditoria/repository.js';
 import type { SesionesRepo } from '../auth/repository.js';
 import type { DbExecutor } from '../db/client.js';
+import type { TxControl } from '../db/uow.js';
 import type { MovimientosRepo } from '../movimientos/repository.js';
 import type { ProductosRepo } from '../productos/repository.js';
 import type { ProveedoresRepo } from '../proveedores/repository.js';
@@ -26,6 +28,7 @@ describe('repos plugin', () => {
     const fakeProductos = {} as ProductosRepo;
     const fakeMovimientos = {} as MovimientosRepo;
     const fakeVentas = {} as VentasRepo;
+    const fakeAlertas = {} as AlertasRepo;
 
     await app.register(reposPlugin, {
       repos: {
@@ -36,6 +39,7 @@ describe('repos plugin', () => {
         productos: fakeProductos,
         movimientos: fakeMovimientos,
         ventas: fakeVentas,
+        alertas: fakeAlertas,
       },
     });
     await app.ready();
@@ -47,6 +51,7 @@ describe('repos plugin', () => {
     expect(app.repos.productos).toBe(fakeProductos);
     expect(app.repos.movimientos).toBe(fakeMovimientos);
     expect(app.repos.ventas).toBe(fakeVentas);
+    expect(app.repos.alertas).toBe(fakeAlertas);
 
     await app.close();
   });
@@ -64,6 +69,7 @@ describe('repos plugin', () => {
     expect(app.repos.productos).toBeDefined();
     expect(app.repos.movimientos).toBeDefined();
     expect(app.repos.ventas).toBeDefined();
+    expect(app.repos.alertas).toBeDefined();
 
     await app.close();
   });
@@ -82,16 +88,22 @@ describe('repos plugin', () => {
 
   it('decorates app.uow with an injected fake, overriding the real one', async () => {
     const app = Fastify();
-    const fakeRun = async <T>(work: (repos: Repos) => Promise<T>) =>
-      work({
-        usuarios: {} as UsuariosRepo,
-        sesiones: {} as SesionesRepo,
-        auditoria: {} as AuditoriaRepo,
-        proveedores: {} as ProveedoresRepo,
-        productos: {} as ProductosRepo,
-        movimientos: {} as MovimientosRepo,
-        ventas: {} as VentasRepo,
-      });
+    const fakeRun = async <T>(
+      work: (repos: Repos, tx: TxControl) => Promise<T>,
+    ) =>
+      work(
+        {
+          usuarios: {} as UsuariosRepo,
+          sesiones: {} as SesionesRepo,
+          auditoria: {} as AuditoriaRepo,
+          proveedores: {} as ProveedoresRepo,
+          productos: {} as ProductosRepo,
+          movimientos: {} as MovimientosRepo,
+          ventas: {} as VentasRepo,
+          alertas: {} as AlertasRepo,
+        },
+        { savepoint: async (_name, fn) => fn() },
+      );
 
     await app.register(reposPlugin, { uow: { run: fakeRun } });
     await app.ready();
@@ -113,5 +125,6 @@ describe('buildRepos', () => {
     expect(repos.productos).toBeDefined();
     expect(repos.movimientos).toBeDefined();
     expect(repos.ventas).toBeDefined();
+    expect(repos.alertas).toBeDefined();
   });
 });

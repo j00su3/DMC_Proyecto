@@ -73,7 +73,7 @@ function harness(
       runCount.value += 1;
       transactionOpen = true;
       try {
-        return await work(repos);
+        return await work(repos, { savepoint: async (_name, fn) => fn() });
       } finally {
         transactionOpen = false;
       }

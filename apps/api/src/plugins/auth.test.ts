@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import type { AlertasRepo } from '../alertas/repository.js';
 import { buildApp } from '../app.js';
 import type { AuditoriaRepo } from '../auditoria/repository.js';
 import type { SesionesRepo } from '../auth/repository.js';
@@ -41,6 +42,7 @@ function fakeRepos(sesiones: Partial<SesionesRepo> = {}) {
     productos: {} as ProductosRepo,
     movimientos: {} as MovimientosRepo,
     ventas: {} as VentasRepo,
+    alertas: {} as AlertasRepo,
   };
 }
 

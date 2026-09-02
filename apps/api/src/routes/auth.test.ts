@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { AlertasRepo } from '../alertas/repository.js';
 import { buildApp } from '../app.js';
 import type { AuditoriaRepo } from '../auditoria/repository.js';
 import { hashPassword } from '../auth/password.js';
 import type { SesionesRepo } from '../auth/repository.js';
+import type { TxControl } from '../db/uow.js';
 import type { MovimientosRepo } from '../movimientos/repository.js';
 import { PROXY_SECRET_HEADER } from '../plugins/clientIp.js';
 import type { ProductosRepo } from '../productos/repository.js';
@@ -57,16 +59,21 @@ function fakeRepos(
     productos: {} as ProductosRepo,
     movimientos: {} as MovimientosRepo,
     ventas: {} as VentasRepo,
+    alertas: {} as AlertasRepo,
   };
 }
 
 // `POST /api/auth/password` runs through `app.uow` (design.md D1/D4), not
 // `app.repos` directly. This fake mimics `db.transaction`: the callback's
 // repos are the same fakes returned by `fakeRepos`.
+const fakeTx: TxControl = { savepoint: async (_name, w) => w() };
+
 function fakeUow(repos: ReturnType<typeof fakeRepos>) {
   return {
-    async run<T>(work: (r: typeof repos) => Promise<T>): Promise<T> {
-      return work(repos);
+    async run<T>(
+      work: (r: typeof repos, tx: TxControl) => Promise<T>,
+    ): Promise<T> {
+      return work(repos, fakeTx);
     },
   };
 }

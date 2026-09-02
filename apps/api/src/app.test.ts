@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { AlertasRepo } from './alertas/repository.js';
 import { buildApp } from './app.js';
 import type { AuditoriaRepo } from './auditoria/repository.js';
 import type { SesionesRepo } from './auth/repository.js';
@@ -109,6 +110,15 @@ function fakeRepos(sesionesOverrides: Partial<SesionesRepo> = {}) {
       marcarAnulada: unusedRepoMethod,
       revertirPagos: unusedRepoMethod,
     } satisfies VentasRepo,
+    alertas: {
+      create: unusedRepoMethod,
+      autoResolve: unusedRepoMethod,
+      manualResolve: unusedRepoMethod,
+      marcarVistas: unusedRepoMethod,
+      findById: unusedRepoMethod,
+      list: unusedRepoMethod,
+      countAbiertas: unusedRepoMethod,
+    } satisfies AlertasRepo,
   };
 }
 

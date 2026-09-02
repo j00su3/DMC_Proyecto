@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { AlertasRepo } from '../alertas/repository.js';
 import type { AuditoriaRepo } from '../auditoria/repository.js';
+import type { TxControl } from '../db/uow.js';
 import type { MovimientosRepo } from '../movimientos/repository.js';
 import type { ProductosRepo } from '../productos/repository.js';
 import type { ProveedoresRepo } from '../proveedores/repository.js';
@@ -288,11 +290,15 @@ function fakeUow(
     productos: {} as ProductosRepo,
     movimientos: {} as MovimientosRepo,
     ventas: {} as VentasRepo,
+    alertas: {} as AlertasRepo,
   };
   const state = { committed: false, calls: 0 };
-  async function run<T>(work: (r: typeof repos) => Promise<T>): Promise<T> {
+  const fakeTx: TxControl = { savepoint: async (_name, w) => w() };
+  async function run<T>(
+    work: (r: typeof repos, tx: TxControl) => Promise<T>,
+  ): Promise<T> {
     state.calls += 1;
-    const result = await work(repos);
+    const result = await work(repos, fakeTx);
     state.committed = true;
     return result;
   }
