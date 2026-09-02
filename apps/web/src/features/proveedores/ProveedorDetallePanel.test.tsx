@@ -107,27 +107,23 @@ describe('ProveedorDetallePanel', () => {
     ).toBeInTheDocument();
   });
 
-  it('placeholder (nothing selected): encargado sees a Crear proveedor nuevo trigger', async () => {
-    const user = userEvent.setup();
-    const onStartCreate = vi.fn();
-
-    render(
-      <ProveedorDetallePanel
-        actorRol="encargado"
-        proveedor={null}
-        onStartCreate={onStartCreate}
-      />,
+  /**
+   * The "Crear proveedor nuevo" trigger no longer lives in this placeholder —
+   * verify-report.md flagged that placement as a WARNING deviation from
+   * PD-5's literal "master pane" wording. It now lives in `ProveedoresTable`
+   * (see that component's test file) so it stays reachable even once a
+   * supplier is selected. This panel keeps owning the placeholder text and
+   * the `isCreating` → create-form transition (D6), just not the trigger.
+   */
+  it('placeholder (nothing selected): renders no create trigger for either role', () => {
+    const { rerender } = render(
+      <ProveedorDetallePanel actorRol="encargado" proveedor={null} />,
     );
+    expect(
+      screen.queryByRole('button', { name: 'Crear proveedor nuevo' }),
+    ).not.toBeInTheDocument();
 
-    await user.click(
-      screen.getByRole('button', { name: 'Crear proveedor nuevo' }),
-    );
-    expect(onStartCreate).toHaveBeenCalledTimes(1);
-  });
-
-  it('placeholder (nothing selected): deposito does not see the create action (PD-5)', () => {
-    render(<ProveedorDetallePanel actorRol="deposito" proveedor={null} />);
-
+    rerender(<ProveedorDetallePanel actorRol="deposito" proveedor={null} />);
     expect(
       screen.queryByRole('button', { name: 'Crear proveedor nuevo' }),
     ).not.toBeInTheDocument();

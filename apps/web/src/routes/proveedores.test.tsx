@@ -200,6 +200,42 @@ describe('proveedores route', () => {
     ).toBeInTheDocument();
   });
 
+  /**
+   * Regression for verify-report.md's WARNING: the trigger used to live
+   * inside the detail pane's nothing-selected placeholder, so it became
+   * unreachable the moment any supplier was selected (no deselect/back
+   * control existed). Now it lives in the master (table) pane, so it must
+   * stay visible and clickable with a supplier already selected.
+   */
+  it('the create trigger stays reachable in the master pane with a supplier already selected', async () => {
+    stubFetch({ usuario: encargadoUsuario });
+    const user = userEvent.setup();
+    const router = await loadAndRenderProveedores(
+      `/proveedores?selected=${PROVEEDOR_ACTIVO.id}`,
+    );
+
+    await screen.findByRole('heading', { name: 'Acme Insumos' });
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Crear proveedor nuevo' }),
+    );
+    expect(
+      screen.getByRole('heading', { name: 'Nuevo proveedor' }),
+    ).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Nombre'), 'Nuevo Proveedor');
+    await user.click(screen.getByRole('button', { name: 'Crear proveedor' }));
+
+    await waitFor(() =>
+      expect(router.state.location.search).toMatchObject({
+        selected: '22222222-2222-4222-8222-222222222222',
+      }),
+    );
+    expect(
+      await screen.findByRole('heading', { name: 'Nuevo Proveedor' }),
+    ).toBeInTheDocument();
+  });
+
   it('the AppShell nav entry reaches /proveedores', async () => {
     stubFetch({ usuario: encargadoUsuario });
     const user = userEvent.setup();

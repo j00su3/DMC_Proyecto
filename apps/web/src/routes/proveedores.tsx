@@ -142,6 +142,8 @@ function ProveedoresScreen() {
           proveedores={proveedores}
           aria-busy={query.isPlaceholderData}
           onSelect={handleSelect}
+          actorRol={usuario.rol}
+          onStartCreate={handleStartCreate}
         />
       </div>
       <div>
@@ -152,7 +154,6 @@ function ProveedoresScreen() {
             actorRol={usuario.rol}
             proveedor={proveedor}
             isCreating={isCreating}
-            onStartCreate={handleStartCreate}
             onCreate={handleCreate}
             onUpdate={handleUpdate}
             onDeactivate={() => selected && estado.deactivate.mutate(selected)}

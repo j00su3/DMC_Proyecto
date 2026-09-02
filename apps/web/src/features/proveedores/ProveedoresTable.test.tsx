@@ -98,4 +98,45 @@ describe('ProveedoresTable', () => {
       screen.getByText(/no se encontraron proveedores/i),
     ).toBeInTheDocument();
   });
+
+  /**
+   * PD-5, master-pane placement fix: the spec says literally "The master
+   * pane MUST offer a Crear proveedor nuevo action" — verify-report.md
+   * flagged the previous placement (inside ProveedorDetallePanel's
+   * nothing-selected placeholder) as a WARNING because it made the trigger
+   * unreachable once any row was selected. It lives here now, so it renders
+   * regardless of what the detail pane shows.
+   */
+  it('encargado: shows a Crear proveedor nuevo trigger that calls onStartCreate', async () => {
+    const user = userEvent.setup();
+    const onStartCreate = vi.fn();
+    render(
+      <ProveedoresTable
+        proveedores={proveedores}
+        actorRol="encargado"
+        onStartCreate={onStartCreate}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: 'Crear proveedor nuevo' }),
+    );
+    expect(onStartCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it('deposito: does not see the create trigger (PD-5)', () => {
+    render(<ProveedoresTable proveedores={proveedores} actorRol="deposito" />);
+
+    expect(
+      screen.queryByRole('button', { name: 'Crear proveedor nuevo' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('no actorRol given: hides the create trigger by default (safe default)', () => {
+    render(<ProveedoresTable proveedores={proveedores} />);
+
+    expect(
+      screen.queryByRole('button', { name: 'Crear proveedor nuevo' }),
+    ).not.toBeInTheDocument();
+  });
 });
