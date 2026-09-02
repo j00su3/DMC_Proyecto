@@ -33,3 +33,16 @@
   border: 1px solid var(--color-border);
   font-weight: 600;
 }
+
+/*
+ * A smaller footprint for a list screen's "Crear X" entry point — the
+ * default 44px height (sized for a form's primary submit action) read as
+ * oversized sitting right under a page heading. Must come after .button
+ * in this file so it wins the cascade regardless of class order in the
+ * markup, since both share the same specificity.
+ */
+.compact {
+  min-height: 34px;
+  padding: 6px 14px;
+  font-size: 13px;
+}
