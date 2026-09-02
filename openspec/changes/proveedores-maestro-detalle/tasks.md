@@ -41,12 +41,12 @@ proposal's own Risks table), plus a mandatory route-level test file covering 5+ 
 
 ## Phase 2: Presentational Components
 
-- [ ] 2.1 RED: `ProveedoresTable.test.tsx` — `onSelect` callback fires with id, `StatusChip activo` renders, filter predicate matches `nombre`/`contacto` case-insensitively (null-safe `contacto`)
-- [ ] 2.2 GREEN: create `ProveedoresTable.tsx` — local `q` `useState`, input label **"Buscar por nombre o contacto"** (chosen copy — mirrors `productos.tsx:105`'s "Buscar por nombre o SKU" tone for this app)
-- [ ] 2.3 RED: `ProveedorForm.test.tsx` — edit-mode submit updates values; readonly mode renders a `<dl>` with zero editable inputs
-- [ ] 2.4 GREEN: create `ProveedorForm.tsx` + `.module.css` with edit/readonly modes
-- [ ] 2.5 RED: `ProveedorDetallePanel.test.tsx` — 🔒-prefixed reason visible for deposito on each disabled control; deactivate/reactivate is one button, no modal; create-new only for encargado
-- [ ] 2.6 GREEN: create `ProveedorDetallePanel.tsx` wiring `ProveedorForm` + action buttons, `isDeposito` gate (`productosDetalle.tsx:53,57` pattern)
+- [x] 2.1 RED: `ProveedoresTable.test.tsx` — `onSelect` callback fires with id, `StatusChip activo` renders, filter predicate matches `nombre`/`contacto` case-insensitively (null-safe `contacto`)
+- [x] 2.2 GREEN: create `ProveedoresTable.tsx` — local `q` `useState`, input label **"Buscar por nombre o contacto"** (chosen copy — mirrors `productos.tsx:105`'s "Buscar por nombre o SKU" tone for this app)
+- [x] 2.3 RED: `ProveedorForm.test.tsx` — edit-mode submit updates values; readonly mode renders a `<dl>` with zero editable inputs
+- [x] 2.4 GREEN: create `ProveedorForm.tsx` + `.module.css` with edit/readonly modes
+- [x] 2.5 RED: `ProveedorDetallePanel.test.tsx` — 🔒-prefixed reason visible for deposito on each disabled control; deactivate/reactivate is one button, no modal; create-new only for encargado
+- [x] 2.6 GREEN: create `ProveedorDetallePanel.tsx` wiring `ProveedorForm` + action buttons, `isDeposito` gate (`productosDetalle.tsx:53,57` pattern)
 
 ## Phase 3: Route Wiring & Integration
 
