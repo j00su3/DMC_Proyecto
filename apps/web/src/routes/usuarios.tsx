@@ -81,7 +81,7 @@ function CrearUsuarioLink() {
   return (
     <Link
       to="/usuarios/nuevo"
-      className={`${buttonStyles.button} ${buttonStyles.primary}`}
+      className={`${buttonStyles.button} ${buttonStyles.primary} ${buttonStyles.compact}`}
     >
       Crear usuario
     </Link>

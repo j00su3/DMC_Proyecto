@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button } from '../../components/ui/Button.js';
+import buttonStyles from '../../components/ui/Button.module.css';
 import {
   DataTable,
   type DataTableColumn,
@@ -112,7 +113,11 @@ export function ProveedoresTable({
         onChange={(event) => setQ(event.target.value)}
       />
       {isDeposito ? null : (
-        <Button variant="primary" onClick={() => onStartCreate?.()}>
+        <Button
+          variant="primary"
+          className={buttonStyles.compact}
+          onClick={() => onStartCreate?.()}
+        >
           Crear proveedor nuevo
         </Button>
       )}

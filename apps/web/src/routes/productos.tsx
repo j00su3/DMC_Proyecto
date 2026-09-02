@@ -63,7 +63,7 @@ function NuevoProductoLink() {
   return (
     <Link
       to="/inventario/nuevo"
-      className={`${buttonStyles.button} ${buttonStyles.primary}`}
+      className={`${buttonStyles.button} ${buttonStyles.primary} ${buttonStyles.compact}`}
     >
       Nuevo producto
     </Link>
