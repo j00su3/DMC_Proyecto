@@ -11,7 +11,10 @@ import type {
 const ESTADO_LOCK_REASON =
   'Solo un encargado puede desactivar o reactivar un proveedor. El servidor rechaza esta acción para un usuario de depósito.';
 
-type ProveedorDetalle = ProveedorFormValues & { activo: boolean };
+type ProveedorDetalle = ProveedorFormValues & {
+  activo: boolean;
+  creadoEn: string;
+};
 
 type ProveedorDetallePanelProps = {
   /** Gates every write affordance (D5) — a UX affordance only; the server's 403 is the boundary. */
@@ -84,6 +87,7 @@ export function ProveedorDetallePanel({
     <div>
       <h2>{proveedor.nombre}</h2>
       <StatusChip activo={proveedor.activo} />
+      <p>Creado: {proveedor.creadoEn}</p>
 
       <ProveedorForm
         proveedor={{ nombre: proveedor.nombre, contacto: proveedor.contacto }}

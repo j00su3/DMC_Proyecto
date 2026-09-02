@@ -7,12 +7,14 @@ const proveedorActivo = {
   nombre: 'Acme Insumos',
   contacto: 'ana@acme.com',
   activo: true,
+  creadoEn: '2026-01-15T12:00:00.000Z',
 };
 
 const proveedorInactivo = {
   nombre: 'Beta Distribuciones',
   contacto: '',
   activo: false,
+  creadoEn: '2025-12-01T12:00:00.000Z',
 };
 
 /**
@@ -84,6 +86,25 @@ describe('ProveedorDetallePanel', () => {
 
     expect(screen.queryAllByRole('textbox')).toHaveLength(0);
     expect(screen.getByText('ana@acme.com')).toBeInTheDocument();
+  });
+
+  /**
+   * spec.md's "Selecting A Proveedor Shows Its Detail" requires nombre,
+   * contacto, activo AND creadoEn — this component owns the whole detail
+   * pane, so creadoEn must render here rather than the route re-implementing
+   * a second detail surface.
+   */
+  it('renders the creadoEn date for both encargado and deposito sessions', () => {
+    render(
+      <ProveedorDetallePanel
+        actorRol="encargado"
+        proveedor={proveedorActivo}
+      />,
+    );
+
+    expect(
+      screen.getByText('Creado: 2026-01-15T12:00:00.000Z'),
+    ).toBeInTheDocument();
   });
 
   it('placeholder (nothing selected): encargado sees a Crear proveedor nuevo trigger', async () => {

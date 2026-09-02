@@ -17,7 +17,7 @@ const NAV_ITEMS: { label: string; to?: string }[] = [
   { label: 'Inventario', to: '/inventario' },
   { label: 'Punto de venta', to: '/pos' },
   { label: 'Movimientos' },
-  { label: 'Proveedores' },
+  { label: 'Proveedores', to: '/proveedores' },
   { label: 'Reportes' },
   { label: 'Usuarios', to: '/usuarios' },
 ];

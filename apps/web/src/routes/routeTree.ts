@@ -8,6 +8,7 @@ import { posRoute } from './pos.js';
 import { productosListRoute } from './productos.js';
 import { productosDetalleRoute } from './productosDetalle.js';
 import { productosNuevoRoute } from './productosNuevo.js';
+import { proveedoresRoute } from './proveedores.js';
 import { publicLayout } from './publicLayout.js';
 import { reciboRoute } from './recibo.js';
 import { reciboBuscarRoute } from './reciboBuscar.js';
@@ -38,6 +39,7 @@ export const routeTree = rootRoute.addChildren([
       productosListRoute,
       productosNuevoRoute,
       productosDetalleRoute,
+      proveedoresRoute,
       encargadoLayout.addChildren([
         usuariosListRoute,
         usuariosNuevoRoute,
