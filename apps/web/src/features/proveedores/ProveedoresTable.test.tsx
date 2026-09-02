@@ -36,10 +36,21 @@ describe('ProveedoresTable', () => {
     expect(screen.getByText('Beta Distribuciones')).toBeInTheDocument();
   });
 
-  it('renders a null contacto as an em dash, never as the literal null', () => {
+  /**
+   * The master pane is only 340px wide (docs/design.md:93). A fourth
+   * "Contacto" column made the table wider than that track, and
+   * DataTable.module.css's `.card { overflow: hidden }` silently clipped
+   * Estado/Acciones off the visible edge instead of showing them. Contacto
+   * stays fully visible in the detail pane (`ProveedorDetallePanel`) and
+   * remains searchable via the filter above — it just isn't its own column
+   * here anymore.
+   */
+  it('does not render a Contacto column — the master pane is too narrow for it (fixes silent column clipping)', () => {
     render(<ProveedoresTable proveedores={proveedores} />);
 
-    expect(screen.getByText('—')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('columnheader', { name: 'Contacto' }),
+    ).not.toBeInTheDocument();
   });
 
   it('calls onSelect with the row id when a row is chosen', async () => {

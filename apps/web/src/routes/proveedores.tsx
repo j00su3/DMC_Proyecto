@@ -127,7 +127,7 @@ function ProveedoresScreen() {
 
   return (
     <div className={styles.screen}>
-      <div>
+      <div className={styles.masterPane}>
         <h1>Proveedores</h1>
         {mutationError ? (
           <FormError
@@ -146,7 +146,7 @@ function ProveedoresScreen() {
           onStartCreate={handleStartCreate}
         />
       </div>
-      <div>
+      <div className={styles.detailPane}>
         {showNotFound ? (
           <p>No se encontró el proveedor solicitado.</p>
         ) : (
