@@ -3,6 +3,11 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ProveedorForm } from './ProveedorForm.js';
 
+const otroProveedor = {
+  nombre: 'Otro Proveedor',
+  contacto: 'contacto@otro.com',
+};
+
 const proveedor = {
   nombre: 'Acme Insumos',
   contacto: 'ana@acme.com',
@@ -87,5 +92,40 @@ describe('ProveedorForm', () => {
     );
 
     expect(screen.getByText('—')).toBeInTheDocument();
+  });
+
+  // Bug found while writing proveedores.test.tsx's create-trigger regression
+  // test (backlog #4.1): react-hook-form's `defaultValues` only applies at
+  // mount. Whether the SAME `ProveedorForm` instance survives a prop change
+  // from one `proveedor` to another (rather than being unmounted/remounted)
+  // depends on React's incidental reconciliation of the parent's conditional
+  // JSX, not on the data — so the form must reset itself explicitly on every
+  // `proveedor` change to be reliable regardless of the surrounding tree
+  // shape.
+  it('resets its fields when the proveedor prop changes on an already-mounted instance', () => {
+    const { rerender } = render(
+      <ProveedorForm
+        proveedor={proveedor}
+        mode="edit"
+        onSubmit={vi.fn()}
+        isPending={false}
+      />,
+    );
+
+    expect(screen.getByLabelText('Nombre')).toHaveValue(proveedor.nombre);
+
+    rerender(
+      <ProveedorForm
+        proveedor={otroProveedor}
+        mode="edit"
+        onSubmit={vi.fn()}
+        isPending={false}
+      />,
+    );
+
+    expect(screen.getByLabelText('Nombre')).toHaveValue(otroProveedor.nombre);
+    expect(screen.getByLabelText('Contacto')).toHaveValue(
+      otroProveedor.contacto,
+    );
   });
 });
