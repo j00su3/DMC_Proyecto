@@ -6,6 +6,7 @@ import {
 } from '../../components/ui/DataTable.js';
 import { StatusChip } from '../../components/ui/StatusChip.js';
 import { TextField } from '../../components/ui/TextField.js';
+import styles from './ProveedoresTable.module.css';
 
 export type ProveedorRow = {
   id: string;
@@ -103,7 +104,7 @@ export function ProveedoresTable({
   const isDeposito = actorRol !== 'encargado';
 
   return (
-    <div>
+    <div className={styles.list}>
       <TextField
         id="proveedores-search"
         label="Buscar por nombre o contacto"

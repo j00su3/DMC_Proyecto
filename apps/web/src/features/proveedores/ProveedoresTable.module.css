@@ -1,0 +1,11 @@
+/*
+ * TextField and Button (components/ui) carry no margin of their own, so
+ * stacking them directly with no gap left the search field and the "Crear
+ * proveedor nuevo" trigger touching, with no breathing room before the
+ * table below either (reported live against the deployed screen).
+ */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
