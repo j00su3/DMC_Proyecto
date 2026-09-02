@@ -82,38 +82,38 @@ Sequential; everything downstream depends on this compiling.
 
 Depends on: Phase 1.
 
-- [ ] 2.1 RED: `apps/api/src/alertas/evaluador.test.ts` — pure evaluator over fake repos: downward
+- [x] 2.1 RED: `apps/api/src/alertas/evaluador.test.ts` — pure evaluator over fake repos: downward
   crossing creates `stock_bajo`/`quiebre`; upward crossing auto-resolves; `stockMinimo=null` never
   fires `stock_bajo`; `stockMinimo=0` fires `quiebre` only, not a redundant `stock_bajo`
   (`quiebreCruzo` guard); `esDiscrepancia=true` creates `discrepancia` regardless of stock math;
   exact-equality boundary cases at `stockResultante === stockMinimo` and `=== 0`.
-- [ ] 2.2 GREEN: `apps/api/src/alertas/evaluador.ts` — `EvaluadorDeAlertas.evaluar` implementing
+- [x] 2.2 GREEN: `apps/api/src/alertas/evaluador.ts` — `EvaluadorDeAlertas.evaluar` implementing
   the exact pseudocode in design.md Evaluator Logic; reads only `producto.stockMinimo`, never
   `stockActual`.
-- [ ] 2.3 `apps/api/src/alertas/service.ts` — internal `registrarSiCorresponde` helper wrapping
+- [x] 2.3 `apps/api/src/alertas/service.ts` — internal `registrarSiCorresponde` helper wrapping
   `tx.savepoint('alertas', () => evaluar(...))` per design's exact call shape, for call sites to
   invoke.
-- [ ] 2.4 RED+GREEN: `apps/api/src/movimientos/service.ts::registrarMovimiento` — invoke the
+- [x] 2.4 RED+GREEN: `apps/api/src/movimientos/service.ts::registrarMovimiento` — invoke the
   evaluator at the existing SEAM (L132-137) after the post-movement `producto` re-read; test
   asserts the evaluator call happens with the re-read product's `stockMinimo`.
-- [ ] 2.5 RED+GREEN: `apps/api/src/productos/service.ts::crearProducto` — invoke the evaluator
+- [x] 2.5 RED+GREEN: `apps/api/src/productos/service.ts::crearProducto` — invoke the evaluator
   after `movimientos.create` in the `stockInicial > 0` branch; test asserts no call when
   `stockInicial === 0` (known v1 limitation, documented).
-- [ ] 2.6 RED+GREEN: `apps/api/src/productos/service.ts::actualizarProducto` (D7) — when the
+- [x] 2.6 RED+GREEN: `apps/api/src/productos/service.ts::actualizarProducto` (D7) — when the
   update changes `stockMinimo` from non-null to `null`, call `repos.alertas.autoResolve(productoId,
   'stock_bajo')` inside the same `uow.run`, after the product row updates; no `SAVEPOINT` (D7's
   own-safety rationale). Test: non-null→non-null and null→non-null changes do NOT trigger
   auto-resolve.
-- [ ] 2.7 RED+GREEN: `apps/api/src/ventas/service.ts::confirmarVenta` — invoke the evaluator inside
+- [x] 2.7 RED+GREEN: `apps/api/src/ventas/service.ts::confirmarVenta` — invoke the evaluator inside
   Pass B's loop, per item, after each `movimientos.create` (one savepoint per item, D3); test
   asserts item 2's evaluator failure does not block items 1/3 from getting their alerts.
-- [ ] 2.8 RED+GREEN: `apps/api/src/ventas/service.ts::anularVenta` — invoke the evaluator inside
+- [x] 2.8 RED+GREEN: `apps/api/src/ventas/service.ts::anularVenta` — invoke the evaluator inside
   the item loop, per item, after each `movimientos.create`; no `tipo === 'anulacion'` special case
   (D3's generic-crossing-rule rationale).
-- [ ] 2.9 Integration (real Postgres): `apps/api/src/alertas/service.integration.test.ts` — **C1
+- [x] 2.9 Integration (real Postgres): `apps/api/src/alertas/service.integration.test.ts` — **C1
   acceptance criterion**: inject a SQL error into `alertas.create`, assert the triggering
   movimiento/venta row still exists and commits (per call site, per design's Testing Strategy).
-- [ ] 2.10 Integration (real Postgres): dedup-under-concurrency — two movements crossing the same
+- [x] 2.10 Integration (real Postgres): dedup-under-concurrency — two movements crossing the same
   threshold concurrently produce exactly one alert row (partial unique index, D4).
 
 **Satisfies**: alertas spec "Threshold-Crossing Creation On Downward Edge Only", "Auto-Resolution On

@@ -1,3 +1,4 @@
+import { registrarSiCorresponde } from '../alertas/service.js';
 import type { UnitOfWork } from '../db/uow.js';
 import {
   insufficientStock,
@@ -97,7 +98,7 @@ export async function registrarMovimiento(
 
   const delta = calcularDelta(input);
 
-  return uow.run(async (txRepos) => {
+  return uow.run(async (txRepos, tx) => {
     const nuevoStock = await txRepos.productos.aplicarDelta(
       input.productoId,
       delta,
@@ -130,11 +131,17 @@ export async function registrarMovimiento(
     }
 
     // ── SEAM (backlog #10, ADR-0008) ──────────────────────────────────────
-    // A future EvaluadorDeAlertas.evaluar(movimiento, producto) is invoked
-    // HERE, wrapped in SAVEPOINT alertas / ROLLBACK TO SAVEPOINT alertas.
-    // Both arguments are already in scope and the transaction is still open.
-    // Do not add code between movimientos.create and this point.
+    // EvaluadorDeAlertas.evaluar(movimiento, producto) runs HERE, wrapped in
+    // SAVEPOINT alertas / ROLLBACK TO SAVEPOINT alertas via
+    // registrarSiCorresponde (design.md D1/D2). Both arguments are already
+    // in scope and the transaction is still open. C1: an evaluator failure
+    // never rolls back this movimiento.
     // ──────────────────────────────────────────────────────────────────────
+    await registrarSiCorresponde(txRepos, tx, {
+      movimiento,
+      stockMinimo: producto.stockMinimo,
+      actorId: input.actor.id,
+    });
 
     return { movimiento, producto };
   });

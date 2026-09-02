@@ -1,3 +1,4 @@
+import { registrarSiCorresponde } from '../alertas/service.js';
 import type { UnitOfWork } from '../db/uow.js';
 import type { Centavos } from '../lib/dinero.js';
 import {
@@ -103,6 +104,12 @@ interface ItemComputado {
   cantidad: number;
   precioUnitario: string; // producto.precio read during Pass A (D5)
   subtotal: string;
+  // Pass-A snapshot (design.md's critical correctness note): the evaluator
+  // at Pass B reads THIS stockMinimo, never a Pass-B re-read of stockActual
+  // — stockMinimo does not change within the sale's own transaction, but
+  // stockActual is stale by Pass B by construction (Pass A ran before any
+  // aplicarDelta call in this sale).
+  stockMinimo: number | null;
 }
 
 // design.md D2: two passes inside one uow.run. Pass A (read-only, sorted):
@@ -131,7 +138,7 @@ export async function confirmarVenta(
 
   const itemsOrdenados = ordenarItems(input.items);
 
-  return uow.run(async (txRepos) => {
+  return uow.run(async (txRepos, tx) => {
     // ── Pass A: read-only, sorted — price check, total, payment rules ──
     const mismatches: Array<{
       productoId: string;
@@ -169,6 +176,7 @@ export async function confirmarVenta(
         cantidad: item.cantidad,
         precioUnitario: producto.precio,
         subtotal: aMonto(subtotalCentavos),
+        stockMinimo: producto.stockMinimo,
       });
     }
 
@@ -238,7 +246,7 @@ export async function confirmarVenta(
         return rechazarVenta(txRepos, itemComputado.productoId);
       }
 
-      await txRepos.movimientos.create({
+      const movimiento = await txRepos.movimientos.create({
         productoId: itemComputado.productoId,
         tipo: 'venta',
         cantidad: -itemComputado.cantidad,
@@ -247,6 +255,17 @@ export async function confirmarVenta(
         usuarioId: input.actor.id,
         ventaId: venta.id,
         stockResultante: nuevoStock,
+      });
+
+      // D3: ONE savepoint PER ITEM, not one for the whole sale — a sale's
+      // items are guaranteed distinct products (duplicateSaleItem refuses
+      // duplicates), so evaluation is inherently per-producto. A single
+      // sale-wide savepoint would discard earlier items' alerts if a LATER
+      // item's evaluator failed.
+      await registrarSiCorresponde(txRepos, tx, {
+        movimiento,
+        stockMinimo: itemComputado.stockMinimo,
+        actorId: input.actor.id,
       });
 
       nuevosItems.push({
@@ -316,7 +335,7 @@ export async function anularVenta(
     );
   }
 
-  return uow.run(async (txRepos) => {
+  return uow.run(async (txRepos, tx) => {
     // The serialization point (design.md): a concurrent second anulación
     // attempt blocks on this row's own UPDATE, then sees 0 rows once this
     // one commits — never a SELECT ... FOR UPDATE followed by a plain SET.
@@ -352,7 +371,7 @@ export async function anularVenta(
       // confirmarVenta's tipo 'venta' negative-cantidad row. motivo: null,
       // ventaId set — the venta row is the single home of the reason (design
       // decision, no duplication across N movimientos rows).
-      await txRepos.movimientos.create({
+      const movimiento = await txRepos.movimientos.create({
         productoId: item.productoId,
         tipo: 'anulacion',
         cantidad: item.cantidad,
@@ -362,6 +381,24 @@ export async function anularVenta(
         usuarioId: input.actorId,
         ventaId: venta.id,
         stockResultante,
+      });
+
+      const producto = await txRepos.productos.findById(item.productoId);
+      if (!producto) {
+        throw new Error(
+          `anularVenta: producto ${item.productoId} vanished inside the transaction`,
+        );
+      }
+
+      // D3: no `tipo === 'anulacion'` special case — the generic crossing
+      // rule already yields resolve-only behaviour in practice, since
+      // revertirStockPorAnulacion only ever adds a positive item.cantidad
+      // (esDiscrepancia is never set on an anulacion movimiento). One
+      // savepoint per item, mirroring confirmarVenta's Pass B loop.
+      await registrarSiCorresponde(txRepos, tx, {
+        movimiento,
+        stockMinimo: producto.stockMinimo,
+        actorId: input.actorId,
       });
     }
 

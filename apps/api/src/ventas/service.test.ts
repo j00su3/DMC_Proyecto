@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { UnitOfWork } from '../db/uow.js';
+import type { TxControl, UnitOfWork } from '../db/uow.js';
 import type { Repos } from '../plugins/repos.js';
 import type { Producto } from '../productos/repository.js';
 import type { UsuarioResumen } from '../usuarios/repository.js';
@@ -62,6 +62,8 @@ interface HarnessOptions {
   findByIdResult?: Venta | undefined;
   findItemsResult?: ItemVenta[];
   revertirPagosResult?: Pago[];
+  alertCreateResult?: unknown;
+  alertAutoResolveResult?: unknown;
 }
 
 // Mirrors movimientos/service.test.ts's harness precedent: a UnitOfWork
@@ -173,22 +175,62 @@ function harness(options: HarnessOptions = {}) {
     ),
   };
 
-  const repos = { productos, movimientos, ventas } as unknown as Repos & {
-    ventas: VentasRepo;
+  const auditoria = { record: spy('auditoria.record', async () => {}) };
+
+  const alertas = {
+    create: spy('alertas.create', async () => options.alertCreateResult),
+    autoResolve: spy(
+      'alertas.autoResolve',
+      async () => options.alertAutoResolveResult,
+    ),
   };
 
-  const run = vi.fn(async (work: (repos: Repos) => Promise<unknown>) => {
-    transactionOpen = true;
-    try {
-      return await work(repos as unknown as Repos);
-    } finally {
-      transactionOpen = false;
-    }
-  });
+  const repos = {
+    productos,
+    movimientos,
+    ventas,
+    auditoria,
+    alertas,
+  } as unknown as Repos & { ventas: VentasRepo };
+
+  const savepoint = vi.fn(
+    async <T>(
+      _name: string,
+      work: () => Promise<T>,
+    ): Promise<T | undefined> => {
+      try {
+        return await work();
+      } catch {
+        return undefined;
+      }
+    },
+  );
+  const tx = { savepoint } as unknown as TxControl;
+
+  const run = vi.fn(
+    async (work: (repos: Repos, tx: TxControl) => Promise<unknown>) => {
+      transactionOpen = true;
+      try {
+        return await work(repos as unknown as Repos, tx);
+      } finally {
+        transactionOpen = false;
+      }
+    },
+  );
 
   const uow = { run } as unknown as UnitOfWork;
 
-  return { repos, uow, productos, movimientos, ventas, calls };
+  return {
+    repos,
+    uow,
+    productos,
+    movimientos,
+    ventas,
+    auditoria,
+    alertas,
+    tx,
+    calls,
+  };
 }
 
 function item(over: Partial<ItemVentaInput> = {}): ItemVentaInput {
@@ -635,6 +677,107 @@ describe('confirmarVenta — atomicity and ledger shape', () => {
   });
 });
 
+// Phase 2 (backlog #10), task 2.7 / D3: one savepoint PER ITEM, not one
+// per sale. An item 2 evaluator failure must not block items 1/3 from
+// getting their own alerts.
+describe('confirmarVenta — alert evaluator wiring (D3: per-item savepoint)', () => {
+  it('invokes tx.savepoint once per item, using each item Pass-A producto stockMinimo snapshot', async () => {
+    const h = harness({
+      productos: [
+        producto({ id: PRODUCT_A_ID, precio: '10.00', stockMinimo: 5 }),
+        producto({ id: PRODUCT_B_ID, precio: '20.00', stockMinimo: null }),
+      ],
+      // A: previo=8 (resultante 3 - cantidad -5) below stockMinimo=5 ->
+      // stock_bajo. B: stockMinimo null -> never fires.
+      aplicarDeltaResults: { [PRODUCT_A_ID]: 3, [PRODUCT_B_ID]: 9 },
+    });
+
+    await confirmarVenta(
+      h.uow,
+      baseInput({
+        items: [
+          item({
+            productoId: PRODUCT_A_ID,
+            cantidad: 5,
+            precioUnitarioEsperado: '10.00',
+          }),
+          item({
+            productoId: PRODUCT_B_ID,
+            cantidad: 1,
+            precioUnitarioEsperado: '20.00',
+          }),
+        ],
+        pagos: [pago({ monto: '70.00' })],
+      }),
+    );
+
+    expect(h.tx.savepoint).toHaveBeenCalledTimes(2);
+    expect(h.alertas.create).toHaveBeenCalledWith(
+      expect.objectContaining({ productoId: PRODUCT_A_ID, tipo: 'stock_bajo' }),
+    );
+  });
+
+  it("item 2's evaluator failure does not block items 1/3 from getting their alerts (savepoint isolates per item)", async () => {
+    const PRODUCT_D_ID = '44444444-4444-4444-8444-444444444444';
+    const h = harness({
+      productos: [
+        producto({ id: PRODUCT_A_ID, precio: '10.00', stockMinimo: 5 }),
+        producto({ id: PRODUCT_B_ID, precio: '20.00', stockMinimo: 5 }),
+        producto({ id: PRODUCT_D_ID, precio: '5.00', stockMinimo: 5 }),
+      ],
+      aplicarDeltaResults: {
+        [PRODUCT_A_ID]: 3,
+        [PRODUCT_B_ID]: 3,
+        [PRODUCT_D_ID]: 3,
+      },
+    });
+    // Item 2 (PRODUCT_B_ID)'s alertas.create throws — the fake tx.savepoint
+    // swallows it (mirrors the real never-rethrow contract), so items 1/3
+    // still reach their own alertas.create call.
+    h.alertas.create.mockImplementation(async (input: unknown) => {
+      const typed = input as { productoId: string };
+      if (typed.productoId === PRODUCT_B_ID) {
+        throw new Error('boom: simulated evaluator SQL failure for item 2');
+      }
+      return undefined;
+    });
+
+    await confirmarVenta(
+      h.uow,
+      baseInput({
+        items: [
+          item({
+            productoId: PRODUCT_A_ID,
+            cantidad: 5,
+            precioUnitarioEsperado: '10.00',
+          }),
+          item({
+            productoId: PRODUCT_B_ID,
+            cantidad: 5,
+            precioUnitarioEsperado: '20.00',
+          }),
+          item({
+            productoId: PRODUCT_D_ID,
+            cantidad: 5,
+            precioUnitarioEsperado: '5.00',
+          }),
+        ],
+        pagos: [pago({ monto: '175.00' })],
+      }),
+    );
+
+    const productoIdsAttempted = h.alertas.create.mock.calls.map(
+      (call) => (call[0] as { productoId: string }).productoId,
+    );
+    expect(productoIdsAttempted).toEqual([
+      PRODUCT_A_ID,
+      PRODUCT_B_ID,
+      PRODUCT_D_ID,
+    ]);
+    expect(h.tx.savepoint).toHaveBeenCalledTimes(3);
+  });
+});
+
 // backlog #9 (anulacion-venta) — tasks.md 3.2, design.md's Technical
 // Approach ("confirmarVenta's mirror image").
 const ANULACION_VENTA_ID = 'venta-1';
@@ -732,6 +875,10 @@ describe('anularVenta — D2 transition-first ordering (design.md serialization 
       cantidad: 3,
     });
     const h = harness({
+      productos: [
+        producto({ id: PRODUCT_A_ID }),
+        producto({ id: PRODUCT_B_ID }),
+      ],
       marcarAnuladaResult: venta({
         id: ANULACION_VENTA_ID,
         estado: 'anulada',
@@ -872,6 +1019,11 @@ describe('anularVenta — total reversal, every item and every pago (v1, not par
       cantidad: 3,
     });
     const h = harness({
+      productos: [
+        producto({ id: PRODUCT_A_ID }),
+        producto({ id: PRODUCT_B_ID }),
+        producto({ id: PRODUCT_C_ID }),
+      ],
       marcarAnuladaResult: venta({ id: ANULACION_VENTA_ID, estado: 'anulada' }),
       findItemsResult: [itemA, itemB, itemC],
       revertirStockPorAnulacionResults: {
@@ -895,6 +1047,70 @@ describe('anularVenta — total reversal, every item and every pago (v1, not par
     expect(h.movimientos.create).toHaveBeenCalledTimes(3);
     expect(h.ventas.revertirPagos).toHaveBeenCalledTimes(1);
     expect(result.pagos).toHaveLength(2);
+  });
+});
+
+// Phase 2 (backlog #10), task 2.8 / D3: invoked per item, inside the item
+// loop, after each movimientos.create — no `tipo === 'anulacion'` special
+// case (the generic crossing rule already yields resolve-only behaviour,
+// since revertirStockPorAnulacion only ever adds positive quantities).
+describe('anularVenta — alert evaluator wiring (D3, generic crossing rule)', () => {
+  it('invokes tx.savepoint once per item and auto-resolves quiebre when stock is restored above zero', async () => {
+    const itemA = itemVenta({
+      id: 'item-1',
+      ventaId: ANULACION_VENTA_ID,
+      productoId: PRODUCT_A_ID,
+      cantidad: 5,
+    });
+    const h = harness({
+      productos: [producto({ id: PRODUCT_A_ID, stockMinimo: null })],
+      marcarAnuladaResult: venta({ id: ANULACION_VENTA_ID, estado: 'anulada' }),
+      findItemsResult: [itemA],
+      // previo = stockResultante - cantidad = 5 - 5 = 0 -> quiebre auto-resolve
+      revertirStockPorAnulacionResults: { [PRODUCT_A_ID]: 5 },
+    });
+
+    await anularVenta(h.uow, {
+      ventaId: ANULACION_VENTA_ID,
+      actorId: ACTOR_ENCARGADO_ID,
+      motivoAnulacion: 'Cliente canceló el pedido',
+    });
+
+    expect(h.tx.savepoint).toHaveBeenCalledTimes(1);
+    expect(h.alertas.autoResolve).toHaveBeenCalledWith(PRODUCT_A_ID, 'quiebre');
+  });
+
+  it('invokes tx.savepoint once per item across a multi-item anulación', async () => {
+    const itemA = itemVenta({
+      id: 'item-1',
+      productoId: PRODUCT_A_ID,
+      cantidad: 2,
+    });
+    const itemB = itemVenta({
+      id: 'item-2',
+      productoId: PRODUCT_B_ID,
+      cantidad: 3,
+    });
+    const h = harness({
+      productos: [
+        producto({ id: PRODUCT_A_ID }),
+        producto({ id: PRODUCT_B_ID }),
+      ],
+      marcarAnuladaResult: venta({ id: ANULACION_VENTA_ID, estado: 'anulada' }),
+      findItemsResult: [itemA, itemB],
+      revertirStockPorAnulacionResults: {
+        [PRODUCT_A_ID]: 12,
+        [PRODUCT_B_ID]: 13,
+      },
+    });
+
+    await anularVenta(h.uow, {
+      ventaId: ANULACION_VENTA_ID,
+      actorId: ACTOR_ENCARGADO_ID,
+      motivoAnulacion: 'Cliente canceló el pedido',
+    });
+
+    expect(h.tx.savepoint).toHaveBeenCalledTimes(2);
   });
 });
 

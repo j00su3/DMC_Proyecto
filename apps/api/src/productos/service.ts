@@ -1,3 +1,4 @@
+import { registrarSiCorresponde } from '../alertas/service.js';
 import { recordAudit } from '../auditoria/service.js';
 import type { UnitOfWork } from '../db/uow.js';
 import {
@@ -81,7 +82,7 @@ export async function crearProducto(
     throw supplierInactive();
   }
 
-  return uow.run(async (txRepos) => {
+  return uow.run(async (txRepos, tx) => {
     const creado = await txRepos.productos.create({
       nombre: input.nombre,
       sku: input.sku,
@@ -107,7 +108,7 @@ export async function crearProducto(
         );
       }
       stockActual = nuevoStock;
-      await txRepos.movimientos.create({
+      const movimiento = await txRepos.movimientos.create({
         productoId: creado.id,
         tipo: 'ajuste',
         cantidad: input.stockInicial,
@@ -116,6 +117,16 @@ export async function crearProducto(
         esMerma: false,
         usuarioId: input.actor.id,
         stockResultante: stockActual,
+      });
+
+      // design.md D3/PD-2: always upward from 0 today (a known v1
+      // limitation — stockInicial === 0 raises no alert at all), but wired
+      // per the evaluator's generic crossing rule for whenever that ceases
+      // to be true.
+      await registrarSiCorresponde(txRepos, tx, {
+        movimiento,
+        stockMinimo: creado.stockMinimo,
+        actorId: input.actor.id,
       });
     }
 
@@ -233,6 +244,22 @@ export async function actualizarProducto(
       datosPrevios: diff.before,
       datosPosteriores: diff.after,
     });
+
+    // D7 (owner-ratified 2026-09-02): when stockMinimo changes from a
+    // non-null value to null, any open stock_bajo alert for this product
+    // no longer has a threshold to violate. A direct repo call, no
+    // SAVEPOINT — this path has no stockActual staleness risk (single-row
+    // update, not a multi-item sale loop) and no evaluator SQL to isolate
+    // from. `quiebre`/`discrepancia` alerts are untouched (they never
+    // depended on stockMinimo).
+    if (
+      Object.hasOwn(input.cambios, 'stockMinimo') &&
+      input.cambios.stockMinimo === null &&
+      previo.stockMinimo !== null
+    ) {
+      await txRepos.alertas.autoResolve(input.id, 'stock_bajo');
+    }
+
     return posterior;
   });
 }
