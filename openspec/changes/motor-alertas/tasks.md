@@ -127,24 +127,24 @@ green against Docker Postgres.
 
 Depends on: Phase 2.
 
-- [ ] 3.1 RED: `apps/api/src/alertas/service.test.ts` — `listar`/`contarAbiertas` pass through to
+- [x] 3.1 RED: `apps/api/src/alertas/service.test.ts` — `listar`/`contarAbiertas` pass through to
   the repo; `resolver` refuses `stock_bajo`/`quiebre` with `alertNotManuallyResolvable()`;
   classify-on-undefined for `resolver` (404 vs 409, `rechazarVenta` precedent); `marcarVistas`
   calls `recordAudit` per resolved alert only when a manual resolve occurs (PD-5 — creation/manual
   resolution audited, not the bulk `marcarVistas` UPDATE, which has no single actor-attributable
   row).
-- [ ] 3.2 GREEN: `apps/api/src/alertas/service.ts` — `listar`, `contarAbiertas`,
+- [x] 3.2 GREEN: `apps/api/src/alertas/service.ts` — `listar`, `contarAbiertas`,
   `resolver(uow, {id, actorId})` (manual resolve, `recordAudit` inside `uow.run`),
   `marcarVistas(uow)`.
-- [ ] 3.3 RED: `apps/api/src/routes/alertas.test.ts` — `GET /api/alertas` (401/200, `?estado=`
+- [x] 3.3 RED: `apps/api/src/routes/alertas.test.ts` — `GET /api/alertas` (401/200, `?estado=`
   filter, both roles); `GET /api/alertas/conteo` (both roles); `POST /api/alertas/:id/resolver`
   (401/403 `deposito` with DB-unchanged assertion/200 `encargado`/404/409 already-resolved/409
   non-manually-resolvable type); `POST /api/alertas/marcar-vistas` (both roles, 200 with
   `{marcadas}`).
-- [ ] 3.4 GREEN: `apps/api/src/routes/alertas.ts` — register all 4 routes with `config: {roles:
+- [x] 3.4 GREEN: `apps/api/src/routes/alertas.ts` — register all 4 routes with `config: {roles:
   [...]}` per design.md Routes table; standard `{data,page,pageSize,total}` envelope for the list
   route.
-- [ ] 3.5 `pnpm contract` — regenerate `openapi.json`/`schema.d.ts`; stage before `contract:check`;
+- [x] 3.5 `pnpm contract` — regenerate `openapi.json`/`schema.d.ts`; stage before `contract:check`;
   fix any collateral fixture widened by the new types (mirrors #9's Recibo fixture precedent).
 
 **Satisfies**: alertas spec "Manual Resolution Restricted To Encargado", "Both Roles Can View

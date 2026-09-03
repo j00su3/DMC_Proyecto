@@ -18,6 +18,7 @@ import { resolveRateLimitKey } from './plugins/clientIp.js';
 import cookiePlugin from './plugins/cookie.js';
 import dbPlugin, { type DbLike } from './plugins/db.js';
 import reposPlugin, { type Repos } from './plugins/repos.js';
+import alertasRoutes from './routes/alertas.js';
 import authRoutes from './routes/auth.js';
 import healthRoutes from './routes/health.js';
 import movimientosRoutes from './routes/movimientos.js';
@@ -165,6 +166,7 @@ export async function buildApp(
   // paths, so the split ownership is legal.
   app.register(movimientosRoutes, { prefix: '/api' });
   app.register(ventasRoutes, { prefix: '/api' });
+  app.register(alertasRoutes, { prefix: '/api' });
 
   app.setErrorHandler((error, _request, reply) => {
     const { status, body } = toErrorEnvelope(error);
