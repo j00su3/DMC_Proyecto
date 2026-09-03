@@ -845,3 +845,35 @@ un `git checkout`/`git reset` posterior de esa misma noche. Reconstruida acá de
 la conversación para no perder el registro; el claims-gate de `anulacion-venta` (ver
 `openspec/changes/archive/2026-09-01-anulacion-venta/claims-report.md`, claim #23) fue lo que hizo
 notar la ausencia de esta entrada para la migración `0007`.
+
+### 2026-09-02 — Motor de alertas (#10) merged; migration 0008 shipped but NOT YET applied to Neon
+
+**Qué se agregó:** backlog #10 (motor-alertas). Nueva tabla `alertas` con columnas `id`, `producto_id`
+(FK), `movimiento_id` (FK nullable), `tipo` (`stock_bajo` | `quiebre` | `discrepancia` |
+`sugerencia_reposicion`), `estado` (`activa` | `vista` | `resuelta`), timestamps, `resuelta_por`
+(FK nullable). Partial unique index `alertas_producto_tipo_abierta_unique`. Enums `alertaTipo` y
+`alertaEstado` agregados a `entidadAuditoria`. Migración: `0008_superb_kronos.sql` (additiva).
+
+**Componentes shipped:** PRs #153 (foundation: schema/TxControl/AlertasRepo/errors/audit), #154
+(evaluador + 4 call sites + C1 proof), #155 (service/routes/contract), #156 (web), #157 (C1 test
+fidelity fix from mutation-probing).
+
+**CRÍTICO — migración NO APLICADA A NEON AÚN:** la migración `0008` está commiteada en `main` y
+shippeada en los deploys de Vercel/Render, pero **nadie corrió `pnpm db:migrate` contra la base de
+Neon todavía.** Consecuencia: `/api/alertas*` devuelve 500 (tabla no existe); `POST /api/ventas`,
+`POST /api/productos`, y otros endpoints que invocan el evaluador también devuelven 500.
+
+**Acción manual requerida (PRE-deploy o con el deploy):** correr manualmente desde la máquina del
+desarrollador:
+```bash
+export DATABASE_URL="<conexión a Neon>"
+pnpm db:migrate
+```
+Esto aplica todas las migraciones pendientes (hoy solo `0008`). Confirmado después en la consola de
+Neon que la tabla `alertas` existe.
+
+**Notas:** patrón de migración manual per el ADR-0010:71-72 y el checklist de release
+(`docs/DEPLOY-PLAN.md` Fase 2 — Migración ADITIVA). La tabla está vacía antes de la aplicación y el
+código viejo (en el último deploy anterior) no la consulta, así que la ventana entre shipear el
+código y migrar la base es inofensiva si la migración corre pronto. Ignorar la ventana indefinidamente
+es lo que causa el 500.
