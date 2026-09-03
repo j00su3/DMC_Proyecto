@@ -187,14 +187,16 @@ Polled Every 60 Seconds", "Manual Resolve Control Restricted To Encargado".
 
 Depends on: Phases 1-4 all green.
 
-- [ ] 5.1 `docs/BACKLOG.md` — flip backlog #10's row, deferred to `sdd-archive` (do not do this
-  during apply, per #9's precedent).
-- [ ] 5.2 Release checklist note: `pnpm db:migrate` must run against Neon before/with deploy
+- [x] 5.1 `docs/BACKLOG.md` — flip backlog #10's row, deferred to `sdd-archive` (do not do this
+  during apply, per #9's precedent). **DONE in archive phase 2026-09-02.**
+- [x] 5.2 Release checklist note: `pnpm db:migrate` must run against Neon before/with deploy
   (manual-migration pattern, CLAUDE.md Deployment) — the new table 500s every `alertas`-touching
-  route, and the movimiento/venta paths themselves, until migrated.
-- [ ] 5.3 Mutation-probe the C1 injected-error test (2.9), the dedup-under-concurrency test (2.10),
+  route, and the movimiento/venta paths themselves, until migrated. **DONE in archive phase 2026-09-02.**
+- [x] 5.3 Mutation-probe the C1 injected-error test (2.9), the dedup-under-concurrency test (2.10),
   and the `savepoint()` rollback path (1.3) against real Docker Postgres — these are the
-  load-bearing correctness proofs for this change.
+  load-bearing correctness proofs for this change. **DONE by orchestrator (2026-09-02): all 3 proofs
+  genuinely fail under mutation and revert cleanly. PR #157 fixed a dead-code test bug found during
+  mutation-probing (productoB's stockMinimo: null skipped evaluator entirely).**
 
 ---
 
