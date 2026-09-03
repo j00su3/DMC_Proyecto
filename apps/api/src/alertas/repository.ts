@@ -2,17 +2,19 @@ import { and, desc, eq, ne, sql } from 'drizzle-orm';
 import type { DbExecutor } from '../db/client.js';
 import { alertas } from '../db/schema.js';
 
-// design.md D5: the pgEnum carries all four values from day one (PD-1, no
-// enum migration when #11/sugerencia_reposicion lands). This cycle's
-// evaluator and `create` are typed against `TipoAlertaEvaluada` — a compile
-// gate, not a convention — so no #10 code path can emit
-// `sugerencia_reposicion`.
+// design.md D5 (backlog #10): the pgEnum carries all four values from day
+// one (PD-1, no enum migration when #11/sugerencia_reposicion landed).
+// design.md D1 (backlog #11): `TipoAlertaEvaluada` now equals `TipoAlerta`
+// exactly — #11 was the only value #10's compile gate ever excluded, and
+// #11 is now implemented, so nothing is held back anymore. The type name
+// stays (used across repository.ts/service.ts/evaluador.ts) to avoid a
+// 3-file rename for a type whose definition simply collapsed.
 export type TipoAlerta =
   | 'stock_bajo'
   | 'quiebre'
   | 'discrepancia'
   | 'sugerencia_reposicion';
-export type TipoAlertaEvaluada = Exclude<TipoAlerta, 'sugerencia_reposicion'>;
+export type TipoAlertaEvaluada = TipoAlerta;
 export type EstadoAlerta = 'activa' | 'vista' | 'resuelta';
 
 export interface Alerta {
