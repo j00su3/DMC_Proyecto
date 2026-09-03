@@ -1,5 +1,6 @@
 import type { AuditoriaRepo } from '../auditoria/repository.js';
 import { recordAudit } from '../auditoria/service.js';
+import type { Movimiento, MovimientosRepo } from '../movimientos/repository.js';
 import type { AlertasRepo, TipoAlertaEvaluada } from './repository.js';
 
 // The narrow slice of a Movimiento the evaluator needs. Deliberately not
@@ -14,6 +15,7 @@ export interface EvaluadorMovimiento {
   cantidad: number; // signed delta, verbatim (never recomputed)
   stockResultante: number; // aplicarDelta's return value, verbatim
   esDiscrepancia: boolean;
+  tipo: Movimiento['tipo']; // design.md D3 — anularVenta exclusion guard
 }
 
 export interface EvaluarParams {
@@ -32,6 +34,7 @@ export interface EvaluarParams {
 export interface EvaluadorRepos {
   alertas: AlertasRepo;
   auditoria: AuditoriaRepo;
+  movimientos: Pick<MovimientosRepo, 'resumenRotacion'>; // design.md D7
 }
 
 async function crearYAuditar(
@@ -153,6 +156,30 @@ export async function evaluar(
         'stock_bajo',
         actorId,
       );
+    }
+  }
+
+  // design.md D3/D5/D6/D7, ADR-0008's S7 heuristic. `anularVenta`'s movements
+  // are excluded here — a reversal restores stock, not new outbound demand —
+  // so `resumenRotacion` is never even queried for them.
+  if (movimiento.tipo !== 'anulacion') {
+    const { unidadesSalida30d, diasHistoria } =
+      await repos.movimientos.resumenRotacion(movimiento.productoId);
+    if (diasHistoria >= 7) {
+      const divisor = Math.min(diasHistoria, 30);
+      const promedioDiario = unidadesSalida30d / divisor;
+      if (promedioDiario > 0) {
+        const coberturaDias = movimiento.stockResultante / promedioDiario;
+        if (coberturaDias < 14) {
+          await crearYAuditar(
+            repos,
+            movimiento.productoId,
+            movimiento.id,
+            'sugerencia_reposicion',
+            actorId,
+          );
+        }
+      }
     }
   }
 }

@@ -84,11 +84,16 @@ export async function contarAbiertas(
   return repos.alertas.countAbiertas();
 }
 
-// Owner-ratified 2026-09-02, design.md's Routes table (PD-3): only
-// `discrepancia` is manually resolvable — `stock_bajo`/`quiebre` only ever
-// auto-resolve on stock recovery.
+// Owner-ratified 2026-09-02, design.md's Routes table (PD-3); widened by
+// backlog #11's design.md D2: `discrepancia` and `sugerencia_reposicion` are
+// manually resolvable — `stock_bajo`/`quiebre` only ever auto-resolve on
+// stock recovery. `sugerencia_reposicion` never auto-resolves either
+// (evaluador.ts only ever calls crearYAuditar for it, never
+// autoResolverYAuditar) — coverage recovering above 14 days does not
+// silently close the alert; the encargado must resolve it.
 const TIPOS_MANUALMENTE_RESOLVIBLES: readonly TipoAlertaEvaluada[] = [
   'discrepancia',
+  'sugerencia_reposicion',
 ];
 
 export interface ResolverAlertaInput {

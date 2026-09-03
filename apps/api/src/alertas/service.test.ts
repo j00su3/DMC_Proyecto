@@ -171,6 +171,34 @@ describe('resolver', () => {
     ).rejects.toMatchObject({ code: 'ALERT_NOT_MANUALLY_RESOLVABLE' });
   });
 
+  it('resolves an activa sugerencia_reposicion and audits the resolution (design.md D2)', async () => {
+    const recordAudit = vi.fn(async () => {});
+    const alertas = fakeAlertasRepo({
+      findById: async () =>
+        makeAlerta({ tipo: 'sugerencia_reposicion', estado: 'activa' }),
+      manualResolve: async (id, resueltaPor) =>
+        makeAlerta({
+          id,
+          tipo: 'sugerencia_reposicion',
+          estado: 'resuelta',
+          resueltaPor,
+        }),
+    });
+    const uow = fakeUow(alertas, { record: recordAudit });
+
+    const result = await resolver(uow, { id: 'alerta-1', actorId: 'user-1' });
+
+    expect(result.estado).toBe('resuelta');
+    expect(result.resueltaPor).toBe('user-1');
+    expect(recordAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entidad: 'alertas',
+        accion: 'actualizar',
+        usuarioId: 'user-1',
+      }),
+    );
+  });
+
   it('throws ALERT_NOT_MANUALLY_RESOLVABLE for an activa quiebre alert', async () => {
     const alertas = fakeAlertasRepo({
       findById: async () => makeAlerta({ tipo: 'quiebre', estado: 'activa' }),

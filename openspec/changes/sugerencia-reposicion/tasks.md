@@ -73,39 +73,39 @@ this data).
 
 Depends on: Phase 1.
 
-- [ ] 2.1 RED: `apps/api/src/alertas/evaluador.test.ts` — pure `evaluar()` over fake
+- [x] 2.1 RED: `apps/api/src/alertas/evaluador.test.ts` — pure `evaluar()` over fake
   `EvaluadorRepos`: `diasHistoria` 6 (skip), 7 (evaluate, divisor 7), 29, 30 (divisor 30), 31
   (divisor still 30 — spec "Fewer than 7 days of history is skipped", "Partial history averages
   over available days"); `promedioDiario = 0` never suggests (spec "Zero average never suggests");
   `coberturaDias` exactly 14 does not trigger, 13.99 does (spec "Exactly 14 days does not trigger",
   "Below-threshold coverage triggers the alert"); a movimiento with `tipo === 'anulacion'` never
   calls `resumenRotacion` at all (D3, spec "anularVenta does not trigger the rule").
-- [ ] 2.2 GREEN: `apps/api/src/alertas/evaluador.ts` — add `tipo: Movimiento['tipo']` to
+- [x] 2.2 GREEN: `apps/api/src/alertas/evaluador.ts` — add `tipo: Movimiento['tipo']` to
   `EvaluadorMovimiento` (D3); widen `EvaluadorRepos.movimientos` to
   `Pick<MovimientosRepo, 'resumenRotacion'>` (D7); append the new branch per design.md's exact
   pseudocode, reading `movimiento.stockResultante` (never a fresh `producto.stockActual`, D6) as the
   `coberturaDias` numerator.
-- [ ] 2.3 GREEN: `apps/api/src/alertas/repository.ts` — D1: `TipoAlertaEvaluada = TipoAlerta`
+- [x] 2.3 GREEN: `apps/api/src/alertas/repository.ts` — D1: `TipoAlertaEvaluada = TipoAlerta`
   (remove the `Exclude<...>` alias), keeping the type name.
-- [ ] 2.4 RED+GREEN: `apps/api/src/alertas/service.ts` — D2: add `'sugerencia_reposicion'` to
+- [x] 2.4 RED+GREEN: `apps/api/src/alertas/service.ts` — D2: add `'sugerencia_reposicion'` to
   `TIPOS_MANUALMENTE_RESOLVIBLES`; unit test asserts `resolver()` no longer 409s for
   `sugerencia_reposicion` and still refuses `quiebre`/`stock_bajo` (spec "Manual Resolution
   Restricted To Encargado" — both new scenarios: encargado resolves, deposito refused with 403 and
   DB-state-unchanged assertion per CLAUDE.md).
-- [ ] 2.5 **Mutation-probe** the `anularVenta` exclusion test (2.1's `tipo === 'anulacion'` case) —
+- [x] 2.5 **Mutation-probe** the `anularVenta` exclusion test (2.1's `tipo === 'anulacion'` case) —
   remove the guard, invert it, and compare against `'venta'` instead of `'anulacion'`; confirm each
   mutant is caught (this is the second named load-bearing test for #11, D3).
-- [ ] 2.6 Integration (real Postgres): `apps/api/src/alertas/service.integration.test.ts` (or
+- [x] 2.6 Integration (real Postgres): `apps/api/src/alertas/service.integration.test.ts` (or
   per-domain integration files) — `movimientos/service.ts::registrarMovimiento`,
   `productos/service.ts::crearProducto` (`stockInicial > 0`), and
   `ventas/service.ts::confirmarVenta` each produce exactly one open `sugerencia_reposicion` alert
   when the rule's threshold is crossed, with **zero production-code changes** to those three files
   (spec "A qualifying call site triggers evaluation"); `ventas/service.ts::anularVenta` produces
   none under the same conditions (spec "anularVenta does not trigger the rule").
-- [ ] 2.7 Integration: re-evaluating an already-`activa` `sugerencia_reposicion` alert while still
+- [x] 2.7 Integration: re-evaluating an already-`activa` `sugerencia_reposicion` alert while still
   under-threshold creates no second row (spec "No duplicate open alert for the same producto" —
   existing dedup index, unchanged).
-- [ ] 2.8 RED+GREEN: `apps/api/src/routes/alertas.test.ts` — `POST /api/alertas/:id/resolver`
+- [x] 2.8 RED+GREEN: `apps/api/src/routes/alertas.test.ts` — `POST /api/alertas/:id/resolver`
   succeeds (200) for a `sugerencia_reposicion` alert as `encargado`, without a 409 (spec "Encargado
   resolves a sugerencia_reposicion"); `deposito` still gets 403 with the alert unchanged (spec
   "Deposito is refused (sugerencia_reposicion)").

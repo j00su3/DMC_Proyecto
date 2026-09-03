@@ -109,6 +109,11 @@ function fakeRepos(
         return makeMovimiento();
       },
       listByProducto: async () => ({ rows: [makeMovimiento()], total: 1 }),
+      // backlog #11: EvaluadorRepos.movimientos now requires resumenRotacion
+      // (design.md D7). diasHistoria=0 keeps every existing test in this
+      // file below the S7 heuristic's `>= 7` gate, so sugerencia_reposicion
+      // never fires unless a test explicitly overrides this.
+      resumenRotacion: async () => ({ unidadesSalida30d: 0, diasHistoria: 0 }),
       ...movimientosOverrides,
     } as MovimientosRepo,
   };

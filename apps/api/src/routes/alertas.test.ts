@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Alerta, AlertasRepo } from '../alertas/repository.js';
 import { buildApp } from '../app.js';
 import type { AuditoriaRepo } from '../auditoria/repository.js';
@@ -316,6 +316,55 @@ describe('POST /api/alertas/:id/resolver', () => {
 
     expect(response.statusCode).toBe(409);
     expect(response.json().error.code).toBe('ALERT_ALREADY_RESOLVED');
+  });
+
+  it('resolves an activa sugerencia_reposicion and returns it resuelta, without a 409 (design.md D2)', async () => {
+    app = await buildWithSession(makeUsuario(), {
+      findById: async () =>
+        makeAlerta({ tipo: 'sugerencia_reposicion', estado: 'activa' }),
+      manualResolve: async (id, resueltaPor) =>
+        makeAlerta({
+          id,
+          tipo: 'sugerencia_reposicion',
+          estado: 'resuelta',
+          resueltaPor,
+        }),
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/alertas/${ALERT_ID}/resolver`,
+      cookies: { sid: app.signCookie('valid-token') },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().alerta.tipo).toBe('sugerencia_reposicion');
+    expect(response.json().alerta.estado).toBe('resuelta');
+    expect(response.json().alerta.resueltaPor).toBe('u1');
+  });
+
+  it('returns 403 FORBIDDEN for a deposito session resolving a sugerencia_reposicion alert, DB state unchanged', async () => {
+    const manualResolve = vi.fn(async () =>
+      makeAlerta({ tipo: 'sugerencia_reposicion', estado: 'resuelta' }),
+    );
+    app = await buildWithSession(makeUsuario({ rol: 'deposito' }), {
+      findById: async () =>
+        makeAlerta({ tipo: 'sugerencia_reposicion', estado: 'activa' }),
+      manualResolve,
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/alertas/${ALERT_ID}/resolver`,
+      cookies: { sid: app.signCookie('valid-token') },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json().error.code).toBe('FORBIDDEN');
+    // The role gate refuses before the handler ever reaches the service —
+    // manualResolve must never have been invoked, so the alert row stays
+    // untouched (CLAUDE.md: assert the database after a refusal).
+    expect(manualResolve).not.toHaveBeenCalled();
   });
 
   it('returns 409 ALERT_NOT_MANUALLY_RESOLVABLE for an activa stock_bajo alert', async () => {
