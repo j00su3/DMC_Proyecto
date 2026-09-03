@@ -1,8 +1,8 @@
 # InvenTienda
 
 Sistema de gestión de inventario para un comercio pequeño, con dos roles (`encargado` y
-`deposito`): catálogo de productos, movimientos de stock auditables, punto de venta y recibo
-interno.
+`deposito`): catálogo de productos, proveedores, movimientos de stock auditables, punto de venta,
+recibo interno con anulación de venta, y un motor de alertas de stock bajo/quiebre/discrepancia.
 
 ## Demo en vivo
 
@@ -35,7 +35,8 @@ Todo el proceso de diseño y decisiones del proyecto está documentado en `docs/
 | [`docs/BACKLOG.md`](docs/BACKLOG.md) | Backlog completo, con estado de cada ítem |
 | [`docs/adrs/`](docs/adrs) | Decisiones de arquitectura (ADRs) |
 | [`docs/REVISION-ADVERSARIAL.md`](docs/REVISION-ADVERSARIAL.md) | Revisión adversarial del diseño |
-| [`docs/SECURITY.md`](docs/SECURITY.md) | Hallazgos y cierre de seguridad |
+| [`docs/SECURITY.md`](docs/SECURITY.md) | Pase de seguridad original y su cierre |
+| [`SECURITY-REPORT.md`](SECURITY-REPORT.md) | Pase de seguridad independiente más reciente (2026-09-01), con hallazgos y fixes ya mergeados |
 | [`docs/DEPLOY-PLAN.md`](docs/DEPLOY-PLAN.md) | Plan y checklist de despliegue |
 
 El proyecto se desarrolló con un flujo de Spec-Driven Development: cada feature del backlog pasa
@@ -70,6 +71,7 @@ pnpm test:integration   # requiere pnpm db:up
 
 ## Estado del proyecto
 
-Backlog #1 al #8 archivados y en producción (fundaciones, autenticación, usuarios, proveedores,
-productos, movimientos de inventario, punto de venta, recibo interno). Ver
-[`docs/BACKLOG.md`](docs/BACKLOG.md) para el detalle y lo que sigue pendiente.
+Backlog #1 al #10 archivados y en producción (fundaciones, autenticación, usuarios, proveedores
+con vista maestro-detalle, productos, movimientos de inventario, punto de venta, recibo interno,
+anulación de venta y motor de alertas de stock). Ver [`docs/BACKLOG.md`](docs/BACKLOG.md) para el
+detalle y lo que sigue pendiente (#11 en adelante).
