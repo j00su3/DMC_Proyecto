@@ -3,7 +3,7 @@ import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { getDb, getPool } from '../db/pool.js';
 import { movimientos, productos, proveedores, usuarios } from '../db/schema.js';
-import { DrizzleMovimientosRepo } from './repository.js';
+import { DrizzleMovimientosRepo, type Movimiento } from './repository.js';
 
 // Real Docker Postgres suite (see vitest.integration.config.ts). Proves two
 // properties that only Postgres itself can prove: `create` returns
@@ -236,6 +236,146 @@ describe('movimientos repository (integration, real Postgres)', () => {
       for (const row of otherResult.rows) {
         expect(row.productoId).toBe(otherProductoId);
       }
+    });
+  });
+
+  // design.md D5 — backlog #11. Real Postgres proves the conditional
+  // aggregation and the `now()`-relative boundary, neither of which a fake
+  // repo could exercise honestly.
+  describe('resumenRotacion', () => {
+    async function insertMovimiento(overrides: {
+      tipo: Movimiento['tipo'];
+      cantidad: number;
+      stockResultante: number;
+      fecha: Date;
+    }) {
+      await db.insert(movimientos).values({
+        productoId,
+        usuarioId,
+        tipo: overrides.tipo,
+        cantidad: overrides.cantidad,
+        stockResultante: overrides.stockResultante,
+        fecha: overrides.fecha,
+      });
+    }
+
+    function daysAgo(days: number): Date {
+      return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    }
+
+    it('sums only venta/salida cantidad (negated) within the last 30 days, excluding entrada/ajuste/anulacion', async () => {
+      // Counts: venta and salida, both negative cantidad per CHECK.
+      await insertMovimiento({
+        tipo: 'venta',
+        cantidad: -4,
+        stockResultante: 6,
+        fecha: daysAgo(1),
+      });
+      await insertMovimiento({
+        tipo: 'salida',
+        cantidad: -2,
+        stockResultante: 4,
+        fecha: daysAgo(2),
+      });
+      // Excluded regardless of recency.
+      await insertMovimiento({
+        tipo: 'entrada',
+        cantidad: 10,
+        stockResultante: 14,
+        fecha: daysAgo(1),
+      });
+      await insertMovimiento({
+        tipo: 'ajuste',
+        cantidad: -3,
+        stockResultante: 11,
+        fecha: daysAgo(1),
+      });
+      await insertMovimiento({
+        tipo: 'anulacion',
+        cantidad: 4,
+        stockResultante: 15,
+        fecha: daysAgo(1),
+      });
+
+      const resumen = await repo.resumenRotacion(productoId);
+
+      expect(resumen.unidadesSalida30d).toBe(6);
+    });
+
+    it('counts a movimiento at day 29 but excludes one older than 30 days (boundary)', async () => {
+      await insertMovimiento({
+        tipo: 'venta',
+        cantidad: -5,
+        stockResultante: 10,
+        fecha: daysAgo(29),
+      });
+      await insertMovimiento({
+        tipo: 'venta',
+        cantidad: -7,
+        stockResultante: 3,
+        fecha: daysAgo(31),
+      });
+
+      const resumen = await repo.resumenRotacion(productoId);
+
+      expect(resumen.unidadesSalida30d).toBe(5);
+    });
+
+    it('includes a movimiento at exactly the 30-day boundary (inclusive `>=`)', async () => {
+      // `now()` is stable for every statement inside the same Postgres
+      // transaction (transaction_timestamp semantics), so computing `fecha`
+      // as `now() - interval '30 days'` in the same transaction the query
+      // later runs in lands exactly on the boundary the production SQL
+      // checks — a JS-computed Date can never hit that exact instant.
+      await db.transaction(async (tx) => {
+        await tx.execute(sql`
+          insert into movimientos (producto_id, usuario_id, tipo, cantidad, stock_resultante, fecha)
+          values (${productoId}, ${usuarioId}, 'venta', -8, 2, now() - interval '30 days')
+        `);
+        const txRepo = new DrizzleMovimientosRepo(tx);
+        const resumen = await txRepo.resumenRotacion(productoId);
+        expect(resumen.unidadesSalida30d).toBe(8);
+      });
+    });
+
+    it('computes diasHistoria as whole days since MIN(fecha) across ALL movimientos, unbounded by the 30-day window', async () => {
+      // Oldest movimiento is well outside the 30-day window; diasHistoria
+      // must still reflect it, not be clamped to 30.
+      await insertMovimiento({
+        tipo: 'entrada',
+        cantidad: 20,
+        stockResultante: 20,
+        fecha: daysAgo(45),
+      });
+      await insertMovimiento({
+        tipo: 'venta',
+        cantidad: -1,
+        stockResultante: 19,
+        fecha: daysAgo(1),
+      });
+
+      const resumen = await repo.resumenRotacion(productoId);
+
+      expect(resumen.diasHistoria).toBe(45);
+    });
+
+    it('returns diasHistoria = 0, never NULL/NaN, for a producto with exactly one just-inserted movimiento', async () => {
+      await repo.create({
+        productoId,
+        tipo: 'ajuste',
+        cantidad: 5,
+        motivo: 'stock inicial (alta de producto)',
+        esDiscrepancia: false,
+        esMerma: false,
+        usuarioId,
+        stockResultante: 5,
+      });
+
+      const resumen = await repo.resumenRotacion(productoId);
+
+      expect(resumen.diasHistoria).toBe(0);
+      expect(Number.isNaN(resumen.diasHistoria)).toBe(false);
+      expect(resumen.unidadesSalida30d).toBe(0);
     });
   });
 });
