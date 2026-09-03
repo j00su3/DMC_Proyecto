@@ -182,6 +182,7 @@ describe('POST /api/productos — atomicity proof (integration, real app + real 
             {
               ...repos,
               movimientos: {
+                ...repos.movimientos,
                 create: async () => {
                   throw new Error('forced movimientos failure');
                 },

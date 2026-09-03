@@ -218,6 +218,7 @@ function fakeRepos(
         };
       },
       listByProducto: async () => ({ rows: [], total: 0 }),
+      resumenRotacion: async () => ({ unidadesSalida30d: 0, diasHistoria: 0 }),
     } as MovimientosRepo,
     ventas: {
       create: async (input: NuevaVenta) => {

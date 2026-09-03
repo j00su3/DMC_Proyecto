@@ -16,6 +16,13 @@ export interface Movimiento {
   stockResultante: number;
 }
 
+// design.md D5 (backlog #11) — one conditional-aggregation query over the
+// existing `movimientos_producto_id_fecha_idx`, no new index/migration.
+export interface ResumenRotacion {
+  unidadesSalida30d: number;
+  diasHistoria: number;
+}
+
 export interface NuevoMovimiento {
   productoId: string;
   tipo: Movimiento['tipo'];
@@ -38,6 +45,7 @@ export interface MovimientosRepo {
     page: number,
     pageSize: number,
   ): Promise<{ rows: Movimiento[]; total: number }>;
+  resumenRotacion(productoId: string): Promise<ResumenRotacion>;
 }
 
 // Mirrors proveedores/repository.ts's expectOneRow precedent.
@@ -94,5 +102,39 @@ export class DrizzleMovimientosRepo implements MovimientosRepo {
       .where(condition);
 
     return { rows, total: totalRows[0]?.total ?? 0 };
+  }
+
+  // design.md D5 — one query, conditional aggregation, existing
+  // `movimientos_producto_id_fecha_idx` (productoId, fecha) serves both the
+  // equality predicate and the `fecha` range filter inside the CASE. Exactly
+  // `venta`+`salida` count toward unidadesSalida30d, per S7's literal text
+  // (`entrada`/`ajuste`/`anulacion` never count); `-cantidad` is safe without
+  // `abs()` because `movimientos_signo_tipo` guarantees a negative cantidad
+  // for both tipos. diasHistoria is unbounded by the 30-day window and uses
+  // Postgres `now()` (transaction-start time) rather than a JS clock.
+  async resumenRotacion(productoId: string): Promise<ResumenRotacion> {
+    const result = await this.db.execute(sql`
+      select
+        coalesce(sum(case when tipo in ('venta', 'salida') and fecha >= now() - interval '30 days'
+                           then -cantidad else 0 end), 0)::int as unidades_salida_30d,
+        floor(extract(epoch from (now() - min(fecha))) / 86400)::int as dias_historia
+      from movimientos
+      where producto_id = ${productoId}
+    `);
+    const rows = (
+      result as unknown as {
+        rows: { unidades_salida_30d: number; dias_historia: number }[];
+      }
+    ).rows;
+    const row = rows[0];
+    if (!row) {
+      throw new Error(
+        `resumenRotacion: no row returned for producto ${productoId}`,
+      );
+    }
+    return {
+      unidadesSalida30d: row.unidades_salida_30d,
+      diasHistoria: row.dias_historia,
+    };
   }
 }

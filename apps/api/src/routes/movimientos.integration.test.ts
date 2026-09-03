@@ -127,6 +127,7 @@ function failingMovimientosUow(): UnitOfWork {
           {
             ...repos,
             movimientos: {
+              ...repos.movimientos,
               create: async () => {
                 throw new Error('forced movimientos failure');
               },
