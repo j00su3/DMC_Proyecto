@@ -877,3 +877,33 @@ Neon que la tabla `alertas` existe.
 código viejo (en el último deploy anterior) no la consulta, así que la ventana entre shipear el
 código y migrar la base es inofensiva si la migración corre pronto. Ignorar la ventana indefinidamente
 es lo que causa el 500.
+
+### 2026-09-03 — Sugerencia de reposición (#11) merged; NO schema/migration, safe auto-deploy
+
+**Qué se agregó:** backlog #11 (sugerencia-reposicion). Un nuevo `EvaluadorDeAlertas` branch
+(heurística S7: `cobertura_dias < 14`, mínimo 7 días de historia) y un nuevo método
+`MovimientosRepo.resumenRotacion` (agregado de 30 días sobre `movimientos`, reutilizando el índice
+existente `movimientos_producto_id_fecha_idx`). Widening de dos gates de compilación
+(`TipoAlertaEvaluada` en `alertas/repository.ts`, `TIPOS_MANUALMENTE_RESOLVIBLES` en
+`alertas/service.ts`) para permitir el tipo `sugerencia_reposicion`, que ya existía en el pgEnum
+desde #10 (D5 de ese ciclo) pero estaba excluido a nivel de tipos.
+
+**Componentes shipped:** PR #161 (`resumenRotacion` + integration tests, foundation), PR #162
+(evaluador branch + compile gates + wiring + call-site/route integration tests).
+
+**IMPORTANTE — a diferencia de #10, este cambio NO REQUIERE ninguna acción manual de deploy.**
+Confirmado por diff directo (`git diff e755bcc..3cdf006 --stat -- apps/api/drizzle/`): cero archivos
+de migración agregados. El pgEnum `alertaTipo`, el índice de dedup parcial, y la FK
+`alertas.movimientoId` ya eran genéricos para un cuarto `tipo` desde que #10 los construyó. Este
+ciclo es puro cambio de código (un método de repositorio, una rama de evaluador, dos widenings de
+tipo) sobre un schema que no cambia.
+
+**Acción manual requerida: ninguna.** Se puede desplegar vía el flujo normal de auto-deploy de
+Render/Vercel sin ningún paso extra por parte del owner — no hay `pnpm db:migrate` que correr contra
+Neon para este ciclo.
+
+**Notas:** verify-report confirma 0 archivos de migración tocados y 0 diff en
+`movimientos/service.ts`, `productos/service.ts`, `ventas/service.ts` (los tres call sites
+existentes de #10 disparan la nueva regla por structural typing, sin cambios de código propios).
+Ver `openspec/changes/archive/2026-09-03-sugerencia-reposicion/archive-report.md` para el detalle
+completo del ciclo.
