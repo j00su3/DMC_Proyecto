@@ -1,4 +1,5 @@
 import { rootRoute } from './__root.js';
+import { alertasRoute } from './alertas.js';
 import { authLayout } from './authLayout.js';
 import { cambiarPasswordRoute } from './cambiarPassword.js';
 import { encargadoLayout } from './encargadoLayout.js';
@@ -40,6 +41,7 @@ export const routeTree = rootRoute.addChildren([
       productosNuevoRoute,
       productosDetalleRoute,
       proveedoresRoute,
+      alertasRoute,
       encargadoLayout.addChildren([
         usuariosListRoute,
         usuariosNuevoRoute,

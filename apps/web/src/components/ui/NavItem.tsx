@@ -14,6 +14,12 @@ export interface NavItemProps {
   /** Required alongside `locked`: docs/design.md's "Permisos visibles"
    * principle forbids marking a restriction without a visible reason. */
   reason?: string;
+  /**
+   * Motor de Alertas (backlog #10): open-alert count for the Alertas nav
+   * item's badge. `undefined` (still loading) or `0` (nothing open) both
+   * render no badge — only a genuinely positive count is worth flagging.
+   */
+  badge?: number;
 }
 
 /**
@@ -22,7 +28,13 @@ export interface NavItemProps {
  * explicitly ignores search params so the Usuarios item stays active across
  * `?page` changes.
  */
-export function NavItem({ label, to, locked = false, reason }: NavItemProps) {
+export function NavItem({
+  label,
+  to,
+  locked = false,
+  reason,
+  badge,
+}: NavItemProps) {
   if (to && !locked) {
     return (
       <Link
@@ -32,6 +44,9 @@ export function NavItem({ label, to, locked = false, reason }: NavItemProps) {
         activeOptions={{ includeSearch: false }}
       >
         {label}
+        {badge !== undefined && badge > 0 && (
+          <span className={styles.navItemBadge}>{badge}</span>
+        )}
       </Link>
     );
   }

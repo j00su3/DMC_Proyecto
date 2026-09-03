@@ -169,6 +169,63 @@ describe('AppShell', () => {
     },
   );
 
+  it.each([
+    ['encargado', encargado],
+    ['deposito', deposito],
+  ])(
+    'renders the Alertas nav item as a link to /alertas for a %s session — both roles read alerts',
+    async (_label, usuario) => {
+      renderShell({
+        usuario,
+        onLogout: vi.fn(),
+        isLoggingOut: false,
+        children: <p>content</p>,
+      });
+
+      expect(
+        await screen.findByRole('link', { name: /Alertas/ }),
+      ).toHaveAttribute('href', '/alertas');
+    },
+  );
+
+  it('shows the open-alerts count as a badge next to the Alertas nav item', async () => {
+    renderShell({
+      usuario: encargado,
+      onLogout: vi.fn(),
+      isLoggingOut: false,
+      alertasAbiertas: 4,
+      children: <p>content</p>,
+    });
+
+    const link = await screen.findByRole('link', { name: /Alertas/ });
+    expect(link).toHaveTextContent('4');
+  });
+
+  it('shows no badge when alertasAbiertas is zero (no open alerts to flag)', async () => {
+    renderShell({
+      usuario: encargado,
+      onLogout: vi.fn(),
+      isLoggingOut: false,
+      alertasAbiertas: 0,
+      children: <p>content</p>,
+    });
+
+    const link = await screen.findByRole('link', { name: /Alertas/ });
+    expect(link).not.toHaveTextContent('0');
+  });
+
+  it('shows no badge when alertasAbiertas is not provided (still loading)', async () => {
+    renderShell({
+      usuario: encargado,
+      onLogout: vi.fn(),
+      isLoggingOut: false,
+      children: <p>content</p>,
+    });
+
+    const link = await screen.findByRole('link', { name: 'Alertas' });
+    expect(link).toBeInTheDocument();
+  });
+
   it('gives the logout control a class the print stylesheet can target', async () => {
     renderShell({
       usuario: encargado,
