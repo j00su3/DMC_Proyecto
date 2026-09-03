@@ -181,8 +181,14 @@ describe('C1 acceptance criterion (integration, real Postgres): evaluator SQL fa
       stockActual: 10,
       precio: '10.00',
     });
+    // stockMinimo=5, same as A/C: this item MUST cross the threshold too, or
+    // the evaluator never calls alertas.create() for it and the injected
+    // failure below is dead code — this is exactly the bug task 5.3's
+    // mutation-probing found (a stockMinimo: null fixture here made this
+    // test pass for the wrong reason: nothing was ever created, mutated, or
+    // proven, ever).
     const productoB = await insertProducto(proveedor.id, {
-      stockMinimo: null,
+      stockMinimo: 5,
       stockActual: 10,
       precio: '20.00',
     });
@@ -254,7 +260,9 @@ describe('C1 acceptance criterion (integration, real Postgres): evaluator SQL fa
     expect(alertasC).toHaveLength(1);
     expect(alertasC[0]?.tipo).toBe('stock_bajo');
 
-    // Item 2 (B)'s evaluator SQL genuinely failed — zero alert rows for it.
+    // Item 2 (B) also crossed stockMinimo=5 (10 -> 4), so the evaluator DID
+    // call alertas.create() for it — its SQL genuinely failed there, and the
+    // savepoint rolled back only that create, leaving zero alert rows for it.
     expect(await alertasFor(productoB.id)).toHaveLength(0);
   });
 });
