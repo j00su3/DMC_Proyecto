@@ -234,12 +234,15 @@ sweep myself:
 
 1. **30-day boundary** (movimientos/repository.integration.test.ts:305-322, "counts a movimiento
    at day 29 but excludes one older than 30 days"): inserts a day-29 movimiento (cantidad -5) and a
-   day-31 movimiento (cantidad -7), asserts unidadesSalida30d equals 5. This precise numeric
-   equality would fail under every mutant task 1.3 names: flipping the interval comparison operator
-   would break the adjacent inclusive-boundary test (line 324, exactly-30-days-ago row); widening
-   the tipo filter list would pull in an entrada/ajuste row and break the 5 expectation; inverting
-   the cantidad sign would flip the result to -5, failing the equality directly. Real,
-   mutation-sensitive test.
+   day-31 movimiento (cantidad -7), asserts unidadesSalida30d equals 5. Correction (claims-gate,
+   2026-09-03): this specific test only inserts `venta` rows, so it is NOT independently sensitive
+   to a widened `tipo IN (...)` filter — there is no `entrada`/`ajuste` row present for a widened
+   filter to pull in. Live mutation (claims-gate) confirmed: flipping the interval comparison and
+   inverting the `cantidad` sign both correctly fail THIS test; the `tipo` filter mutant is instead
+   caught by the sibling test at line 266 ("sums only venta/salida cantidad (negated)..."), which
+   does insert an `entrada` and an `ajuste` row. All three named mutants are genuinely caught by
+   `movimientos/repository.integration.test.ts` as a file — the original attribution of all three
+   to this one test was inaccurate.
 
 2. **anularVenta exclusion** (evaluador.test.ts:495-513, "a movimiento with tipo anulacion never
    calls resumenRotacion at all, D3"): harness sets resumenRotacionResult to values that WOULD
