@@ -69,6 +69,18 @@
   opacity: 0.75;
 }
 
+/* Motor de Alertas (backlog #10): open-alert count badge, next to the
+   Alertas label. */
+.navItemBadge {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .userCard {
   display: flex;
   flex-direction: column;

@@ -8,14 +8,17 @@ import { NavItem } from './NavItem.js';
  * table. "Usuarios", "Inventario" and, from here on, "Punto de venta" have
  * a shipped destination — `to="/inventario"` etc. would be a type error
  * against the registered router until those screens exist, so the
- * remaining four stay destination-less and render as inert markers through
+ * remaining destination-less entries render as inert markers through
  * the same `NavItem` component/class, never a bare `<span>` (app-layout
- * spec, "Sidebar Items Render As Navigation Links").
+ * spec, "Sidebar Items Render As Navigation Links"). "Alertas" (Motor de
+ * Alertas, backlog #10) has no destination-less slot to reuse — it is a
+ * new entry, not a placeholder promoted to a link.
  */
 const NAV_ITEMS: { label: string; to?: string }[] = [
   { label: 'Panel general' },
   { label: 'Inventario', to: '/inventario' },
   { label: 'Punto de venta', to: '/pos' },
+  { label: 'Alertas', to: '/alertas' },
   { label: 'Movimientos' },
   { label: 'Proveedores', to: '/proveedores' },
   { label: 'Reportes' },
@@ -42,6 +45,13 @@ export interface AppShellProps {
   onLogout: () => void;
   isLoggingOut: boolean;
   children: ReactNode;
+  /**
+   * Motor de Alertas (backlog #10, PD-4): open-alert count for the Alertas
+   * nav item's badge. `AppShell` stays presentational (props only) — the
+   * data hook (`useConteoAlertas`) lives in `shellLayout`'s container, per
+   * design.md's Frontend note.
+   */
+  alertasAbiertas?: number;
 }
 
 /**
@@ -56,6 +66,7 @@ export function AppShell({
   onLogout,
   isLoggingOut,
   children,
+  alertasAbiertas,
 }: AppShellProps) {
   const initials = usuario.nombre
     .split(' ')
@@ -78,6 +89,7 @@ export function AppShell({
               to={item.to}
               locked={item.label === 'Usuarios' && usuario.rol !== 'encargado'}
               reason={LOCKED_REASON}
+              badge={item.label === 'Alertas' ? alertasAbiertas : undefined}
             />
           ))}
         </nav>

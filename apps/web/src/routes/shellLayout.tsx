@@ -1,5 +1,6 @@
 import { Outlet, createRoute, redirect } from '@tanstack/react-router';
 import { AppShell } from '../components/ui/AppShell.js';
+import { useConteoAlertas } from '../features/alertas/useConteoAlertas.js';
 import { useLogout } from '../features/auth/useLogout.js';
 import { authLayout } from './authLayout.js';
 
@@ -33,12 +34,16 @@ export const shellLayout = createRoute({
 function ShellLayoutContainer() {
   const usuario = shellLayout.useRouteContext().usuario;
   const logout = useLogout();
+  // The polling badge's data hook lives here, in the container — `AppShell`
+  // stays presentational (props only), per design.md's Frontend note.
+  const conteo = useConteoAlertas();
 
   return (
     <AppShell
       usuario={usuario}
       onLogout={() => logout.mutate()}
       isLoggingOut={logout.isPending}
+      alertasAbiertas={conteo.data?.abiertas}
     >
       <Outlet />
     </AppShell>

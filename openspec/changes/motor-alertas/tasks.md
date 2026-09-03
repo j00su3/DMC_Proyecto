@@ -156,24 +156,24 @@ Alerts", "Alert Create And Resolve Are Audited".
 
 Depends on: Phase 3 (needs `schema.d.ts` types for the new routes).
 
-- [ ] 4.1 RED+GREEN: `apps/web/src/features/alertas/queries.ts` — `alertasKeys` factory,
+- [x] 4.1 RED+GREEN: `apps/web/src/features/alertas/queries.ts` — `alertasKeys` factory,
   `alertasListQueryOptions()`, `alertasConteoQueryOptions()` with `refetchInterval: 60_000` on the
   count options object (PD-4); test asserts the options object's `refetchInterval === 60_000`
   without advancing timers.
-- [ ] 4.2 RED+GREEN: `useAlertas.ts` (list hook), `useConteoAlertas.ts` (polling count hook).
-- [ ] 4.3 RED+GREEN: `useResolverAlerta.ts` — mutation invalidating `alertasKeys.all`.
-- [ ] 4.4 RED+GREEN: `useMarcarVistas.ts` — fires once on mount (route effect, not a user action);
+- [x] 4.2 RED+GREEN: `useAlertas.ts` (list hook), `useConteoAlertas.ts` (polling count hook).
+- [x] 4.3 RED+GREEN: `useResolverAlerta.ts` — mutation invalidating `alertasKeys.all`.
+- [x] 4.4 RED+GREEN: `useMarcarVistas.ts` — fires once on mount (route effect, not a user action);
   invalidates `alertasKeys.all` on success.
-- [ ] 4.5 RED+GREEN: `AlertasTable.tsx` + `errorMessages.ts` — presentational table; resolve
+- [x] 4.5 RED+GREEN: `AlertasTable.tsx` + `errorMessages.ts` — presentational table; resolve
   control hidden for `deposito` (documented UX-affordance-only docblock per CLAUDE.md); code→message
   map for `ALERT_NOT_FOUND`/`ALERT_ALREADY_RESOLVED`/`ALERT_NOT_MANUALLY_RESOLVABLE`.
-- [ ] 4.6 RED+GREEN: `apps/web/src/routes/alertas.tsx` — screen under `shellLayout`; register in
+- [x] 4.6 RED+GREEN: `apps/web/src/routes/alertas.tsx` — screen under `shellLayout`; register in
   `routeTree.ts`; calls `useMarcarVistas()` on mount.
-- [ ] 4.7 `apps/web/src/routes/shellLayout.tsx` (modify) — `ShellLayoutContainer` calls
+- [x] 4.7 `apps/web/src/routes/shellLayout.tsx` (modify) — `ShellLayoutContainer` calls
   `useConteoAlertas()`, passes the count down.
-- [ ] 4.8 `apps/web/src/components/ui/AppShell.tsx` (modify) — add `{label: 'Alertas', to:
+- [x] 4.8 `apps/web/src/components/ui/AppShell.tsx` (modify) — add `{label: 'Alertas', to:
   '/alertas'}` nav item; add optional `alertasAbiertas?: number` badge prop.
-- [ ] 4.9 RED tests, route level (`await router.load()` first, per CLAUDE.md): `deposito` reaches
+- [x] 4.9 RED tests, route level (`await router.load()` first, per CLAUDE.md): `deposito` reaches
   `/alertas` and sees the list, not a refusal; `deposito` sees no resolve control on a
   `discrepancia` row; `encargado` resolving updates the list to `resuelta`; badge issues a new
   request after 60s (fake timers at the route level, not just hook level).
