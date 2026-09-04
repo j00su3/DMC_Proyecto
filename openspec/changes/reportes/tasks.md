@@ -150,21 +150,21 @@ service-layer half of "Movimientos — Encargado Scope", "Stock Actual Report" (
 
 Depends on: Phase 3. Wires all 4 report endpoints with per-route `config.roles` and Zod schemas.
 
-- [ ] 4.1 RED: `apps/api/src/routes/reportes.test.ts` — `GET /api/reportes/stock-actual` and
+- [x] 4.1 RED: `apps/api/src/routes/reportes.test.ts` — `GET /api/reportes/stock-actual` and
   `/bajo-minimo`: both roles get `200` and an identical result for identical paging (spec "Both
   roles get identical results"); `GET /api/reportes/movimientos`: malformed range
   (`fechaDesde > fechaHasta`) returns `400 VALIDATION_ERROR` via the Zod `.refine()` (design.md
   Threat Matrix); `GET /api/reportes/discrepancias`: encargado `200` with `estado`/`resueltaEn`/
   `resueltaPor` per row (spec "Encargado sees resolution state"), deposito `403` with no `data`
   (spec "Deposito is denied") — assert no data leaks in the 403 body.
-- [ ] 4.2 GREEN: `apps/api/src/routes/reportes.ts` — create the file with 4 routes per D5's table
+- [x] 4.2 GREEN: `apps/api/src/routes/reportes.ts` — create the file with 4 routes per D5's table
   (`config.roles` per route, mirroring `productos.ts`/`movimientos.ts` — no shared conditional
   branch inside one endpoint per proposal.md's approach); `isoDateSchema` +
   `movimientosPeriodoQuerySchema` exactly per D5's snippet; each route resolves `requireActor` and
   calls the matching `reportes/service.ts` function from Phase 3; reuses
   `apps/api/src/lib/pagination.ts`'s envelope, no new shape.
-- [ ] 4.3 GREEN: `apps/api/src/app.ts` — register `reportesRoutes`.
-- [ ] 4.4 Integration: `apps/api/src/routes/reportes.integration.test.ts` (real Postgres) — an
+- [x] 4.3 GREEN: `apps/api/src/app.ts` — register `reportesRoutes`.
+- [x] 4.4 Integration: `apps/api/src/routes/reportes.integration.test.ts` (real Postgres) — an
   empty-range movimientos request returns `{data: [], total: 0}` with a 2xx status, not an error
   (spec "Empty period is not an error"); `page=0`/negative `pageSize` rejected by existing
   `pageQuerySchema.min(1)` (no new validation needed, confirm as regression coverage only).
