@@ -125,7 +125,10 @@ describe('AppShell', () => {
       children: <p>content</p>,
     });
 
-    expect(await screen.findByText('🔒')).toBeInTheDocument();
+    // Two encargado-only entries lock for a deposito session as of backlog
+    // #12 (Usuarios, Discrepancias globales) — `findAllByText` since both
+    // render the same 🔒 marker.
+    expect((await screen.findAllByText('🔒')).length).toBeGreaterThanOrEqual(1);
     expect(
       screen.queryByRole('link', { name: /Usuarios/ }),
     ).not.toBeInTheDocument();

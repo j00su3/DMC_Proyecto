@@ -13,6 +13,11 @@ import { NavItem } from './NavItem.js';
  * spec, "Sidebar Items Render As Navigation Links"). "Alertas" (Motor de
  * Alertas, backlog #10) has no destination-less slot to reuse — it is a
  * new entry, not a placeholder promoted to a link.
+ *
+ * The former single "Reportes" placeholder (no destination) is replaced
+ * here by its four shipped screens (backlog #12) — one flat nav entry per
+ * screen, matching this file's existing convention (no submenu support in
+ * `NavItem`, same shape "Alertas" used when it shipped).
  */
 const NAV_ITEMS: { label: string; to?: string }[] = [
   { label: 'Panel general' },
@@ -21,19 +26,27 @@ const NAV_ITEMS: { label: string; to?: string }[] = [
   { label: 'Alertas', to: '/alertas' },
   { label: 'Movimientos' },
   { label: 'Proveedores', to: '/proveedores' },
-  { label: 'Reportes' },
+  { label: 'Stock actual', to: '/reportes/stock-actual' },
+  { label: 'Bajo mínimo', to: '/reportes/bajo-minimo' },
+  { label: 'Movimientos por período', to: '/reportes/movimientos' },
+  { label: 'Discrepancias globales', to: '/reportes/discrepancias' },
   { label: 'Usuarios', to: '/usuarios' },
 ];
 
 /**
  * A `deposito` session cannot use any Usuarios route (the encargado-only
- * guard, D4). Per docs/design.md's "Permisos visibles" principle (D3), that
- * restriction is marked with 🔒 and a reason — never hidden without
- * explanation. Inventario carries no such restriction: both roles read
- * (and mostly write) products, so it is never `locked` regardless of role
- * (productos-ledger-base D9).
+ * guard, D4), nor the discrepancias globales report (backlog #12's
+ * `encargadoLayout` route, spec's "Discrepancias Globales Report" — server
+ * returns `403` regardless of this marker). Per docs/design.md's "Permisos
+ * visibles" principle (D3), that restriction is marked with 🔒 and a
+ * reason — never hidden without explanation. Inventario carries no such
+ * restriction: both roles read (and mostly write) products, so it is never
+ * `locked` regardless of role (productos-ledger-base D9). The other three
+ * reports (stock actual, bajo mínimo, movimientos por período) are also
+ * never locked — both roles can read them (D5).
  */
 const LOCKED_REASON = 'Disponible solo para encargados.';
+const ENCARGADO_ONLY_LABELS = new Set(['Usuarios', 'Discrepancias globales']);
 
 const ROL_LABEL: Record<'encargado' | 'deposito', string> = {
   encargado: 'Encargado · Admin',
@@ -87,7 +100,10 @@ export function AppShell({
               key={item.label}
               label={item.label}
               to={item.to}
-              locked={item.label === 'Usuarios' && usuario.rol !== 'encargado'}
+              locked={
+                ENCARGADO_ONLY_LABELS.has(item.label) &&
+                usuario.rol !== 'encargado'
+              }
               reason={LOCKED_REASON}
               badge={item.label === 'Alertas' ? alertasAbiertas : undefined}
             />
