@@ -1,4 +1,14 @@
-import { type SQL, and, asc, desc, eq, or, sql } from 'drizzle-orm';
+import {
+  type SQL,
+  and,
+  asc,
+  desc,
+  eq,
+  isNotNull,
+  lte,
+  or,
+  sql,
+} from 'drizzle-orm';
 import type { DbExecutor } from '../db/client.js';
 import { productos } from '../db/schema.js';
 import { isUniqueViolation } from '../lib/db-errors.js';
@@ -55,6 +65,17 @@ export interface ProductosRepo {
     pageSize: number,
     q?: string,
     opts?: ListProductosOpts,
+  ): Promise<{ rows: Producto[]; total: number }>;
+  // backlog #12 (reportes) design.md D1: a new dedicated method, not a
+  // `list()` opt — isolated, single-predicate, zero risk to `list()`'s
+  // existing callers (GET /api/productos, the POS catalog read). Predicate
+  // (both page and count query, this file's own D7/D11 trap):
+  // `stockActual <= stockMinimo AND stockMinimo IS NOT NULL`. `<=` is
+  // inclusive of exactly-at-threshold. Order: asc(stockActual), asc(id)
+  // (most-depleted first, deterministic tie-break).
+  bajoMinimo(
+    page: number,
+    pageSize: number,
   ): Promise<{ rows: Producto[]; total: number }>;
   findById(id: string): Promise<Producto | undefined>;
   findByIdForUpdate(id: string): Promise<Producto | undefined>;
@@ -136,6 +157,33 @@ export class DrizzleProductosRepo implements ProductosRepo {
           ? [asc(productos.nombre), asc(productos.id)]
           : [desc(productos.creadoEn), desc(productos.id)]),
       )
+      .limit(pageSize)
+      .offset((page - 1) * pageSize);
+
+    const totalRows = await this.db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(productos)
+      .where(whereCondition);
+
+    return { rows, total: totalRows[0]?.total ?? 0 };
+  }
+
+  // D1: same condition applied to BOTH the page query and the count
+  // query — the D7/D11 trap this file already documents applies here too.
+  async bajoMinimo(
+    page: number,
+    pageSize: number,
+  ): Promise<{ rows: Producto[]; total: number }> {
+    const whereCondition = and(
+      lte(productos.stockActual, productos.stockMinimo),
+      isNotNull(productos.stockMinimo),
+    );
+
+    const rows = await this.db
+      .select()
+      .from(productos)
+      .where(whereCondition)
+      .orderBy(asc(productos.stockActual), asc(productos.id))
       .limit(pageSize)
       .offset((page - 1) * pageSize);
 

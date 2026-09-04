@@ -94,6 +94,7 @@ function fakeRepos(sesionesOverrides: Partial<SesionesRepo> = {}) {
       setActivo: unusedRepoMethod,
       aplicarDelta: unusedRepoMethod,
       revertirStockPorAnulacion: unusedRepoMethod,
+      bajoMinimo: unusedRepoMethod,
     } satisfies ProductosRepo,
     movimientos: {
       create: unusedRepoMethod,

@@ -7,6 +7,7 @@ import {
   actualizarProducto,
   crearProducto,
   getProducto,
+  listBajoMinimo,
   listProductos,
   requireActor,
   setProductoActivo,
@@ -66,6 +67,7 @@ function harness(
     productoActual?: Producto | undefined;
     alertCreateResult?: unknown;
     alertAutoResolveResult?: unknown;
+    bajoMinimoResult?: { rows: Producto[]; total: number };
   } = {},
 ) {
   let transactionOpen = false;
@@ -107,6 +109,10 @@ function harness(
         producto({ activo: activo as boolean }),
     ),
     list: spy('productos.list', async () => ({ rows: [], total: 0 })),
+    bajoMinimo: spy(
+      'productos.bajoMinimo',
+      async () => options.bajoMinimoResult ?? { rows: [], total: 0 },
+    ),
   };
 
   const movimientos = {
@@ -593,6 +599,28 @@ describe('listProductos', () => {
     await listProductos(h.repos, { page: 1, pageSize: 20 });
 
     expect(h.productos.list).toHaveBeenCalledWith(1, 20, undefined);
+  });
+});
+
+// backlog #12 (reportes) design.md D1/D5, tasks.md task 1.3: thin
+// pass-through wrapper — the only contract to prove is that page/pageSize
+// reach the repository unchanged and the envelope shape passes through.
+describe('listBajoMinimo', () => {
+  it('passes page and pageSize through to the repository unchanged', async () => {
+    const h = harness();
+
+    await listBajoMinimo(h.repos, { page: 2, pageSize: 15 });
+
+    expect(h.productos.bajoMinimo).toHaveBeenCalledWith(2, 15);
+  });
+
+  it('returns the repository result envelope unchanged', async () => {
+    const expected = { rows: [producto()], total: 1 };
+    const h = harness({ bajoMinimoResult: expected });
+
+    const result = await listBajoMinimo(h.repos, { page: 1, pageSize: 20 });
+
+    expect(result).toEqual(expected);
   });
 });
 

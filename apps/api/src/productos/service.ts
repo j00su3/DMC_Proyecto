@@ -311,6 +311,21 @@ export async function listProductos(
   return repos.productos.list(input.page, input.pageSize, input.q);
 }
 
+export interface ListBajoMinimoInput {
+  page: number;
+  pageSize: number;
+}
+
+// backlog #12 (reportes) design.md D1/D5: thin wrapper over
+// ProductosRepo.bajoMinimo — no business rule of its own, the repository
+// owns the predicate entirely.
+export async function listBajoMinimo(
+  repos: ReadRepos,
+  input: ListBajoMinimoInput,
+): Promise<{ rows: Producto[]; total: number }> {
+  return repos.productos.bajoMinimo(input.page, input.pageSize);
+}
+
 export async function getProducto(
   repos: ReadRepos,
   id: string,
