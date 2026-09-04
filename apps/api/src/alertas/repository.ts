@@ -65,6 +65,13 @@ export interface AlertasRepo {
     pageSize: number,
   ): Promise<{ rows: Alerta[]; total: number }>;
   countAbiertas(): Promise<number>;
+  /**
+   * backlog #13 (dashboard-kpis) design.md D2's correction: a NEW method
+   * mirroring `countAbiertas()`'s exact `estado <> 'resuelta'` predicate
+   * plus a `tipo` equality — not a reuse of `list()` (which has no `estado`
+   * predicate when only `tipo` is supplied).
+   */
+  countAbiertasPorTipo(tipo: TipoAlerta): Promise<number>;
 }
 
 export class DrizzleAlertasRepo implements AlertasRepo {
@@ -186,6 +193,17 @@ export class DrizzleAlertasRepo implements AlertasRepo {
       .select({ total: sql<number>`count(*)::int` })
       .from(alertas)
       .where(ne(alertas.estado, 'resuelta'));
+    return rows[0]?.total ?? 0;
+  }
+
+  // backlog #13 (dashboard-kpis) design.md D2's correction: same predicate as
+  // countAbiertas() plus a tipo equality — a KPI card must mean "currently
+  // open", not every alert ever created with that tipo.
+  async countAbiertasPorTipo(tipo: TipoAlerta): Promise<number> {
+    const rows = await this.db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(alertas)
+      .where(and(ne(alertas.estado, 'resuelta'), eq(alertas.tipo, tipo)));
     return rows[0]?.total ?? 0;
   }
 }

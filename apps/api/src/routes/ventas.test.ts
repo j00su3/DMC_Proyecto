@@ -220,6 +220,7 @@ function fakeRepos(
       listByProducto: async () => ({ rows: [], total: 0 }),
       resumenRotacion: async () => ({ unidadesSalida30d: 0, diasHistoria: 0 }),
       listByPeriodo: async () => ({ rows: [], total: 0 }),
+      listRecientes: async () => [],
     } as MovimientosRepo,
     ventas: {
       create: async (input: NuevaVenta) => {
