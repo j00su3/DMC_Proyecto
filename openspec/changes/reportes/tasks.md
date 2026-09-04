@@ -182,23 +182,23 @@ table, `DataTable` + explicit `if (rows.length === 0) return <p>...</p>` empty s
 import inside the table component) — design.md explicitly left frontend architecture undetailed, so
 no dashboard/chart/export scope is invented here (out of scope per proposal.md).
 
-- [ ] 5.1 RED+GREEN: `apps/web/src/features/reportes/StockActualTable.tsx` +
+- [x] 5.1 RED+GREEN: `apps/web/src/features/reportes/StockActualTable.tsx` +
   `BajoMinimoTable.tsx` — presentational tables mirroring `ProveedoresTable.tsx`'s shape; empty
   state `<p>No hay productos para mostrar.</p>` equivalent; tests assert row rendering and the empty
   state, matching `AlertasTable.tsx`'s existing test convention.
-- [ ] 5.2 RED+GREEN: `apps/web/src/features/reportes/MovimientosPeriodoTable.tsx` — includes
+- [x] 5.2 RED+GREEN: `apps/web/src/features/reportes/MovimientosPeriodoTable.tsx` — includes
   date-range filter controls (`fechaDesde`/`fechaHasta`, both roles get the same control per
   proposal.md's ratified scoping decision 2); test covers the filter triggering a re-fetch and the
   empty-range empty state.
-- [ ] 5.3 RED+GREEN: `apps/web/src/features/reportes/DiscrepanciasTable.tsx` — displays `estado`,
+- [x] 5.3 RED+GREEN: `apps/web/src/features/reportes/DiscrepanciasTable.tsx` — displays `estado`,
   `resueltaEn`, `resueltaPor` per row (spec "Encargado sees resolution state").
-- [ ] 5.4 Route registration: both-role reports (stock-actual, bajo-minimo, movimientos) under
+- [x] 5.4 Route registration: both-role reports (stock-actual, bajo-minimo, movimientos) under
   `shellLayout`; discrepancias under `encargadoLayout` only (proposal.md: "screens both roles can
   read are never under `encargadoLayout`"; mirrors `CLAUDE.md`'s "Route guards are for
   encargado-only subtrees"). Route-level test asserts deposito is redirected/denied access to the
   discrepancias route in the SPA (UX affordance only — the server's 403 from Phase 4 is the real
   boundary, document as such per `CLAUDE.md`'s Authorization note).
-- [ ] 5.5 `pnpm contract` / `pnpm contract:check` — regenerate `openapi.json` and
+- [x] 5.5 `pnpm contract` / `pnpm contract:check` — regenerate `openapi.json` and
   `apps/web/src/api/schema.d.ts` for the 4 new routes; stage the regenerated artifacts before
   `contract:check` is trusted (per `CLAUDE.md`'s contract-pipeline note: unstaged regenerated files
   read as drift).

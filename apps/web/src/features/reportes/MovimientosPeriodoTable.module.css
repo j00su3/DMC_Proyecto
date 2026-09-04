@@ -1,0 +1,13 @@
+/* Mirrors `ProveedoresTable.module.css`'s `.list` gap rationale — the date
+ * filters and the table below need breathing room, and the two date fields
+ * need their own row gap. */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.filters {
+  display: flex;
+  gap: 12px;
+}

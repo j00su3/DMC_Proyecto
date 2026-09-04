@@ -13,6 +13,10 @@ import { proveedoresRoute } from './proveedores.js';
 import { publicLayout } from './publicLayout.js';
 import { reciboRoute } from './recibo.js';
 import { reciboBuscarRoute } from './reciboBuscar.js';
+import { reportesBajoMinimoRoute } from './reportesBajoMinimo.js';
+import { reportesDiscrepanciasRoute } from './reportesDiscrepancias.js';
+import { reportesMovimientosRoute } from './reportesMovimientos.js';
+import { reportesStockActualRoute } from './reportesStockActual.js';
 import { shellLayout } from './shellLayout.js';
 import { usuariosListRoute } from './usuarios.js';
 import { usuariosDetalleRoute } from './usuariosDetalle.js';
@@ -42,10 +46,14 @@ export const routeTree = rootRoute.addChildren([
       productosDetalleRoute,
       proveedoresRoute,
       alertasRoute,
+      reportesStockActualRoute,
+      reportesBajoMinimoRoute,
+      reportesMovimientosRoute,
       encargadoLayout.addChildren([
         usuariosListRoute,
         usuariosNuevoRoute,
         usuariosDetalleRoute,
+        reportesDiscrepanciasRoute,
       ]),
     ]),
   ]),
