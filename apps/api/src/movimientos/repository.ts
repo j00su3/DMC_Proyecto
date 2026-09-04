@@ -1,4 +1,4 @@
-import { desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, lt, sql } from 'drizzle-orm';
 import type { DbExecutor } from '../db/client.js';
 import { movimientos } from '../db/schema.js';
 
@@ -38,6 +38,16 @@ export interface NuevoMovimiento {
 // Two methods, deliberately narrow. `create` is from #5 (S2b). `listByProducto`
 // is from #6 (S2). The port is still narrow enough for a fake to be a full
 // replacement — every future writer (#7, #9) is forced to state `esMerma`.
+// design.md D2 (backlog #12) — cross-producto period query for the
+// movimientos report. Bare `Movimiento[]` rows, same shape as
+// `listByProducto`; `productoNombre` resolution is a `reportes/service.ts`
+// concern (D6 N+1-lookup idiom), not this repo's.
+export interface FiltroMovimientosPeriodo {
+  fechaDesde: Date;
+  fechaHastaExclusiva: Date;
+  usuarioId?: string;
+}
+
 export interface MovimientosRepo {
   create(input: NuevoMovimiento): Promise<Movimiento>;
   listByProducto(
@@ -46,6 +56,11 @@ export interface MovimientosRepo {
     pageSize: number,
   ): Promise<{ rows: Movimiento[]; total: number }>;
   resumenRotacion(productoId: string): Promise<ResumenRotacion>;
+  listByPeriodo(
+    filtro: FiltroMovimientosPeriodo,
+    page: number,
+    pageSize: number,
+  ): Promise<{ rows: Movimiento[]; total: number }>;
 }
 
 // Mirrors proveedores/repository.ts's expectOneRow precedent.
@@ -136,5 +151,40 @@ export class DrizzleMovimientosRepo implements MovimientosRepo {
       unidadesSalida30d: row.unidades_salida_30d,
       diasHistoria: row.dias_historia,
     };
+  }
+
+  // design.md D2 (backlog #12) — half-open interval
+  // `[fechaDesde, fechaHastaExclusiva)`, optional actor scope. Predicate
+  // applied identically to page and count query (this file's own D7/D11
+  // trap, extended to a third repo). Uses the new `movimientos_fecha_idx`
+  // index — no `productoId` predicate here, so the existing
+  // `(productoId, fecha)` index cannot serve this query.
+  async listByPeriodo(
+    filtro: FiltroMovimientosPeriodo,
+    page: number,
+    pageSize: number,
+  ): Promise<{ rows: Movimiento[]; total: number }> {
+    const condition = and(
+      gte(movimientos.fecha, filtro.fechaDesde),
+      lt(movimientos.fecha, filtro.fechaHastaExclusiva),
+      filtro.usuarioId
+        ? eq(movimientos.usuarioId, filtro.usuarioId)
+        : undefined,
+    );
+
+    const rows = await this.db
+      .select()
+      .from(movimientos)
+      .where(condition)
+      .orderBy(desc(movimientos.fecha), desc(movimientos.id))
+      .limit(pageSize)
+      .offset((page - 1) * pageSize);
+
+    const totalRows = await this.db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(movimientos)
+      .where(condition);
+
+    return { rows, total: totalRows[0]?.total ?? 0 };
   }
 }

@@ -228,6 +228,11 @@ export const movimientos = pgTable(
       table.productoId,
       table.fecha,
     ),
+    // design.md D2 (backlog #12) — cross-producto range scan for
+    // `listByPeriodo`. `movimientos_producto_id_fecha_idx` above has
+    // `productoId` as its leading column, so it cannot serve a query with no
+    // `productoId` predicate; a dedicated `(fecha)` index is required.
+    index('movimientos_fecha_idx').on(table.fecha),
     check(
       'movimientos_signo_tipo',
       sql`(
