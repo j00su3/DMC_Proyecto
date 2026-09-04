@@ -378,4 +378,164 @@ describe('movimientos repository (integration, real Postgres)', () => {
       expect(resumen.unidadesSalida30d).toBe(0);
     });
   });
+
+  // design.md D2 — backlog #12. Real Postgres proves the half-open
+  // `[fechaDesde, fechaHastaExclusiva)` boundary and cross-actor visibility,
+  // neither of which a fake repo could exercise honestly.
+  describe('listByPeriodo', () => {
+    let otherUsuarioId: string;
+
+    beforeEach(async () => {
+      otherUsuarioId = (await insertUsuario()).id;
+    });
+
+    async function insertMovimiento(overrides: {
+      usuarioId: string;
+      fecha: Date;
+      cantidad?: number;
+      stockResultante?: number;
+    }) {
+      await db.insert(movimientos).values({
+        productoId,
+        usuarioId: overrides.usuarioId,
+        tipo: 'entrada',
+        cantidad: overrides.cantidad ?? 1,
+        stockResultante: overrides.stockResultante ?? 1,
+        fecha: overrides.fecha,
+      });
+    }
+
+    it('returns movimientos from all actors within [fechaDesde, fechaHastaExclusiva)', async () => {
+      const fechaDesde = new Date('2026-02-01T00:00:00.000Z');
+      const fechaHastaExclusiva = new Date('2026-03-01T00:00:00.000Z');
+
+      // In range, actor A.
+      await insertMovimiento({
+        usuarioId,
+        fecha: new Date('2026-02-15T00:00:00.000Z'),
+      });
+      // In range, actor B — must still be visible with no usuarioId filter.
+      await insertMovimiento({
+        usuarioId: otherUsuarioId,
+        fecha: new Date('2026-02-20T00:00:00.000Z'),
+      });
+      // Before range — excluded.
+      await insertMovimiento({
+        usuarioId,
+        fecha: new Date('2026-01-31T23:59:59.999Z'),
+      });
+      // Exactly at fechaHastaExclusiva — excluded (half-open, upper bound).
+      await insertMovimiento({
+        usuarioId,
+        fecha: fechaHastaExclusiva,
+      });
+      // Exactly at fechaDesde — included (half-open, lower bound inclusive).
+      await insertMovimiento({
+        usuarioId,
+        fecha: fechaDesde,
+      });
+
+      const result = await repo.listByPeriodo(
+        { fechaDesde, fechaHastaExclusiva },
+        1,
+        10,
+      );
+
+      expect(result.total).toBe(3);
+      expect(result.rows).toHaveLength(3);
+      const usuarioIds = result.rows.map((row) => row.usuarioId).sort();
+      expect(usuarioIds).toEqual([otherUsuarioId, usuarioId, usuarioId].sort());
+    });
+
+    it('restricts rows to the given usuarioId when the optional filter is present', async () => {
+      const fechaDesde = new Date('2026-02-01T00:00:00.000Z');
+      const fechaHastaExclusiva = new Date('2026-03-01T00:00:00.000Z');
+
+      await insertMovimiento({
+        usuarioId,
+        fecha: new Date('2026-02-10T00:00:00.000Z'),
+      });
+      await insertMovimiento({
+        usuarioId: otherUsuarioId,
+        fecha: new Date('2026-02-12T00:00:00.000Z'),
+      });
+
+      const result = await repo.listByPeriodo(
+        { fechaDesde, fechaHastaExclusiva, usuarioId },
+        1,
+        10,
+      );
+
+      expect(result.total).toBe(1);
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0]?.usuarioId).toBe(usuarioId);
+    });
+
+    it('applies the same predicate (date range + optional actor) to the page and count query', async () => {
+      const fechaDesde = new Date('2026-02-01T00:00:00.000Z');
+      const fechaHastaExclusiva = new Date('2026-03-01T00:00:00.000Z');
+
+      for (let i = 1; i <= 3; i++) {
+        await insertMovimiento({
+          usuarioId,
+          fecha: new Date(`2026-02-0${i}T00:00:00.000Z`),
+        });
+      }
+      // A different actor's movimiento, same range — must not count when
+      // usuarioId filter is present.
+      await insertMovimiento({
+        usuarioId: otherUsuarioId,
+        fecha: new Date('2026-02-05T00:00:00.000Z'),
+      });
+
+      const result = await repo.listByPeriodo(
+        { fechaDesde, fechaHastaExclusiva, usuarioId },
+        1,
+        2,
+      );
+
+      // Page 1, pageSize 2 → 2 rows, but total must still be 3 (not 4).
+      expect(result.rows).toHaveLength(2);
+      expect(result.total).toBe(3);
+    });
+
+    it('orders by desc(fecha), desc(id) — newest first', async () => {
+      const fechaDesde = new Date('2026-02-01T00:00:00.000Z');
+      const fechaHastaExclusiva = new Date('2026-03-01T00:00:00.000Z');
+      const older = new Date('2026-02-05T00:00:00.000Z');
+      const newer = new Date('2026-02-20T00:00:00.000Z');
+
+      await insertMovimiento({ usuarioId, fecha: older, cantidad: 1 });
+      await insertMovimiento({ usuarioId, fecha: newer, cantidad: 2 });
+
+      const result = await repo.listByPeriodo(
+        { fechaDesde, fechaHastaExclusiva },
+        1,
+        10,
+      );
+
+      expect(result.rows).toHaveLength(2);
+      expect(result.rows[0]?.cantidad).toBe(2);
+      expect(result.rows[1]?.cantidad).toBe(1);
+    });
+
+    it('returns { rows: [], total: 0 } for an empty range, not an error', async () => {
+      await insertMovimiento({
+        usuarioId,
+        fecha: new Date('2026-02-10T00:00:00.000Z'),
+      });
+
+      const result = await repo.listByPeriodo(
+        {
+          fechaDesde: new Date('2027-01-01T00:00:00.000Z'),
+          fechaHastaExclusiva: new Date('2027-02-01T00:00:00.000Z'),
+        },
+        1,
+        10,
+      );
+
+      expect(result.rows).toEqual([]);
+      expect(result.total).toBe(0);
+    });
+  });
 });

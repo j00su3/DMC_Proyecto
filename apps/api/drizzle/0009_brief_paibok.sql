@@ -1,0 +1,1 @@
+CREATE INDEX "movimientos_fecha_idx" ON "movimientos" USING btree ("fecha");

@@ -91,20 +91,20 @@ route that touches it until someone runs that migration." Neon migrations are al
 the user (`pnpm db:migrate`) — never by the agent, per `CLAUDE.md`'s "Never touch `.env*`" /
 manual-migration convention. This task only generates the migration file; it does not apply it.
 
-- [ ] 2.1 **Migration (isolated task)**: `apps/api/src/db/schema.ts` — add index
+- [x] 2.1 **Migration (isolated task)**: `apps/api/src/db/schema.ts` — add index
   `movimientos_fecha_idx` on `(fecha)` per D2. Run `drizzle-kit generate` to produce the new
   migration file under the existing migrations directory. **Do not run `pnpm db:migrate` against
   Neon** — flag in the PR description and in the final summary that the user must run it manually
   post-merge, exactly as `CLAUDE.md`'s Deployment section and design.md's Migration/Rollout section
   require. Only the `/api/reportes/movimientos` route is affected until this runs; the other three
   report routes need no schema change.
-- [ ] 2.2 RED: `apps/api/src/movimientos/repository.integration.test.ts` — real Postgres:
+- [x] 2.2 RED: `apps/api/src/movimientos/repository.integration.test.ts` — real Postgres:
   `listByPeriodo` returns movimientos from all actors within `[fechaDesde, fechaHastaExclusiva)`
   (spec "Encargado sees all actors"); an optional `usuarioId` filter, when present, restricts rows
   to that actor only; predicate (date range + optional actor) applied identically to page and count
   query (extends D7/D11/D9 to a third repo); order `desc(fecha), desc(id)`; empty range returns
   `{rows: [], total: 0}` (spec "Empty period is not an error").
-- [ ] 2.3 GREEN: `apps/api/src/movimientos/repository.ts` — add `listByPeriodo(filtro, page,
+- [x] 2.3 GREEN: `apps/api/src/movimientos/repository.ts` — add `listByPeriodo(filtro, page,
   pageSize): Promise<{rows: Movimiento[], total: number}>` per D2's exact signature and predicate,
   using the new `movimientos_fecha_idx` index.
 
