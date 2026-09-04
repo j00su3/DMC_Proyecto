@@ -27,4 +27,9 @@ describe('StatusChip', () => {
     render(<StatusChip variant="warning" label="Bajo" />);
     expect(screen.getByText('Bajo')).toBeInTheDocument();
   });
+
+  it('renders a generic success-variant chip with the given label', () => {
+    render(<StatusChip variant="success" label="Sin quiebres" />);
+    expect(screen.getByText('Sin quiebres')).toBeInTheDocument();
+  });
 });

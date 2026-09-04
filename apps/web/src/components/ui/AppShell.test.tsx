@@ -104,6 +104,25 @@ describe('AppShell', () => {
     ).toBeDisabled();
   });
 
+  it.each([
+    ['encargado', encargado],
+    ['deposito', deposito],
+  ])(
+    'renders the Panel general nav item as a link to / for a %s session, with no lock icon — dashboard-ui is unfiltered for both roles',
+    async (_label, usuario) => {
+      renderShell({
+        usuario,
+        onLogout: vi.fn(),
+        isLoggingOut: false,
+        children: <p>content</p>,
+      });
+
+      const link = await screen.findByRole('link', { name: 'Panel general' });
+      expect(link).toHaveAttribute('href', '/');
+      expect(link).not.toHaveTextContent('🔒');
+    },
+  );
+
   it('renders the Usuarios nav item as a link to /usuarios for an encargado session', async () => {
     renderShell({
       usuario: encargado,

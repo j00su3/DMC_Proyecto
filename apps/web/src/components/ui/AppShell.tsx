@@ -14,13 +14,18 @@ import { NavItem } from './NavItem.js';
  * Alertas, backlog #10) has no destination-less slot to reuse — it is a
  * new entry, not a placeholder promoted to a link.
  *
+ * "Panel general" (backlog #13, `dashboard-ui`) now wires `to: '/'` — the
+ * dashboard reuses the already-registered index route. Unlike the
+ * encargado-only entries below, it is never `locked`: `dashboard-ui`'s
+ * ratified scoping is unfiltered for both roles.
+ *
  * The former single "Reportes" placeholder (no destination) is replaced
  * here by its four shipped screens (backlog #12) — one flat nav entry per
  * screen, matching this file's existing convention (no submenu support in
  * `NavItem`, same shape "Alertas" used when it shipped).
  */
 const NAV_ITEMS: { label: string; to?: string }[] = [
-  { label: 'Panel general' },
+  { label: 'Panel general', to: '/' },
   { label: 'Inventario', to: '/inventario' },
   { label: 'Punto de venta', to: '/pos' },
   { label: 'Alertas', to: '/alertas' },
