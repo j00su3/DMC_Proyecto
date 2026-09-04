@@ -36,6 +36,9 @@ export interface NuevaAlerta {
 
 export interface FiltroAlertas {
   estado?: EstadoAlerta;
+  // backlog #12 (reportes) design.md D4: additive field, mirroring
+  // `estado?` — `GET /api/reportes/discrepancias` filters on this.
+  tipo?: TipoAlerta;
 }
 
 export interface AlertasRepo {
@@ -148,15 +151,19 @@ export class DrizzleAlertasRepo implements AlertasRepo {
 
   // Mirrors proveedores/repository.ts's list() D9 precedent: the same
   // filter condition applied to BOTH the page query and the count query —
-  // applying it to only one is the single most likely defect here.
+  // applying it to only one is the single most likely defect here. D4
+  // (backlog #12) widens this from a single ternary to a composed `and()`
+  // of both optional predicates — `and()` already tolerates `undefined`
+  // members elsewhere in this codebase (productos/repository.ts:126).
   async list(
     filtro: FiltroAlertas,
     page: number,
     pageSize: number,
   ): Promise<{ rows: Alerta[]; total: number }> {
-    const condition = filtro.estado
-      ? eq(alertas.estado, filtro.estado)
-      : undefined;
+    const condition = and(
+      filtro.estado ? eq(alertas.estado, filtro.estado) : undefined,
+      filtro.tipo ? eq(alertas.tipo, filtro.tipo) : undefined,
+    );
 
     const rows = await this.db
       .select()
