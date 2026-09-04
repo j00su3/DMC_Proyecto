@@ -117,7 +117,7 @@ Filtering" (movimientos actor-scope case).
 Depends on: Phase 1 (`bajoMinimo`, widened `AlertasRepo.list`), Phase 2 (`listByPeriodo`). This is
 the highest-risk phase — the first row-level (non-role) authorization filter in the codebase.
 
-- [ ] 3.1 RED: `apps/api/src/reportes/service.test.ts` (unit, fake `ReadRepos`) —
+- [x] 3.1 RED: `apps/api/src/reportes/service.test.ts` (unit, fake `ReadRepos`) —
   `listarMovimientosPeriodo`: `actor.rol === 'deposito'` always forces `usuarioId = actor.id` into
   the repo call args, regardless of any other input field (spec "Query parameters cannot override
   the scope" — assert the repo call args directly, since the Zod schema structurally has no
@@ -125,13 +125,13 @@ the highest-risk phase — the first row-level (non-role) authorization filter i
   calendar-day-inclusive `fechaHasta` is converted to a half-open `fechaHastaExclusiva` (+1 day)
   before reaching the repo (D3); per-row `productoNombre` resolution follows the `alertas/service.ts`
   D6 N+1-lookup idiom, not a join.
-- [ ] 3.2 GREEN: `apps/api/src/reportes/service.ts` — create the file per D3's exact interfaces
+- [x] 3.2 GREEN: `apps/api/src/reportes/service.ts` — create the file per D3's exact interfaces
   (`ReadRepos`, `ListarMovimientosPeriodoInput`) and pseudocode; implement `listarMovimientosPeriodo`,
   `listBajoMinimo` passthrough (calls Phase 1's `listBajoMinimo`), `listStockActual` passthrough
   (calls existing `ProductosRepo.list()` unmodified — no new query), and `listDiscrepancias` (calls
   existing `alertas/service.ts::listar(repos, {filtro: {tipo: 'discrepancia'}, ...})` directly per
   D4 — zero new alertas service code).
-- [ ] 3.3 **Integration (real Postgres, load-bearing, mutation-probed)**:
+- [x] 3.3 **Integration (real Postgres, load-bearing, mutation-probed)**:
   `apps/api/src/reportes/service.integration.test.ts` — seed deposito users A and B, each with
   movimientos in the same date range; assert A's request returns only A's rows, none of B's (spec
   "Deposito sees only their own movimientos"); assert supplying B's id as any client-controllable
@@ -139,7 +139,7 @@ the highest-risk phase — the first row-level (non-role) authorization filter i
   `actor.rol === 'deposito'` guard (remove it, invert it, compare against `'encargado'` instead) and
   confirm each mutant is caught before trusting the test — this is the named load-bearing test for
   #12 per CLAUDE.md's mutation discipline, mirroring #11's `anularVenta`-exclusion precedent.
-- [ ] 3.4 Integration: encargado's `listarMovimientosPeriodo` request returns movimientos from more
+- [x] 3.4 Integration: encargado's `listarMovimientosPeriodo` request returns movimientos from more
   than one actor in range (spec "Encargado sees all actors").
 
 **Satisfies**: design.md D3. Spec "Movimientos — Deposito Row-Level Scope" (both scenarios), the
