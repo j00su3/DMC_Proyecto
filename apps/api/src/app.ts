@@ -24,6 +24,7 @@ import healthRoutes from './routes/health.js';
 import movimientosRoutes from './routes/movimientos.js';
 import productosRoutes from './routes/productos.js';
 import proveedoresRoutes from './routes/proveedores.js';
+import reportesRoutes from './routes/reportes.js';
 import usuariosRoutes from './routes/usuarios.js';
 import ventasRoutes from './routes/ventas.js';
 
@@ -167,6 +168,9 @@ export async function buildApp(
   app.register(movimientosRoutes, { prefix: '/api' });
   app.register(ventasRoutes, { prefix: '/api' });
   app.register(alertasRoutes, { prefix: '/api' });
+  // design.md D5 (backlog #12): four read-only report routes, own file, no
+  // shared prefix segment with any other route plugin.
+  app.register(reportesRoutes, { prefix: '/api' });
 
   app.setErrorHandler((error, _request, reply) => {
     const { status, body } = toErrorEnvelope(error);
