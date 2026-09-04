@@ -2,7 +2,15 @@ import styles from './StatusChip.module.css';
 
 type StatusChipProps =
   | { activo: boolean; debeCambiarPassword?: boolean }
-  | { variant: 'danger' | 'warning'; label: string };
+  | { variant: 'danger' | 'warning' | 'success'; label: string };
+
+function variantClass(
+  variant: 'danger' | 'warning' | 'success',
+): string | undefined {
+  if (variant === 'danger') return styles.danger;
+  if (variant === 'warning') return styles.warning;
+  return styles.success;
+}
 
 /**
  * 11px/700 pill per `docs/design.md:76-77` (Chips de estado). Two shapes:
@@ -10,15 +18,18 @@ type StatusChipProps =
  * success, `Inactivo` neutral, `Debe cambiar contraseña` warning — the
  * password-change warning takes precedence, the more actionable signal),
  * and a generic `variant`/`label` pair reused by `productos-ledger-base`'s
- * derived stock chips (`quiebre` danger, `bajo` warning) so a second chip
- * component is never built for the same pill styling.
+ * derived stock chips (`quiebre` danger, `bajo` warning) and by
+ * `dashboard-ui`'s KPI cards (`Quiebres`/`Stock bajo` reuse the same
+ * danger/warning mapping, falling back to `success` when the count is
+ * zero) so a second chip component is never built for the same pill
+ * styling.
  */
 export function StatusChip(props: StatusChipProps) {
   if ('variant' in props) {
-    const variantClass =
-      props.variant === 'danger' ? styles.danger : styles.warning;
     return (
-      <span className={`${styles.chip} ${variantClass}`}>{props.label}</span>
+      <span className={`${styles.chip} ${variantClass(props.variant)}`}>
+        {props.label}
+      </span>
     );
   }
 

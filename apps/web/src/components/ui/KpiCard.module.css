@@ -1,0 +1,29 @@
+.card {
+  background: #ffffff;
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 16px 18px;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted-strong);
+}
+
+.value {
+  margin-top: 6px;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+/* Estado crítico (docs/design.md's "KPI cards" tokens): red top border and
+   red cifra. */
+.danger {
+  border-top: 3px solid var(--color-danger);
+}
+
+.danger .value {
+  color: var(--color-danger);
+}

@@ -88,23 +88,23 @@ And Stock-Bajo Counts", "Alertas Activas Counts All Open Alerts", "Actividad Rec
 
 Depends on: Phase 2 (route contract).
 
-- [ ] 3.1 RED+GREEN: `apps/web/src/components/ui/StatusChip.tsx` — widen `variant` union to add
+- [x] 3.1 RED+GREEN: `apps/web/src/components/ui/StatusChip.tsx` — widen `variant` union to add
   `'success'` (CSS class already exists); test asserts the new variant renders.
-- [ ] 3.2 RED+GREEN: `apps/web/src/components/ui/KpiCard.tsx` — presentational card
+- [x] 3.2 RED+GREEN: `apps/web/src/components/ui/KpiCard.tsx` — presentational card
   (label/value/optional `variant`) per `docs/design.md` tokens.
-- [ ] 3.3 RED+GREEN: `apps/web/src/features/dashboard/{queries.ts,useDashboardResumen.ts}` —
+- [x] 3.3 RED+GREEN: `apps/web/src/features/dashboard/{queries.ts,useDashboardResumen.ts}` —
   zero-arg `dashboardResumenQueryOptions()`, thin `useQuery` wrapper mirroring `useConteoAlertas`.
-- [ ] 3.4 RED+GREEN: `apps/web/src/features/dashboard/ActividadRecienteList.tsx` — columns
+- [x] 3.4 RED+GREEN: `apps/web/src/features/dashboard/ActividadRecienteList.tsx` — columns
   producto nombre/tipo/fecha/usuario (spec "Each row shows the required fields"); empty state
   `<p>No hay movimientos recientes.</p>` (spec "No movimientos have ever been recorded").
-- [ ] 3.5 RED+GREEN: `apps/web/src/routes/index.tsx` — replace placeholder body; add `loader`
+- [x] 3.5 RED+GREEN: `apps/web/src/routes/index.tsx` — replace placeholder body; add `loader`
   calling `queryClient.ensureQueryData(dashboardResumenQueryOptions()).catch(() => undefined)`;
   renders 4 cards left-to-right per spec "Cards render in the specified order"; `await
   router.load()` before render (`CLAUDE.md` rule).
-- [ ] 3.6 RED+GREEN: `apps/web/src/components/ui/AppShell.tsx` — add `to: '/'` to `NAV_ITEMS[0]`
+- [x] 3.6 RED+GREEN: `apps/web/src/components/ui/AppShell.tsx` — add `to: '/'` to `NAV_ITEMS[0]`
   (`Panel general`), no `locked`/`reason`; test asserts navigation + no lock icon for both roles
   (spec "Panel general navigates for both roles without a lock icon").
-- [ ] 3.7 `pnpm contract` / `pnpm contract:check` — regenerate `openapi.json` and
+- [x] 3.7 `pnpm contract` / `pnpm contract:check` — regenerate `openapi.json` and
   `apps/web/src/api/schema.d.ts` for the new route; stage regenerated artifacts before trusting
   `contract:check`.
 
