@@ -907,3 +907,37 @@ Neon para este ciclo.
 existentes de #10 disparan la nueva regla por structural typing, sin cambios de código propios).
 Ver `openspec/changes/archive/2026-09-03-sugerencia-reposicion/archive-report.md` para el detalle
 completo del ciclo.
+
+### 2026-09-04 — Reportes (#12) merged; requiere migración manual antes de usar el reporte de movimientos
+
+**Qué se agregó:** backlog #12 (reportes). Cuatro reportes de solo lectura: stock actual, bajo
+mínimo, movimientos por período, y discrepancias globales — gateados por rol per
+`docs/PRD.md:62-64`. Nuevo método `ProductosRepo.bajoMinimo`, nuevo método
+`MovimientosRepo.listByPeriodo` (primera consulta cross-producto sobre `movimientos`), y widening
+de `AlertasRepo.FiltroAlertas` con un campo `tipo` opcional. El servicio `reportes/service.ts`
+aplica el primer filtro de autorización a nivel de fila de este proyecto (`WHERE usuario_id =
+:actor` para el reporte de movimientos de depósito, per ADR-0007/hallazgo A6 — nunca en el
+middleware de RBAC).
+
+**Componentes shipped:** PR #164 (`bajoMinimo` + widening de alertas), PR #165 (migración +
+`listByPeriodo`), PR #166 (`reportes/service.ts`, la fase de mayor riesgo), PR #167 (las 4 rutas
+HTTP), PR #168 (frontend).
+
+**IMPORTANTE — a diferencia de #11, este cambio SÍ REQUIERE una migración manual.** La migración
+`apps/api/drizzle/0009_brief_paibok.sql` agrega el índice `movimientos_fecha_idx` sobre
+`movimientos(fecha)` — el índice existente `(productoId, fecha)` no puede servir una consulta
+cross-producto sin predicado de `productoId`. Ya está aplicada contra el Postgres local de Docker,
+**pero no contra Neon** al momento de este archive.
+
+**Acción manual requerida: correr `pnpm db:migrate` contra el `DATABASE_URL` de Neon desde tu
+máquina antes de usar `GET /api/reportes/movimientos` en producción.** Los otros tres reportes
+(stock actual, bajo mínimo, discrepancias) no tocan schema y funcionan sin este paso — solo el
+reporte de movimientos por período 500-eará hasta que la migración corra, per el patrón ya conocido
+de este proyecto (ADR-0010:71-72).
+
+**Notas:** verify-report confirma que la fila-scoping de depósito (`reportes/service.ts`'s guard
+`actor.rol === 'deposito'`) fue mutada en vivo tres veces (removida, invertida, comparada contra
+`'encargado'`) y las tres mutaciones fueron atrapadas por
+`reportes/service.integration.test.ts` antes de revertir. Ver
+`openspec/changes/archive/2026-09-04-reportes/archive-report.md` para el detalle completo del
+ciclo.
