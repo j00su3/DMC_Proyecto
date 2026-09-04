@@ -14,7 +14,13 @@ read path for a product's own movement history. Builds on backlog #5's schema an
 - `venta` and `anulacion` write paths (backlog #7, #9).
 - Automatic alert evaluation (backlog #10) — this change only leaves a transaction seam
   (SAVEPOINT point) for the future evaluator; it evaluates nothing.
-- Cross-product / global movement listing and reporting (backlog #12).
+- Cross-product / global movement listing and reporting was deferred here at this capability's
+  inception (originally attributed to backlog #12). Both `listByPeriodo` (backlog #12, date-range
+  filterable, actor-scoped for `deposito`) and `listRecientes` (backlog #13, fixed top-N,
+  unfiltered by actor) have since been added as read-only methods on this capability's own
+  `MovimientosRepo` — see the "Recent Movimientos Are Readable" requirement below. What remains
+  out of scope here is only the reporting/dashboard presentation layer that consumes these reads,
+  which belongs to the `reportes` and `dashboard-ui` capabilities respectively, not this one.
 - Any change to the `auditoria` system, its schema, or its field classification.
 
 | Failure | Status | Code |
@@ -232,3 +238,36 @@ across products is out of scope (see Non-Goals).
 - GIVEN a product with one ordinary salida and one merma salida
 - WHEN its history is read
 - THEN both rows show `tipo = 'salida'`, and only the merma row's merma indicator is `true`
+
+### Requirement: Recent Movimientos Are Readable Across All Productos, Unfiltered, By Both Roles
+The system MUST expose a read query returning the N most recently recorded movimientos across
+ALL productos and ALL actors, ordered most-recent-first by `fecha`, with no producto or actor
+predicate. Each row MUST include: producto nombre, tipo, fecha, usuario. This read MUST be
+permitted for `rol='encargado'` and `rol='deposito'` sessions, returning identical results for
+both.
+
+#### Scenario: Returns exactly N most recent when more exist
+- GIVEN 15 movimientos recorded across several productos and actors, and N=10
+- WHEN the recent-movimientos read is requested
+- THEN exactly 10 rows are returned, the 10 most recent by `fecha`, most-recent-first
+
+#### Scenario: Returns all movimientos when fewer than N exist
+- GIVEN 4 movimientos have ever been recorded and N=10
+- WHEN the recent-movimientos read is requested
+- THEN exactly those 4 rows are returned, most-recent-first
+
+#### Scenario: Empty result when zero movimientos exist
+- GIVEN zero movimientos exist in the system
+- WHEN the recent-movimientos read is requested
+- THEN an empty list is returned, not an error
+
+#### Scenario: Not scoped to a single actor or producto
+- GIVEN movimientos recorded by two different usuarios across two different productos, all
+  within the most recent N
+- WHEN the recent-movimientos read is requested
+- THEN rows from both usuarios and both productos appear in the same result
+
+#### Scenario: Either role reads identical results
+- GIVEN a fixed set of recorded movimientos
+- WHEN both an `encargado` and a `deposito` session request the recent-movimientos read
+- THEN both receive the identical result
