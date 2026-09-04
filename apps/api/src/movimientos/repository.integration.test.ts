@@ -538,4 +538,70 @@ describe('movimientos repository (integration, real Postgres)', () => {
       expect(result.total).toBe(0);
     });
   });
+
+  // design.md D1 (backlog #13) — real Postgres proves the fixed-N,
+  // no-predicate ordering behavior against `movimientos_fecha_idx`.
+  describe('listRecientes', () => {
+    it('returns exactly `limit` rows, most recent by fecha DESC, id DESC, when more than limit exist', async () => {
+      for (let i = 0; i < 12; i++) {
+        await db.insert(movimientos).values({
+          productoId,
+          usuarioId,
+          tipo: 'entrada',
+          cantidad: 1,
+          stockResultante: i + 1,
+          fecha: new Date(
+            `2026-02-${String(i + 1).padStart(2, '0')}T00:00:00.000Z`,
+          ),
+        });
+      }
+
+      const result = await repo.listRecientes(10);
+
+      expect(result).toHaveLength(10);
+      // Most recent first: day 12 down to day 3 (the 10 most recent of 12).
+      expect(result[0]?.stockResultante).toBe(12);
+      expect(result[9]?.stockResultante).toBe(3);
+      for (let i = 0; i < result.length - 1; i++) {
+        const current = result[i]?.fecha as Date;
+        const next = result[i + 1]?.fecha as Date;
+        expect(current.getTime()).toBeGreaterThanOrEqual(next.getTime());
+      }
+    });
+
+    it('is not scoped to any single producto or usuario', async () => {
+      const otroProveedor = await insertProveedor();
+      const otroProducto = (await insertProducto(otroProveedor.id)).id;
+      const otroUsuario = (await insertUsuario()).id;
+
+      await db.insert(movimientos).values({
+        productoId,
+        usuarioId,
+        tipo: 'entrada',
+        cantidad: 1,
+        stockResultante: 1,
+        fecha: new Date('2026-03-01T00:00:00.000Z'),
+      });
+      await db.insert(movimientos).values({
+        productoId: otroProducto,
+        usuarioId: otroUsuario,
+        tipo: 'entrada',
+        cantidad: 1,
+        stockResultante: 1,
+        fecha: new Date('2026-03-02T00:00:00.000Z'),
+      });
+
+      const result = await repo.listRecientes(10);
+
+      expect(result).toHaveLength(2);
+      const productoIds = result.map((row) => row.productoId).sort();
+      expect(productoIds).toEqual([otroProducto, productoId].sort());
+    });
+
+    it('returns [] when no movimientos exist', async () => {
+      const result = await repo.listRecientes(10);
+
+      expect(result).toEqual([]);
+    });
+  });
 });

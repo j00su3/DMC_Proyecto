@@ -323,6 +323,37 @@ describe('DrizzleAlertasRepo.countAbiertas', () => {
   });
 });
 
+// backlog #13 (dashboard-kpis) design.md D2's correction: a NEW method, not
+// list() reuse — mirrors countAbiertas()'s exact predicate plus a tipo eq.
+describe('DrizzleAlertasRepo.countAbiertasPorTipo', () => {
+  it('counts only non-resuelta rows matching the given tipo', async () => {
+    const where = vi.fn(async () => [{ total: 2 }]);
+    const from = vi.fn(() => ({ where }));
+    const select = vi.fn(() => ({ from }));
+    const db = { select } as unknown as DbExecutor;
+
+    const repo = new DrizzleAlertasRepo(db);
+    const result = await repo.countAbiertasPorTipo('quiebre');
+
+    expect(result).toBe(2);
+    expect(where).toHaveBeenCalledWith(
+      and(ne(alertas.estado, 'resuelta'), eq(alertas.tipo, 'quiebre')),
+    );
+  });
+
+  it('returns 0, not undefined, when none match', async () => {
+    const where = vi.fn(async () => [{ total: 0 }]);
+    const from = vi.fn(() => ({ where }));
+    const select = vi.fn(() => ({ from }));
+    const db = { select } as unknown as DbExecutor;
+
+    const repo = new DrizzleAlertasRepo(db);
+    const result = await repo.countAbiertasPorTipo('stock_bajo');
+
+    expect(result).toBe(0);
+  });
+});
+
 describe('DrizzleAlertasRepo.findById', () => {
   it('returns the row when found', async () => {
     const limit = vi.fn(async () => [fakeAlerta]);

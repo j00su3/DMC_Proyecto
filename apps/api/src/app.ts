@@ -20,6 +20,7 @@ import dbPlugin, { type DbLike } from './plugins/db.js';
 import reposPlugin, { type Repos } from './plugins/repos.js';
 import alertasRoutes from './routes/alertas.js';
 import authRoutes from './routes/auth.js';
+import dashboardRoutes from './routes/dashboard.js';
 import healthRoutes from './routes/health.js';
 import movimientosRoutes from './routes/movimientos.js';
 import productosRoutes from './routes/productos.js';
@@ -171,6 +172,8 @@ export async function buildApp(
   // design.md D5 (backlog #12): four read-only report routes, own file, no
   // shared prefix segment with any other route plugin.
   app.register(reportesRoutes, { prefix: '/api' });
+  // design.md D3 (backlog #13): one read-only dashboard summary route.
+  app.register(dashboardRoutes, { prefix: '/api' });
 
   app.setErrorHandler((error, _request, reply) => {
     const { status, body } = toErrorEnvelope(error);

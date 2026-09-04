@@ -61,6 +61,13 @@ export interface MovimientosRepo {
     page: number,
     pageSize: number,
   ): Promise<{ rows: Movimiento[]; total: number }>;
+  /**
+   * backlog #13 (dashboard-kpis) design.md D1: fixed top-N, no `usuarioId`
+   * (unfiltered for both roles), no pagination envelope. `productoNombre`
+   * resolution is a `dashboard/service.ts` concern (same N+1 idiom as
+   * `reportes/service.ts::listarMovimientosPeriodo`), not this repo's.
+   */
+  listRecientes(limit: number): Promise<Movimiento[]>;
 }
 
 // Mirrors proveedores/repository.ts's expectOneRow precedent.
@@ -186,5 +193,16 @@ export class DrizzleMovimientosRepo implements MovimientosRepo {
       .where(condition);
 
     return { rows, total: totalRows[0]?.total ?? 0 };
+  }
+
+  // design.md D1 (backlog #13) — reuses `movimientos_fecha_idx`, no
+  // predicate. `id DESC` is the same tie-break convention as
+  // `listByProducto`/`listByPeriodo`. No new index/migration.
+  async listRecientes(limit: number): Promise<Movimiento[]> {
+    return this.db
+      .select()
+      .from(movimientos)
+      .orderBy(desc(movimientos.fecha), desc(movimientos.id))
+      .limit(limit);
   }
 }

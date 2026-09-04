@@ -101,6 +101,7 @@ function fakeRepos(sesionesOverrides: Partial<SesionesRepo> = {}) {
       listByProducto: unusedRepoMethod,
       resumenRotacion: unusedRepoMethod,
       listByPeriodo: unusedRepoMethod,
+      listRecientes: unusedRepoMethod,
     } satisfies MovimientosRepo,
     ventas: {
       create: unusedRepoMethod,
@@ -121,6 +122,7 @@ function fakeRepos(sesionesOverrides: Partial<SesionesRepo> = {}) {
       findById: unusedRepoMethod,
       list: unusedRepoMethod,
       countAbiertas: unusedRepoMethod,
+      countAbiertasPorTipo: unusedRepoMethod,
     } satisfies AlertasRepo,
   };
 }
