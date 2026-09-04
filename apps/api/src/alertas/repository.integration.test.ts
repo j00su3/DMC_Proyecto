@@ -60,7 +60,7 @@ describe('alertas repository (integration, real Postgres)', () => {
       const p3 = (await insertProducto(proveedorId)).id;
       const p4 = (await insertProducto(proveedorId)).id;
 
-      // 2 open quiebre, 3 open stock_bajo, 1 open discrepancia.
+      // 2 open quiebre, 1 open stock_bajo, 1 open discrepancia.
       await repo.create({ productoId: p1, tipo: 'quiebre' });
       await repo.create({ productoId: p2, tipo: 'quiebre' });
       await repo.create({ productoId: p3, tipo: 'stock_bajo' });

@@ -3,7 +3,7 @@
 **Change**: `dashboard-kpis` · **Artifact store**: hybrid (this file + Engram
 `sdd/dashboard-kpis/tasks`) **Inputs**: `proposal.md` (decisions 1-6, ratified 2026-09-04),
 `design.md` (D1-D6, File Changes, Testing Strategy — Threat Matrix is N/A), `specs/dashboard-ui/spec.md`
-(7 requirements, 15 scenarios), `specs/app-layout/spec.md` (MODIFIED nav requirement),
+(6 requirements, 15 scenarios), `specs/app-layout/spec.md` (MODIFIED nav requirement),
 `specs/inventory-movements/spec.md` (ADDED read requirement).
 
 **Phase count: 3, not 2.** Unlike #11 (4 files, single PR), this change spans 12 files across two
