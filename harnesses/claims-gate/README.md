@@ -37,6 +37,7 @@ apply it.
 | Sub-agent | `agents/claims-verifier.md` | Does the checking **cold** — receives the claims with no report, no rationale and no author summary. The author of a claim is its worst verifier, so the verifier is never the author. |
 | Hook | `hooks/claims_gate.py` | A `PreToolUse` hook that refuses `gh pr merge` while a closing cycle has unproven claims. Silent on every other tool call. |
 | Rule | `rules.md` | A `CLAUDE.md` section so the agent knows what a `claims-report.md` is and why a merge was refused. |
+| Tests | `hooks/test_claims_gate.py` | The hook's own suite. Three parsing defects once reached `main` in a gate whose job is refusing to trust unproven things; the suite exists so that stops being possible. |
 
 Three mechanisms rather than one, because they do different jobs: the skill is invoked, the
 rule is always in context, and the hook **executes** — an instruction in a rules file can
@@ -126,7 +127,25 @@ than none, and one silent `jq` failure had already cost a CI monitor in this pro
 
 ## Verifying it works
 
-With an open cycle that has no report yet, the hook should refuse:
+Run the hook's own suite from the repository root:
+
+```bash
+python -m unittest discover -s harnesses/claims-gate/hooks -p 'test_*.py'
+```
+
+62 tests, standard library only — no `pip install`, no config, nothing to add to the pnpm
+workspace. It builds real temporary git repositories and runs real `git` against them;
+`gh` is never called, so it needs no network and no auth. Roughly 20 seconds, which is why
+it is not wired into `pnpm -r test`.
+
+The suite was mutation-probed: nine defects were reintroduced into `claims_gate.py` one at
+a time — the pre-fix flag set, `pr_head_ref` dropping `--repo`, `cycles_relevant_to`
+returning `[]` instead of `None`, `main` dropping branch scoping, and five others — and
+every one of them turned the suite red. **A test never seen fail is not evidence that it
+detects anything**, which is the same rule the gate itself enforces on claims.
+
+The manual checks below verify the *installation* — that the hook is registered and
+actually runs. With an open cycle that has no report yet, it should refuse:
 
 ```bash
 echo '{"tool_name":"Bash","tool_input":{"command":"gh pr merge 99 --merge"}}' \
