@@ -221,6 +221,7 @@ function fakeRepos(
       resumenRotacion: async () => ({ unidadesSalida30d: 0, diasHistoria: 0 }),
       listByPeriodo: async () => ({ rows: [], total: 0 }),
       listRecientes: async () => [],
+      verificarConsistenciaStock: async () => [],
     } as MovimientosRepo,
     ventas: {
       create: async (input: NuevaVenta) => {

@@ -20,7 +20,8 @@
     "db:migrate": "pnpm --filter @inventienda/api db:migrate",
     "test:integration": "pnpm --filter @inventienda/api test:integration",
     "seed:encargado": "pnpm --filter @inventienda/api seed:encargado",
-    "seed:demo": "pnpm --filter @inventienda/api seed:demo"
+    "seed:demo": "pnpm --filter @inventienda/api seed:demo",
+    "verificar:consistencia": "pnpm --filter @inventienda/api verificar:consistencia"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
