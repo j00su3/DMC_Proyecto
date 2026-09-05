@@ -1,0 +1,32 @@
+name: Backup semanal de Neon
+
+# docs/DEPLOY-PLAN.md, "2026-09-04 -- Backup independiente (backlog #14, mitad B)". Neon's free
+# tier only offers 6h of point-in-time recovery -- this workflow extends real coverage to 90 days
+# via a weekly pg_dump uploaded as a GitHub Actions artifact. Reuses the SAME read-only Neon
+# credential as consistencia-stock.yml (NEON_READONLY_DATABASE_URL) -- no new secret. Runs one hour
+# after that workflow so both don't compete for the same connection.
+
+on:
+  schedule:
+    - cron: '0 9 * * 0'
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    env:
+      DATABASE_URL: ${{ secrets.NEON_READONLY_DATABASE_URL }}
+
+    steps:
+      - name: Dump Neon database
+        run: |
+          docker run --rm -e DATABASE_URL postgres:16-alpine \
+            sh -c 'pg_dump "$DATABASE_URL" --no-owner --no-privileges' \
+            | gzip > backup.sql.gz
+
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-backup-${{ github.run_id }}
+          path: backup.sql.gz
+          retention-days: 90

@@ -517,9 +517,36 @@ producción desde el panel es prácticamente instantáneo y es el camino de recu
 todo el sistema. Es también el más inofensivo: el frontend no tiene estado.
 
 **Base de datos — Neon.** No hay rollback automático (ver **Data & Migrations**). Las tres opciones
-son: migración nueva hacia adelante que revierta; restauración desde el historial de Neon —cuya
-retención en el tier gratuito **hay que verificar en la consola antes de depender de ella**—; o
+son: migración nueva hacia adelante que revierta; restauración desde el historial de Neon; o
 corregir hacia adelante aceptando el estado actual.
+
+**Retención de Neon, verificada (2026-09-04, contra `neon.com/docs/introduction/plans` y
+`neon.com/docs/manage/backups`, no de memoria):** el tier gratuito ofrece **point-in-time recovery
+de 6 horas** (tope de 1 GB-mes de cambios), no días como dejaba abierto este documento. Es
+automático una vez fijada la ventana — no hace falta un backup propio para tenerlo — pero el margen
+real es angosto: si un error se descubre pasadas 6 horas de ocurrido (muy plausible en un proyecto
+de una sola persona que se revisa una vez al día), Neon ya no lo tiene. Neon no ofrece exportación
+propia descargable — el único camino portable es `pg_dump` contra el connection string, igual que
+cualquier Postgres (confirmado en `neon.com/docs/manage/backup-pg-dump-automate`, que Neon mismo
+recomienda automatizar así para retención más allá del plan).
+
+### Backup independiente — decisión pendiente (backlog #14, mitad B)
+
+`docs/adrs/0009-despliegue-local.md`'s script de `pg_dump` vía Task Scheduler asumía disco local;
+quedó huérfano cuando `docs/adrs/0010-...md` movió la base a Neon sin heredar esa decisión
+(`docs/DRIFT.md` D-04). Dos caminos, ninguno adoptado todavía:
+
+- **Opción A — aceptar el PITR de 6 horas como único respaldo.** Costo cero, cero mantenimiento.
+  Honesto para un proyecto de curso sin datos reales de clientes. Riesgo: cualquier corrupción
+  detectada después de 6 horas no tiene vuelta atrás.
+- **Opción B — agregar un `pg_dump` semanal a un destino externo**, reusando el patrón ya construido
+  para `consistencia-stock.yml` (GitHub Actions programado, credencial de solo lectura de Neon).
+  Destino más simple sin cuenta nueva: artifact de GitHub Actions (retención configurable, gratis).
+  Extiende la cobertura de 6 horas a semanas por costo casi nulo.
+
+**Recomendación:** Opción B — el patrón ya existe en el repo, no requiere una cuenta/credencial
+nueva, y la asimetría (6 horas vs. un proyecto revisado ~diariamente) es real, no hipotética. Pero
+es una decisión del dueño, no mía: confirmar antes de generar el workflow.
 
 **La asimetría que define la recuperación de este proyecto:**
 
@@ -766,7 +793,7 @@ en ese momento concreto**. No se aprueban en bloque.
 | 8 | Aplicar la migración de `productos-ledger-base` (#5) contra Neon | **Neon — irreversible** | **No automáticamente** | ⬜ Pendiente |
 | 9 | Contratar o activar un monitor externo sobre `/api/health` | Externo | Sí | ⬜ Pendiente — decisión del propietario |
 | 10 | Rotar `COOKIE_SECRET` o `DATABASE_URL` | Render / Neon | Invalida sesiones | ⬜ Pendiente — solo ante incidente |
-| 11 | Crear el rol read-only `consistencia_readonly` en la consola SQL de Neon (backlog #14, D4) y agregar la cadena de conexión resultante como el secreto `NEON_READONLY_DATABASE_URL` en GitHub Actions | Neon + GitHub | Sí — el rol se puede `DROP`, el secreto se puede borrar | ⬜ Pendiente |
+| 11 | Crear el rol read-only `consistencia_readonly` en la consola SQL de Neon (backlog #14, D4) y agregar la cadena de conexión resultante como el secreto `NEON_READONLY_DATABASE_URL` en GitHub Actions — **el mismo rol/secreto ahora también usado por el backup semanal (ver 2026-09-04 abajo), agregar el `GRANT SELECT ON ALL SEQUENCES`/`ALTER DEFAULT PRIVILEGES` equivalente además del de tablas, o `pg_dump` no podrá volcar el estado de las secuencias** | Neon + GitHub | Sí — el rol se puede `DROP`, el secreto se puede borrar | ⬜ Pendiente |
 
 ---
 
@@ -974,3 +1001,39 @@ esperado y documentado por el propio design.md del ciclo, no un defecto.**
 no ratificados explícitamente por el propietario más allá de la existencia/naturaleza read-only del
 secreto y la cadencia semanal — ver `openspec/changes/archive/2026-09-04-operacion-local/
 archive-report.md` para el detalle completo del ciclo.
+
+### 2026-09-04 — Backup independiente (backlog #14, mitad B) — decisión tomada vía `deploy-pass`
+
+**Investigación (no de memoria, contra la documentación oficial de Neon del día):** el tier gratuito
+de Neon ofrece point-in-time recovery de **6 horas** (tope 1 GB-mes de cambios), automático una vez
+fijada la ventana, sin exportación propia descargable — el único camino portable sigue siendo
+`pg_dump` contra el connection string. Neon mismo recomienda automatizarlo así para retención más
+allá del plan (`neon.com/docs/manage/backup-pg-dump-automate`). Fuentes:
+`neon.com/docs/introduction/plans`, `neon.com/docs/manage/backups`.
+
+**Decisión del propietario (2026-09-04):** Opción B — agregar un `pg_dump` semanal, reusando el
+mismo patrón `schedule` + rol read-only ya construido para `consistencia-stock.yml`, en vez de
+aceptar las 6 horas de PITR como único respaldo. Extiende la cobertura real a semanas por costo
+casi nulo, sin cuenta ni credencial nueva — **reusa el mismo secreto `NEON_READONLY_DATABASE_URL`**
+del ítem 11 de Autorizaciones pendientes (todavía no creado por el propietario), ampliándole el
+`GRANT` a las secuencias además de las tablas.
+
+**Diseño:** nuevo workflow `.github/workflows/backup-neon.yml` — `schedule` semanal (domingo 09:00
+UTC, una hora después del chequeo de consistencia, para no competir por la misma conexión), corre
+`pg_dump` dentro de un contenedor `postgres:16-alpine` (misma versión mayor que Neon, evita
+desajustes de versión del cliente `pg_dump` vs. el servidor), con `--no-owner --no-privileges`
+(el dump no debe asumir que el rol/permisos del propietario existen igual en un restore), comprime
+con `gzip`, y sube el resultado como GitHub Actions artifact (`actions/upload-artifact@v4`,
+`retention-days: 90` — 90 días vs. las 6 horas de Neon, la mejora real). Sin nueva base de datos,
+sin nuevo servicio externo, sin nuevo secreto.
+
+**Restauración (documentado, no ejecutado — ver Recovery arriba):** descargar el artifact más
+reciente desde la pestaña Actions del repo, descomprimir, y `psql "$DATABASE_URL" < backup.sql` (o
+crear un branch nuevo en Neon primero y restaurar ahí, para no pisar producción antes de confirmar
+que el dump es el correcto).
+
+**Acción manual pendiente, la misma que ya estaba pendiente (no una nueva):** el propietario debe
+crear el rol `consistencia_readonly` en Neon (ítem 11 de Autorizaciones pendientes) con el `GRANT`
+ampliado a secuencias, y cargar `NEON_READONLY_DATABASE_URL` como secreto — **ambos workflows
+(`consistencia-stock.yml` y `backup-neon.yml`) quedan en rojo hasta entonces**, comportamiento
+esperado, no un defecto.
