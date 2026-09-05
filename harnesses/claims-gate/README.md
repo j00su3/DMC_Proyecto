@@ -44,10 +44,21 @@ be read and ignored, which is precisely how the original failure happened.
 
 ## What the gate refuses
 
-`gh pr merge` is blocked while a **closing** cycle under `openspec/changes/` has any of
-the following. A cycle counts as closing once it carries a `verify-report.md` or
-`archive-report.md` — a cycle still in planning is not gated, because its claims are about
-intent, not about code that exists yet:
+`gh pr merge` is blocked while a **closing** cycle under `openspec/changes/` — one whose
+slug appears in the branch name of the PR being merged — has any of the following. A cycle
+counts as closing once it carries a `verify-report.md` or `archive-report.md` — a cycle
+still in planning is not gated, because its claims are about intent, not about code that
+exists yet:
+
+The branch-to-cycle link is a naming convention already followed by every PR in this
+project's history (`feat/motor-alertas-pr1-foundation`, `docs/archive-reportes`, and so on
+all carry their cycle's folder name), not a piece of metadata the hook stores anywhere. The
+hook resolves the PR's head branch with `gh pr view` and only checks cycles whose slug is a
+substring of it — an unrelated PR (`fix/backup-exclude-drizzle-schema`, say) is no longer
+blocked by an unrelated cycle's unproven claims. When `gh pr view` cannot resolve the branch
+(no network, no auth, an already-closed PR), the hook cannot tell a cycle is unrelated, and
+"can't tell" is not "isn't" — it falls back to checking every closing cycle, same as before
+this scoping existed.
 
 - no `claims-report.md`;
 - a `Verified revision` that is not `HEAD` — the report is stale, the code moved under it;
