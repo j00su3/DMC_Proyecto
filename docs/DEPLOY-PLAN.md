@@ -1020,12 +1020,16 @@ del ítem 11 de Autorizaciones pendientes (todavía no creado por el propietario
 
 **Diseño:** nuevo workflow `.github/workflows/backup-neon.yml` — `schedule` semanal (domingo 09:00
 UTC, una hora después del chequeo de consistencia, para no competir por la misma conexión), corre
-`pg_dump` dentro de un contenedor `postgres:16-alpine` (misma versión mayor que Neon, evita
-desajustes de versión del cliente `pg_dump` vs. el servidor), con `--no-owner --no-privileges`
+`pg_dump` dentro de un contenedor `postgres:18-alpine` (misma versión mayor que Neon — **corregido
+2026-09-05**: la primera corrida real falló con "server version mismatch, server 18.6, pg_dump
+16.15"; a diferencia del Postgres local vía Docker Compose, que sigue en 16, Neon corre 18 —
+`pg_dump` se niega a volcar un servidor más nuevo que él mismo), con `--no-owner --no-privileges`
 (el dump no debe asumir que el rol/permisos del propietario existen igual en un restore), comprime
 con `gzip`, y sube el resultado como GitHub Actions artifact (`actions/upload-artifact@v4`,
-`retention-days: 90` — 90 días vs. las 6 horas de Neon, la mejora real). Sin nueva base de datos,
-sin nuevo servicio externo, sin nuevo secreto.
+`retention-days: 90` — 90 días vs. las 6 horas de Neon, la mejora real). `set -o pipefail` es
+obligatorio antes del pipe — sin él, un `pg_dump` que falla no rompe el step (solo el `exit code`
+de `gzip` importa), y el workflow marca **success** con un artifact vacío, exactamente lo que pasó
+en la primera corrida real. Sin nueva base de datos, sin nuevo servicio externo, sin nuevo secreto.
 
 **Restauración (documentado, no ejecutado — ver Recovery arriba):** descargar el artifact más
 reciente desde la pestaña Actions del repo, descomprimir, y `psql "$DATABASE_URL" < backup.sql` (o
