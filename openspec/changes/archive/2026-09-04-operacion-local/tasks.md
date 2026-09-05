@@ -4,7 +4,7 @@
 `sdd/operacion-local/tasks`) **Inputs**: `proposal.md` (scoping decisions 1-2, ratified 2026-09-04,
 including the correction that `apps/api/scripts/` already exists), `design.md` (D1-D5, File Changes,
 Interfaces/Contracts, Threat Matrix), `specs/verificacion-consistencia-stock/spec.md` (5
-requirements, 8 scenarios).
+requirements, 7 scenarios).
 
 **Phase count: 2, not 1.** Smaller than #11 (4 files) but the repo-layer aggregate (D1) and the
 script entry point (D2) are still genuinely sequential — the script's unit test fakes the repo
