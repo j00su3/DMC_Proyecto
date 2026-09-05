@@ -125,42 +125,69 @@ def closing_cycles(root):
 
 # Flags to `gh pr merge` that consume the next token as a value, so that
 # token must not be mistaken for the PR selector (number, URL, or branch).
-MERGE_VALUE_FLAGS = {"-R", "--repo", "-t", "--subject", "-b", "--body", "-F", "--body-file"}
+# Every value-taking flag `gh pr merge --help` lists, including the
+# inherited `-R`. A missing entry is not cosmetic: its value would be read
+# as the selector, `gh pr view <that value>` would fail, and the gate would
+# fall back to checking every closing cycle.
+MERGE_VALUE_FLAGS = {
+    "-R", "--repo",
+    "-t", "--subject",
+    "-b", "--body",
+    "-F", "--body-file",
+    "-A", "--author-email",
+    "--match-head-commit",
+}
+
+# The subset of the above that selects which repository the merge acts on.
+# `pr view` must be pointed at the same one, or it resolves a local PR that
+# merely shares a number with the real target.
+MERGE_REPO_FLAGS = {"-R", "--repo"}
 
 
-def merge_selector(command):
-    """The PR number/url/branch argument to `gh pr merge` in `command`, or
-    None. None also covers the no-argument form, which `gh` resolves to the
-    PR for the current branch - same as passing nothing to `pr view` below.
+def merge_target(command):
+    """`(selector, repo)` for the `gh pr merge` in `command`.
+
+    `selector` is the PR number/url/branch argument, or None - which also
+    covers the no-argument form, where `gh` resolves the PR for the current
+    branch, same as passing nothing to `pr view` below. `repo` is the
+    `-R`/`--repo` value when one is given, so a cross-repo merge is not
+    matched against a same-numbered PR in this checkout.
     """
     match = re.search(r"\bgh\s+pr\s+merge\b", command)
     if not match:
-        return None
+        return None, None
     try:
         tokens = shlex.split(command[match.end():])
     except ValueError:
-        return None
-    skip_next = False
+        return None, None
+    selector = None
+    repo = None
+    pending = None
     for token in tokens:
-        if skip_next:
-            skip_next = False
+        if pending:
+            if pending in MERGE_REPO_FLAGS:
+                repo = token
+            pending = None
             continue
         if token in MERGE_VALUE_FLAGS:
-            skip_next = True
+            pending = token
             continue
         if token.startswith("-"):
             continue
-        return token
-    return None
+        if selector is None:
+            selector = token
+    return selector, repo
 
 
-def pr_head_ref(root, selector):
+def pr_head_ref(root, selector, repo=None):
     """The head branch name of the PR `gh pr merge` would act on, or None
     when it cannot be resolved (no `gh`, no auth, no network, bad selector).
     """
     args = ["gh", "pr", "view"]
     if selector:
         args.append(selector)
+    if repo:
+        args += ["--repo", repo]
     args += ["--json", "headRefName", "-q", ".headRefName"]
     try:
         out = subprocess.run(
@@ -300,8 +327,8 @@ def main():
         # Nothing is closing, so there is nothing this gate is responsible for.
         return 0
 
-    selector = merge_selector(command)
-    relevant = cycles_relevant_to(cycles, pr_head_ref(root, selector))
+    selector, repo = merge_target(command)
+    relevant = cycles_relevant_to(cycles, pr_head_ref(root, selector, repo))
     if relevant is None:
         # Could not resolve which branch this PR merges. Uncertain is not
         # the same as unrelated - check every closing cycle, same as before
