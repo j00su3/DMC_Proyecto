@@ -38,9 +38,7 @@ describe('verificarConsistencia', () => {
     const exitCode = await verificarConsistencia(repo);
 
     expect(exitCode).toBe(0);
-    expect(consoleLogSpy).toHaveBeenCalledWith(
-      'No mismatches found. 0 productos checked.',
-    );
+    expect(consoleLogSpy).toHaveBeenCalledWith('No mismatches found.');
     consoleLogSpy.mockRestore();
   });
 
