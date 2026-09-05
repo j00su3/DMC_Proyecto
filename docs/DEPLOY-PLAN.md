@@ -766,6 +766,7 @@ en ese momento concreto**. No se aprueban en bloque.
 | 8 | Aplicar la migración de `productos-ledger-base` (#5) contra Neon | **Neon — irreversible** | **No automáticamente** | ⬜ Pendiente |
 | 9 | Contratar o activar un monitor externo sobre `/api/health` | Externo | Sí | ⬜ Pendiente — decisión del propietario |
 | 10 | Rotar `COOKIE_SECRET` o `DATABASE_URL` | Render / Neon | Invalida sesiones | ⬜ Pendiente — solo ante incidente |
+| 11 | Crear el rol read-only `consistencia_readonly` en la consola SQL de Neon (backlog #14, D4) y agregar la cadena de conexión resultante como el secreto `NEON_READONLY_DATABASE_URL` en GitHub Actions | Neon + GitHub | Sí — el rol se puede `DROP`, el secreto se puede borrar | ⬜ Pendiente |
 
 ---
 
@@ -941,3 +942,35 @@ de este proyecto (ADR-0010:71-72).
 `reportes/service.integration.test.ts` antes de revertir. Ver
 `openspec/changes/archive/2026-09-04-reportes/archive-report.md` para el detalle completo del
 ciclo.
+
+### 2026-09-04 — Operación local (#14, mitad de consistencia de stock) merged; requiere rol Neon read-only + secreto de GitHub Actions antes de que el workflow corra de verdad
+
+**Qué se agregó:** backlog #14, solo la mitad de verificación periódica de consistencia stock ↔
+Σ(ledger) — la mitad de backup/`pg_dump` de este mismo ítem quedó explícitamente fuera de este
+ciclo (decisión del propietario, ver `docs/BACKLOG.md` fila #14 y `docs/DRIFT.md` D-04). Un nuevo
+agregado `MovimientosRepo.verificarConsistenciaStock` (raw SQL, mismo precedente que
+`resumenRotacion`), el script `apps/api/scripts/verificar-consistencia.ts` (mismo patrón que
+`seed-encargado.ts`/`seed-demo.ts`), y el nuevo workflow `.github/workflows/consistencia-stock.yml`
+(`schedule`, cron `0 8 * * 0`, domingo 08:00 UTC). Sin tabla ni migración nueva — cero pasos de
+`pnpm db:migrate` para este ciclo, a diferencia de #12.
+
+**IMPORTANTE — el código está mergeado pero el workflow todavía NO puede correr en verde.** El
+paso D4 del design (rol Postgres read-only `consistencia_readonly` en Neon + el secreto
+`NEON_READONLY_DATABASE_URL` en GitHub Actions) es una acción manual del propietario fuera de
+cualquier tool al que un agente tenga acceso (sin acceso a `.env*` ni a secretos, per este mismo
+documento y `CLAUDE.md`). Ver el ítem 11 de **Autorizaciones pendientes**, arriba.
+
+**Acción manual requerida antes de que el workflow produzca una corrida real (no una falla
+esperada):** en la consola SQL de Neon, `CREATE ROLE consistencia_readonly` + los `GRANT`s exactos
+documentados en el `design.md` archivado de este ciclo (incluyendo `ALTER DEFAULT PRIVILEGES`, que
+no es opcional — sin él, la próxima `pnpm db:migrate` agrega una tabla que este rol no puede leer);
+después, construir `NEON_READONLY_DATABASE_URL` a partir de ese rol y cargarlo como secreto nuevo
+de GitHub Actions. **Hasta que esto se haga, el workflow corre en rojo cada domingo — comportamiento
+esperado y documentado por el propio design.md del ciclo, no un defecto.**
+
+**Notas:** verify-report confirma 0 archivos de migración tocados y 0 diff en `apps/api/openapi.json`
+(sin ruta nueva, sin cambio de contrato). El nombre exacto del secreto
+(`NEON_READONLY_DATABASE_URL`) y el cron (`0 8 * * 0`) quedaron marcados en el propio design.md como
+no ratificados explícitamente por el propietario más allá de la existencia/naturaleza read-only del
+secreto y la cadencia semanal — ver `openspec/changes/archive/2026-09-04-operacion-local/
+archive-report.md` para el detalle completo del ciclo.
