@@ -32,8 +32,21 @@ export async function verificarConsistencia(
     return 1;
   } catch (err) {
     // Never swallowed (design.md Threat Matrix "Neon connection failure").
-    console.error(err instanceof Error ? err.message : err);
+    // Drizzle's query-error message is often just "Failed query: ...\nparams:
+    // ..." with the actual driver/Postgres reason chained as `.cause` — print
+    // both, or a CI failure is undiagnosable from the log alone.
+    logError(err);
     return 1;
+  }
+}
+
+function logError(err: unknown): void {
+  console.error(err instanceof Error ? err.message : err);
+  if (err instanceof Error && err.cause) {
+    console.error(
+      'Caused by:',
+      err.cause instanceof Error ? err.cause.message : err.cause,
+    );
   }
 }
 
@@ -48,7 +61,7 @@ if (
   import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
   main().catch((err) => {
-    console.error(err instanceof Error ? err.message : err);
+    logError(err);
     process.exitCode = 1;
   });
 }
