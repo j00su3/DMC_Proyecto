@@ -72,11 +72,10 @@ pnpm test:integration   # requiere pnpm db:up
 
 ## Estado del proyecto
 
-Backlog #1 al #13 archivados y en producción (fundaciones, autenticación, usuarios, proveedores con
+Backlog #1 al #14 archivados y en producción (fundaciones, autenticación, usuarios, proveedores con
 vista maestro-detalle, productos, movimientos de inventario, punto de venta, recibo interno,
-anulación de venta, motor de alertas de stock, sugerencia de reposición, reportes, y panel general
-con KPIs). El #14 (operación local) está parcial: la verificación periódica de consistencia
-stock ↔ ledger ya está archivada y en producción; el backup automático queda como una decisión de
-infraestructura separada, todavía pendiente. El #3.5 (recuperación de contraseña por email) está
-bloqueado por infraestructura (falta un dominio propio con DNS que soporte SPF/DKIM), no por
+anulación de venta, motor de alertas de stock, sugerencia de reposición, reportes, panel general
+con KPIs, verificación periódica de consistencia stock ↔ ledger, y backup semanal de la base). El
+#3.5 (recuperación de contraseña por email) está bloqueado por infraestructura (falta un dominio
+propio con DNS que soporte SPF/DKIM), no por
 esfuerzo. Ver [`docs/BACKLOG.md`](docs/BACKLOG.md) para el detalle completo.
