@@ -196,6 +196,18 @@ class MergeTargetTests(unittest.TestCase):
     def test_repo_flag_value_is_not_read_as_the_selector(self):
         self.assertTarget("gh pr merge --repo owner/other", None, "owner/other")
 
+    def test_repo_flag_with_equals_is_captured_after_the_selector(self):
+        # pflag (gh's flag library) accepts `--flag=value` as well as
+        # `--flag value` for any flag, long or short. Skipping the `=` form
+        # silently reproduces the cross-repo regression the space form fixes.
+        self.assertTarget("gh pr merge 10 --repo=owner/other", "10", "owner/other")
+
+    def test_short_repo_flag_with_equals_is_captured_before_the_selector(self):
+        self.assertTarget("gh pr merge -R=owner/other 10", "10", "owner/other")
+
+    def test_non_repo_value_flag_with_equals_is_not_the_selector(self):
+        self.assertTarget("gh pr merge --subject=hello 10", "10", None)
+
     def test_match_head_commit_value_is_not_the_selector(self):
         # `--match-head-commit <SHA>` used to yield the SHA as the selector,
         # `gh pr view <sha>` then failed, and the gate fell back to checking

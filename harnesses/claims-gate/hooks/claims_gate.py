@@ -169,6 +169,17 @@ def merge_target(command):
                 repo = token
             pending = None
             continue
+        # pflag (gh's flag library) accepts `--flag=value` for any flag,
+        # long or short, as an alternative to `--flag value`. Both are
+        # equally real: `gh pr merge -R=owner/other 10` reads the repo just
+        # as well as `-R owner/other 10` does, and skipping it here would
+        # silently drop back to querying the wrong repository.
+        if "=" in token:
+            flag, _, value = token.partition("=")
+            if flag in MERGE_VALUE_FLAGS:
+                if flag in MERGE_REPO_FLAGS:
+                    repo = value
+                continue
         if token in MERGE_VALUE_FLAGS:
             pending = token
             continue

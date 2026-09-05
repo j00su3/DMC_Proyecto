@@ -133,14 +133,16 @@ Run the hook's own suite from the repository root:
 python -m unittest discover -s harnesses/claims-gate/hooks -p 'test_*.py'
 ```
 
-62 tests, standard library only — no `pip install`, no config, nothing to add to the pnpm
+65 tests, standard library only — no `pip install`, no config, nothing to add to the pnpm
 workspace. It builds real temporary git repositories and runs real `git` against them;
-`gh` is never called, so it needs no network and no auth. Roughly 20 seconds, which is why
+`gh` is never called, so it needs no network and no auth. Roughly 25 seconds, which is why
 it is not wired into `pnpm -r test`.
 
-The suite was mutation-probed: nine defects were reintroduced into `claims_gate.py` one at
+The suite was mutation-probed: ten defects were reintroduced into `claims_gate.py` one at
 a time — the pre-fix flag set, `pr_head_ref` dropping `--repo`, `cycles_relevant_to`
-returning `[]` instead of `None`, `main` dropping branch scoping, and five others — and
+returning `[]` instead of `None`, `main` dropping branch scoping, `merge_target` dropping
+`--repo=owner/other`/`-R=owner/other` (pflag's `=` form, as real as the space form and just
+as capable of resolving the wrong repository when silently ignored), and five others — and
 every one of them turned the suite red. **A test never seen fail is not evidence that it
 detects anything**, which is the same rule the gate itself enforces on claims.
 
