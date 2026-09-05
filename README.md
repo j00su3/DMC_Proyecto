@@ -2,7 +2,8 @@
 
 Sistema de gestión de inventario para un comercio pequeño, con dos roles (`encargado` y
 `deposito`): catálogo de productos, proveedores, movimientos de stock auditables, punto de venta,
-recibo interno con anulación de venta, y un motor de alertas de stock bajo/quiebre/discrepancia.
+recibo interno con anulación de venta, motor de alertas de stock bajo/quiebre/discrepancia,
+reportes, panel general con KPIs, y una verificación periódica de consistencia stock ↔ ledger.
 
 ## Demo en vivo
 
@@ -71,7 +72,11 @@ pnpm test:integration   # requiere pnpm db:up
 
 ## Estado del proyecto
 
-Backlog #1 al #10 archivados y en producción (fundaciones, autenticación, usuarios, proveedores
-con vista maestro-detalle, productos, movimientos de inventario, punto de venta, recibo interno,
-anulación de venta y motor de alertas de stock). Ver [`docs/BACKLOG.md`](docs/BACKLOG.md) para el
-detalle y lo que sigue pendiente (#11 en adelante).
+Backlog #1 al #13 archivados y en producción (fundaciones, autenticación, usuarios, proveedores con
+vista maestro-detalle, productos, movimientos de inventario, punto de venta, recibo interno,
+anulación de venta, motor de alertas de stock, sugerencia de reposición, reportes, y panel general
+con KPIs). El #14 (operación local) está parcial: la verificación periódica de consistencia
+stock ↔ ledger ya está archivada y en producción; el backup automático queda como una decisión de
+infraestructura separada, todavía pendiente. El #3.5 (recuperación de contraseña por email) está
+bloqueado por infraestructura (falta un dominio propio con DNS que soporte SPF/DKIM), no por
+esfuerzo. Ver [`docs/BACKLOG.md`](docs/BACKLOG.md) para el detalle completo.
