@@ -27,11 +27,19 @@ jobs:
       # pipefail` is load-bearing too: without it, `pg_dump | gzip` silently
       # produced a "successful" empty artifact when pg_dump failed, since
       # only gzip's exit code gated the step -- exactly what happened here.
+      # 2026-09-05, second live failure: "permission denied for schema
+      # drizzle" -- pg_dump tries to LOCK every table it can see across every
+      # schema, including drizzle.__drizzle_migrations, and
+      # consistencia_readonly's GRANTs only ever covered `public`.
+      # `--exclude-schema=drizzle` is the fix, not a new GRANT: that schema
+      # only tracks which migration files already ran, and those files are
+      # already version-controlled in apps/api/drizzle/ -- nothing there is
+      # actual application data worth an independent backup.
       - name: Dump Neon database
         run: |
           set -o pipefail
           docker run --rm -e DATABASE_URL postgres:18-alpine \
-            sh -c 'pg_dump "$DATABASE_URL" --no-owner --no-privileges' \
+            sh -c 'pg_dump "$DATABASE_URL" --no-owner --no-privileges --exclude-schema=drizzle' \
             | gzip > backup.sql.gz
 
       - name: Upload backup artifact
