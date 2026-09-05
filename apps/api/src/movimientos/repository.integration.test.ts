@@ -604,4 +604,144 @@ describe('movimientos repository (integration, real Postgres)', () => {
       expect(result).toEqual([]);
     });
   });
+
+  // design.md D1 (backlog #14, consistency-check half) — real Postgres
+  // proves the `LEFT JOIN` + `HAVING`/`COALESCE` shape, which a fake repo
+  // cannot exercise honestly (D5: unit coverage lives at the script layer
+  // instead, with a fake repo).
+  describe('verificarConsistenciaStock', () => {
+    it('does not report a producto whose stockActual equals the sum of its movimientos', async () => {
+      await repo.create({
+        productoId,
+        tipo: 'ajuste',
+        cantidad: 5,
+        motivo: 'stock inicial (alta de producto)',
+        esDiscrepancia: false,
+        esMerma: false,
+        usuarioId,
+        stockResultante: 5,
+      });
+      await db
+        .update(productos)
+        .set({ stockActual: 5 })
+        .where(eq(productos.id, productoId));
+
+      const result = await repo.verificarConsistenciaStock();
+
+      expect(result.find((r) => r.productoId === productoId)).toBeUndefined();
+    });
+
+    it('detects a producto whose stockActual was deliberately mutated to diverge from its ledger sum', async () => {
+      await repo.create({
+        productoId,
+        tipo: 'ajuste',
+        cantidad: 5,
+        motivo: 'stock inicial (alta de producto)',
+        esDiscrepancia: false,
+        esMerma: false,
+        usuarioId,
+        stockResultante: 5,
+      });
+      // Deliberate direct UPDATE, bypassing the application write path
+      // (ADR-0003), to simulate the exact corruption this check exists to
+      // catch.
+      await db
+        .update(productos)
+        .set({ stockActual: 999 })
+        .where(eq(productos.id, productoId));
+
+      const result = await repo.verificarConsistenciaStock();
+
+      const mismatch = result.find((r) => r.productoId === productoId);
+      expect(mismatch).toBeDefined();
+      expect(mismatch?.sku).toBe(
+        (
+          await db
+            .select({ sku: productos.sku })
+            .from(productos)
+            .where(eq(productos.id, productoId))
+        )[0]?.sku,
+      );
+      expect(mismatch?.stockActual).toBe(999);
+      expect(mismatch?.sumaMovimientos).toBe(5);
+      expect(mismatch?.delta).toBe(994);
+    });
+
+    it('identifies only the mismatching producto among several, leaving consistent ones unreported', async () => {
+      // Fixture producto: mismatched via direct UPDATE.
+      await repo.create({
+        productoId,
+        tipo: 'ajuste',
+        cantidad: 5,
+        motivo: 'stock inicial (alta de producto)',
+        esDiscrepancia: false,
+        esMerma: false,
+        usuarioId,
+        stockResultante: 5,
+      });
+      await db
+        .update(productos)
+        .set({ stockActual: 42 })
+        .where(eq(productos.id, productoId));
+
+      // A second, consistent producto.
+      const proveedor = await insertProveedor();
+      const otherProductoId = (await insertProducto(proveedor.id)).id;
+      await repo.create({
+        productoId: otherProductoId,
+        tipo: 'ajuste',
+        cantidad: 10,
+        motivo: 'stock inicial (alta de producto)',
+        esDiscrepancia: false,
+        esMerma: false,
+        usuarioId,
+        stockResultante: 10,
+      });
+      await db
+        .update(productos)
+        .set({ stockActual: 10 })
+        .where(eq(productos.id, otherProductoId));
+
+      const result = await repo.verificarConsistenciaStock();
+
+      expect(result).toHaveLength(1);
+      expect(result[0]?.productoId).toBe(productoId);
+    });
+
+    it('treats a producto with zero movimientos ever and stockActual = 0 as consistent, never a false positive', async () => {
+      // productoId already exists from beforeEach with no movimientos
+      // inserted for it and the schema default stockActual = 0.
+      const result = await repo.verificarConsistenciaStock();
+
+      expect(result.find((r) => r.productoId === productoId)).toBeUndefined();
+    });
+
+    it('is read-only: productos and movimientos rows/values are unchanged after the call', async () => {
+      await repo.create({
+        productoId,
+        tipo: 'ajuste',
+        cantidad: 5,
+        motivo: 'stock inicial (alta de producto)',
+        esDiscrepancia: false,
+        esMerma: false,
+        usuarioId,
+        stockResultante: 5,
+      });
+      await db
+        .update(productos)
+        .set({ stockActual: 999 })
+        .where(eq(productos.id, productoId));
+
+      const productosBefore = await db.select().from(productos);
+      const movimientosBefore = await db.select().from(movimientos);
+
+      await repo.verificarConsistenciaStock();
+
+      const productosAfter = await db.select().from(productos);
+      const movimientosAfter = await db.select().from(movimientos);
+
+      expect(productosAfter).toEqual(productosBefore);
+      expect(movimientosAfter).toEqual(movimientosBefore);
+    });
+  });
 });

@@ -102,6 +102,7 @@ function fakeRepos(sesionesOverrides: Partial<SesionesRepo> = {}) {
       resumenRotacion: unusedRepoMethod,
       listByPeriodo: unusedRepoMethod,
       listRecientes: unusedRepoMethod,
+      verificarConsistenciaStock: unusedRepoMethod,
     } satisfies MovimientosRepo,
     ventas: {
       create: unusedRepoMethod,

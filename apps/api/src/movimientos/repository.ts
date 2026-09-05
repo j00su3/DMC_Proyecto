@@ -48,6 +48,16 @@ export interface FiltroMovimientosPeriodo {
   usuarioId?: string;
 }
 
+// design.md D1 (backlog #14, consistency-check half) — one row per producto
+// whose `stockActual` diverges from the sum of its own movimientos' cantidad.
+export interface InconsistenciaStock {
+  productoId: string;
+  sku: string;
+  stockActual: number;
+  sumaMovimientos: number;
+  delta: number; // stockActual - sumaMovimientos
+}
+
 export interface MovimientosRepo {
   create(input: NuevoMovimiento): Promise<Movimiento>;
   listByProducto(
@@ -68,6 +78,12 @@ export interface MovimientosRepo {
    * `reportes/service.ts::listarMovimientosPeriodo`), not this repo's.
    */
   listRecientes(limit: number): Promise<Movimiento[]>;
+  /**
+   * design.md D1 (backlog #14, consistency-check half) — read-only, no
+   * pagination: one LEFT JOIN + GROUP BY + HAVING, server-side filtering so
+   * only mismatching productos are ever returned.
+   */
+  verificarConsistenciaStock(): Promise<InconsistenciaStock[]>;
 }
 
 // Mirrors proveedores/repository.ts's expectOneRow precedent.
@@ -204,5 +220,42 @@ export class DrizzleMovimientosRepo implements MovimientosRepo {
       .from(movimientos)
       .orderBy(desc(movimientos.fecha), desc(movimientos.id))
       .limit(limit);
+  }
+
+  // design.md D1 (backlog #14, consistency-check half) — LEFT JOIN so a
+  // producto with zero movimientos still appears in the aggregation
+  // (`count`/`sum` over an unmatched right side), and `COALESCE` is
+  // load-bearing: a bare `sum()` over an empty group is NULL, and
+  // `HAVING x <> NULL` is never true, so an untouched producto whose
+  // `stockActual` really diverged from 0 would silently pass without it.
+  async verificarConsistenciaStock(): Promise<InconsistenciaStock[]> {
+    const result = await this.db.execute(sql`
+      select
+        p.id as producto_id,
+        p.sku as sku,
+        p.stock_actual as stock_actual,
+        coalesce(sum(m.cantidad), 0)::int as suma_movimientos
+      from productos p
+      left join movimientos m on m.producto_id = p.id
+      group by p.id, p.sku, p.stock_actual
+      having p.stock_actual <> coalesce(sum(m.cantidad), 0)
+    `);
+    const rows = (
+      result as unknown as {
+        rows: {
+          producto_id: string;
+          sku: string;
+          stock_actual: number;
+          suma_movimientos: number;
+        }[];
+      }
+    ).rows;
+    return rows.map((row) => ({
+      productoId: row.producto_id,
+      sku: row.sku,
+      stockActual: row.stock_actual,
+      sumaMovimientos: row.suma_movimientos,
+      delta: row.stock_actual - row.suma_movimientos,
+    }));
   }
 }
