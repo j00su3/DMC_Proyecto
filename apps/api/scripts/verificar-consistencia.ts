@@ -19,7 +19,10 @@ export async function verificarConsistencia(
     const inconsistencias = await repo.verificarConsistenciaStock();
 
     if (inconsistencias.length === 0) {
-      console.log('No mismatches found. 0 productos checked.');
+      // The query only ever returns mismatching rows (design.md D1's HAVING
+      // clause filters server-side), so there is no real "N productos
+      // checked" count available here -- stating one would be fabricated.
+      console.log('No mismatches found.');
       return 0;
     }
 
