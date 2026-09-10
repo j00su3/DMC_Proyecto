@@ -532,21 +532,11 @@ recomienda automatizar así para retención más allá del plan).
 
 ### Backup independiente — decisión pendiente (backlog #14, mitad B)
 
-`docs/adrs/0009-despliegue-local.md`'s script de `pg_dump` vía Task Scheduler asumía disco local;
-quedó huérfano cuando `docs/adrs/0010-...md` movió la base a Neon sin heredar esa decisión
-(`docs/DRIFT.md` D-04). Dos caminos, ninguno adoptado todavía:
-
-- **Opción A — aceptar el PITR de 6 horas como único respaldo.** Costo cero, cero mantenimiento.
-  Honesto para un proyecto de curso sin datos reales de clientes. Riesgo: cualquier corrupción
-  detectada después de 6 horas no tiene vuelta atrás.
-- **Opción B — agregar un `pg_dump` semanal a un destino externo**, reusando el patrón ya construido
-  para `consistencia-stock.yml` (GitHub Actions programado, credencial de solo lectura de Neon).
-  Destino más simple sin cuenta nueva: artifact de GitHub Actions (retención configurable, gratis).
-  Extiende la cobertura de 6 horas a semanas por costo casi nulo.
-
-**Recomendación:** Opción B — el patrón ya existe en el repo, no requiere una cuenta/credencial
-nueva, y la asimetría (6 horas vs. un proyecto revisado ~diariamente) es real, no hipotética. Pero
-es una decisión del dueño, no mía: confirmar antes de generar el workflow.
+**Nota (2026-09-09): esta sección quedó desactualizada — la decisión ya se tomó.** Lo que sigue
+describe el estado *antes* de decidir, conservado solo como contexto de la investigación original.
+Ver la entrada fechada **"2026-09-04 — Backup independiente (backlog #14, mitad B) — decisión
+tomada vía `deploy-pass`"** más abajo (sección Recovery) para la decisión real (Opción B, adoptada)
+y el diseño del workflow (`.github/workflows/backup-neon.yml`) que ya está en el repositorio.
 
 **La asimetría que define la recuperación de este proyecto:**
 

@@ -90,15 +90,25 @@ existe ningún camino de escritura de `stock_actual` que no genere un asiento en
 siquiera el alta o la edición de producto.**
 
 - **Usuario** — `id`, `nombre`, `email/usuario`, `hash_contraseña`, `rol` (`encargado` |
-  `deposito`), `activo`, `creado_en`. El rol gobierna el RBAC ([ADR-0007](adrs/0007-sesion-cookie-rbac-propio.md)).
+  `deposito`), `activo`, `intentos_fallidos`, `bloqueado_hasta`, `debe_cambiar_password`,
+  `creado_en`. El rol gobierna el RBAC ([ADR-0007](adrs/0007-sesion-cookie-rbac-propio.md)).
+  `intentos_fallidos`/`bloqueado_hasta` respaldan el rate-limit/lockout de login (SEC-001); el
+  bloqueo se evalúa **después** de verificar la contraseña, así que una credencial correcta
+  concede acceso y limpia el contador (ver ADR-0007 § Actualizado 2026-08-29). `debe_cambiar_password`
+  fuerza el cambio obligatorio tras una contraseña temporal, impuesto del lado del servidor.
   (El Design.md muestra avatar con iniciales y color por rol: azul encargado, verde depósito.)
 - **Sesión** — `id`, `usuario_id`, `creada_en`, `expira_en`. Respalda la cookie httpOnly. La cookie
   lleva `httpOnly` + **`SameSite=Lax`** desde v1 (resuelve S10; `Secure` queda condicionado al
   despliegue, ver ADR-0009).
 - **Proveedor** — `id`, `nombre`, `contacto`, `activo`. Un producto referencia a un proveedor.
   Caso borde "proveedor eliminado con productos asociados": baja lógica (`activo = false`), no
-  borrado físico, para no romper referencias ni historial.
-- **Producto** — `id`, `nombre`, `sku/codigo` (único → cubre "producto duplicado"), `categoria`,
+  borrado físico, para no romper referencias ni historial. La unicidad de `nombre` es
+  **case-insensitive**: `proveedores_nombre_lower_unique` es un índice único funcional sobre
+  `lower(nombre)` — la columna guarda el valor exactamente como se envió, solo el índice pliega
+  mayúsculas/minúsculas.
+- **Producto** — `id`, `nombre`, `sku/codigo` (único, **case-insensitive** vía el índice funcional
+  `productos_sku_lower_unique` sobre `lower(sku)`, mismo patrón que `proveedores_nombre_lower_unique`
+  → cubre "producto duplicado"), `categoria`,
   `stock_actual`, `stock_minimo` (puede ser nulo → afecta generación de alertas, ver riesgos),
   `precio` (**`NUMERIC(12,2)`**, nunca float — S10), `proveedor_id`, `activo` (la **baja** es
   lógica y reservada al encargado; un producto inactivo **no admite movimientos nuevos** — con la
@@ -124,10 +134,12 @@ siquiera el alta o la edición de producto.**
   `venta` | **`anulacion`**), `cantidad` (con signo: −2, +50; `CHECK` ata el signo al `tipo` —
   `entrada` > 0, `salida`/`venta` < 0, **`anulacion` > 0**, `ajuste` libre), `motivo`
   (obligatorio en ajustes y salidas de merma), **`es_discrepancia`** (`boolean`, default `false`,
-  solo aplicable a `tipo = ajuste` — `CHECK`; resuelve A9), `usuario_id`, `fecha`, `venta_id`
-  (obligatorio en `venta` y `anulacion`, nulo en el resto), `stock_resultante` (calculado dentro
-  de la misma transacción que el update de stock). Es la traza de auditoría de todo cambio de
-  stock ([ADR-0003](adrs/0003-postgres-stock-guardado-ledger.md)) — **de stock, y solo de stock**:
+  solo aplicable a `tipo = ajuste` — `CHECK`; resuelve A9), **`es_merma`** (`boolean`, default
+  `false`, solo aplicable a `tipo = salida` — `CHECK movimientos_merma_solo_salida`; backlog #6
+  D3: la merma es un motivo sobre una salida, no un `tipo` propio del enum), `usuario_id`,
+  `fecha`, `venta_id` (obligatorio en `venta` y `anulacion`, nulo en el resto), `stock_resultante`
+  (calculado dentro de la misma transacción que el update de stock). Es la traza de auditoría de
+  todo cambio de stock ([ADR-0003](adrs/0003-postgres-stock-guardado-ledger.md)) — **de stock, y solo de stock**:
   el rastro de cambios sobre registros (usuarios, proveedores, productos) es la tabla `auditoria`
   del backlog #2.2, que es otra cosa y no se mezcla con esta
   ([ADR-0012](adrs/0012-frontera-auditoria-y-ledger.md)).
@@ -162,11 +174,23 @@ siquiera el alta o la edición de producto.**
   Es seguro porque una Venta confirmada es inmutable (solo cambia su `estado` al anular, nunca sus
   ítems/importes). **Sin validez fiscal.**
 - **Alerta** — `id`, `tipo` (`stock_bajo` | `quiebre` | `discrepancia` | `sugerencia_reposicion`),
-  `producto_id`, `creada_en`, `estado` (`activa` | `vista` | `resuelta`), `resuelta_en`,
+  `producto_id`, `movimiento_id` (nulo — traza el movimiento que cruzó el umbral en
+  `stock_bajo`/`quiebre`; una alerta auto-resuelta por `stock_minimo → null` no tiene movimiento
+  disparador), `creada_en`, `estado` (`activa` | `vista` | `resuelta`), `resuelta_en`,
   `resuelta_por` (nulo si la resolución fue automática). El ciclo de vida completo y la regla
   anti-ruido se definen abajo (resuelve A10).
+- **Auditoría** — `id`, `entidad` (`usuarios` | `proveedores` | `productos` | `alertas`),
+  `entidad_id` (sin FK: es polimórfico — el rastro sobrevive al borrado de la entidad que
+  describe, [ADR-0011](adrs/0011-claves-primarias-uuid.md)), `accion` (`crear` | `actualizar` |
+  `baja_logica` | `reactivar` | `cambiar_password`), `usuario_id` (el actor; FK real a `Usuario`),
+  `datos_previos` (`jsonb`, nulo si y solo si `accion = 'crear'` — `CHECK`), `datos_posteriores`
+  (`jsonb`, siempre presente), `creado_en`. Es el rastro de cambios sobre **registros**
+  (usuarios, proveedores, productos) — deliberadamente separado del ledger de stock
+  ([ADR-0012](adrs/0012-frontera-auditoria-y-ledger.md)); no se mezclan aunque ambos sean
+  "auditoría" en sentido amplio.
 
-Trazabilidad Design.md → datos: KPI cards y chips (quiebre/bajo) ← `stock_actual`/`stock_minimo`;
+Trazabilidad Design.md → datos: KPI cards del dashboard ← `Alerta` (conteo de alertas abiertas por
+tipo); chips de producto (quiebre/bajo) ← `stock_actual`/`stock_minimo` calculados en el cliente;
 tabla de movimientos con signo ← Movimiento; chips VENTA/AJUSTE/ENTRADA/ANULACIÓN ←
 `Movimiento.tipo` (ANULACIÓN ahora es tipo propio) / `Venta.estado`; POS (catálogo, carrito, total,
 vuelto) ← Producto/ItemVenta/Pago; vista de proveedores maestro-detalle ← Proveedor; matriz de
@@ -358,8 +382,9 @@ y conserva intacta la garantía de atomicidad alerta+movimiento cuando el evalua
 
 - **Redundancia stock ↔ ledger:** `stock_actual` es un derivado del ledger; un bug que rompa la
   atomicidad podría divergirlos. Mitigación: toda escritura pasa por la transacción (en v2 ya sin
-  excepciones: el alta también asienta en el ledger — C2) y se agrega una **verificación periódica
-  de consistencia** (stock vs suma del ledger). Revisar antes de producción.
+  excepciones: el alta también asienta en el ledger — C2) y **se agregó una verificación periódica
+  de consistencia** (stock vs suma del ledger): `apps/api/scripts/verificar-consistencia.ts`,
+  corriendo semanalmente vía `.github/workflows/consistencia-stock.yml`.
 - **Productos sin `stock_minimo`:** el PRD marca el caso "datos incompletos". Se resolvió no
   generando alertas para ellos; validar con la operación si conviene forzar un mínimo al alta.
 - **Política "nunca negativo" vs realidad física:** [ADR-0006](adrs/0006-bloquear-stock-insuficiente.md)
@@ -379,7 +404,15 @@ y conserva intacta la garantía de atomicidad alerta+movimiento cuando el evalua
   reset de contraseña. Revisar checklist de seguridad antes de producción.
 - **Despliegue local sin HTTPS:** mientras el sistema corra solo en la máquina del desarrollador
   ([ADR-0009](adrs/0009-despliegue-local.md)), la integridad de los datos depende de un backup
-  manual/programado fuera del disco principal, y la cookie de sesión no tiene `Secure`.
+  manual/programado fuera del disco principal. **`Secure` en la cookie de sesión — resuelto
+  (2026-09-01, commit `5520779`):** dos frentes independientes lo cierran. En producción
+  ([ADR-0010](adrs/0010-despliegue-tiers-gratuitos.md), Vercel + Render), el despliegue corre bajo
+  HTTPS de punta a punta, así que `Secure` no pierde ninguna petición. Y desde el commit citado,
+  `sessionCookieOptions()` (`apps/api/src/auth/session.ts:45-54`) ya no decide `Secure` en función
+  de `NODE_ENV`: fija `secure: process.env.ALLOW_INSECURE_COOKIES !== 'true'`, fail-closed por
+  default. `render.yaml` no define esa variable, así que en producción el default se aplica sin
+  nada que lo desactive; en desarrollo local la cookie **también** es `Secure` salvo que alguien
+  active explícitamente `ALLOW_INSECURE_COOKIES=true` como opt-out documentado.
 - **(A11) Criterios de éxito inmedibles bajo `localhost`:** casi todos los criterios de éxito del
   PRD (≥ 30 % menos discrepancias, validar la matriz de permisos con la operación real, calibrar
   alertas con datos reales) requieren **usuarios reales operando el sistema** — algo que el
