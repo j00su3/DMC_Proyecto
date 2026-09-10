@@ -97,6 +97,30 @@ rendir credenciales utilizables, y el coste de cómputo es despreciable frente a
 
 Se adopta el hash. Efecto colateral aceptado: el despliegue invalida todas las sesiones activas.
 
+### Actualizado 2026-09-09 — SEC-003 se resolvió, y la condición de revisión que este ADR fijó ya se cumplió
+
+La sección *Actualizado 2026-08-29* de arriba descartó el bloqueo por IP "porque hoy no hay
+`trustProxy` configurado" y lo dejó "disponible como refuerzo posterior, una vez corregido
+SEC-003". Este ADR no volvía a mencionar `trustProxy`, IP ni SEC-003 en ninguna sección posterior.
+
+**SEC-003 se corrigió el 2026-08-30** (`docs/SECURITY.md:385-419`, "RESUELTO... ambas mitades,
+verificado contra producción"), un día después de la fecha de este ADR — pero por una ruta
+distinta a la que este documento anticipaba, no activando `trustProxy`. `apps/api/src/plugins/clientIp.ts`
+agrega un `keyGenerator` para el rate-limit de login que confía en `X-Forwarded-For` **solo**
+cuando la petición trae el secreto compartido `PROXY_SHARED_SECRET` en la cabecera
+`x-inventienda-proxy` (comparado en tiempo constante); `trustProxy` de Fastify queda
+**deliberadamente apagado**. Cualquier otro caso — sin secreto configurado, cabecera ausente,
+secreto incorrecto, sin `X-Forwarded-For` — cae a la dirección del socket, el comportamiento
+previo. Es una ruta distinta de la que este ADR había previsto, pero resuelve el mismo problema de
+fondo: distinguir clientes reales del proxy compartido de Vercel, sin convertir una cabecera que
+un atacante controla en la clave del rate-limit.
+
+**Punto abierto, sin decidir acá:** la condición de revisión que este mismo ADR fijó para el
+bloqueo por IP — "una vez corregido SEC-003" — se cumplió el 2026-08-30 y, a la fecha de este
+addendum, nadie volvió a evaluar si corresponde agregar bloqueo por IP como refuerzo de SEC-001
+ahora que esa condición ya no aplica. Este addendum registra el hecho (la condición se cumplió,
+la revisión no ocurrió); la decisión de agregar o no ese refuerzo queda para el propietario.
+
 ## Alternativas consideradas
 
 - **JWT stateless + RBAC** — token firmado que el front envía en cada request, sin estado de sesión

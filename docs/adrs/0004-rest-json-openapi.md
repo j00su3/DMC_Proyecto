@@ -29,6 +29,19 @@ Dos convenciones de contrato quedan fijadas para toda la API:
   `{ data, page, pageSize, total }`, consistente con la paginación que el Design.md muestra en las
   tablas.
 
+**Excepción aceptada: `POST /<recurso>/:id/<transición>` para acciones de cambio de estado.** El
+patrón se asentó de forma independiente en cuatro dominios sin una línea escrita acá que lo
+autorizara: `apps/api/src/routes/usuarios.ts` (`/usuarios/:id/password-reset`),
+`apps/api/src/routes/proveedores.ts` (`/proveedores/:id/deactivate`, `/reactivate`),
+`apps/api/src/routes/ventas.ts` (`/ventas/:id/anular`) y `apps/api/src/routes/alertas.ts`
+(`/alertas/:id/resolver`). Se documenta acá porque es exactamente eso: el patrón que el código ya
+resolvió por su cuenta cuatro veces, no una construcción nueva. Una transición de estado (resetear
+contraseña, activar/desactivar, anular una venta, resolver una alerta) no mapea limpio a los verbos
+CRUD estándar (no es un `PUT`/`PATCH` sobre el recurso completo, ni un alta ni una baja), y modelar
+cada una como su propio sub-recurso vía `POST` en una ruta con nombre del verbo de transición es la
+convención aceptada para este caso — sin relajar la regla de recurso/verbo estándar para todo lo
+demás.
+
 ## Alternativas consideradas
 
 - **tRPC (RPC tipado end-to-end)** — al ser todo TypeScript, daría llamadas tipadas de punta a
