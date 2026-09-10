@@ -16,6 +16,7 @@ on stderr, and the ordinary review path still applies.
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 
@@ -122,6 +123,123 @@ def closing_cycles(root):
     return found
 
 
+# Flags to `gh pr merge` that consume the next token as a value, so that
+# token must not be mistaken for the PR selector (number, URL, or branch).
+# Every value-taking flag `gh pr merge --help` lists, including the
+# inherited `-R`. A missing entry is not cosmetic: its value would be read
+# as the selector, `gh pr view <that value>` would fail, and the gate would
+# fall back to checking every closing cycle.
+MERGE_VALUE_FLAGS = {
+    "-R", "--repo",
+    "-t", "--subject",
+    "-b", "--body",
+    "-F", "--body-file",
+    "-A", "--author-email",
+    "--match-head-commit",
+}
+
+# The subset of the above that selects which repository the merge acts on.
+# `pr view` must be pointed at the same one, or it resolves a local PR that
+# merely shares a number with the real target.
+MERGE_REPO_FLAGS = {"-R", "--repo"}
+
+
+def merge_target(command):
+    """`(selector, repo)` for the `gh pr merge` in `command`.
+
+    `selector` is the PR number/url/branch argument, or None - which also
+    covers the no-argument form, where `gh` resolves the PR for the current
+    branch, same as passing nothing to `pr view` below. `repo` is the
+    `-R`/`--repo` value when one is given, so a cross-repo merge is not
+    matched against a same-numbered PR in this checkout.
+    """
+    match = re.search(r"\bgh\s+pr\s+merge\b", command)
+    if not match:
+        return None, None
+    try:
+        tokens = shlex.split(command[match.end():])
+    except ValueError:
+        return None, None
+    selector = None
+    repo = None
+    pending = None
+    for token in tokens:
+        if pending:
+            if pending in MERGE_REPO_FLAGS:
+                repo = token
+            pending = None
+            continue
+        # pflag (gh's flag library) accepts `--flag=value` for any flag,
+        # long or short, as an alternative to `--flag value`. Both are
+        # equally real: `gh pr merge -R=owner/other 10` reads the repo just
+        # as well as `-R owner/other 10` does, and skipping it here would
+        # silently drop back to querying the wrong repository.
+        if "=" in token:
+            flag, _, value = token.partition("=")
+            if flag in MERGE_VALUE_FLAGS:
+                if flag in MERGE_REPO_FLAGS:
+                    repo = value
+                continue
+        if token in MERGE_VALUE_FLAGS:
+            pending = token
+            continue
+        if token.startswith("-"):
+            continue
+        if selector is None:
+            selector = token
+    return selector, repo
+
+
+def pr_head_ref(root, selector, repo=None):
+    """The head branch name of the PR `gh pr merge` would act on, or None
+    when it cannot be resolved (no `gh`, no auth, no network, bad selector).
+    """
+    args = ["gh", "pr", "view"]
+    if selector:
+        args.append(selector)
+    if repo:
+        args += ["--repo", repo]
+    args += ["--json", "headRefName", "-q", ".headRefName"]
+    try:
+        out = subprocess.run(
+            args,
+            cwd=root,
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+    except Exception:
+        return None
+    if out.returncode != 0:
+        return None
+    ref = out.stdout.strip()
+    return ref or None
+
+
+def cycles_relevant_to(cycles, head_ref):
+    """Narrow `cycles` to the ones the PR's branch actually references.
+
+    Branch names in this repo carry their cycle's slug by convention -
+    verified against every merged PR in this project's history at the time
+    this was written: `feat/motor-alertas-pr1-foundation`,
+    `docs/archive-reportes`, `feat/dashboard-kpis-backend` and every other
+    PR belonging to a cycle contain that cycle's `openspec/changes/` folder
+    name; unrelated PRs like `fix/backup-exclude-drizzle-schema` contain no
+    cycle slug at all. This is why a closing cycle with unproven claims no
+    longer blocks merges of PRs that have nothing to do with it.
+
+    Returns None, not an empty list, when `head_ref` is unknown. The caller
+    must then fall back to checking every closing cycle rather than skip the
+    check: "can't tell if it's related" is not evidence that it isn't, and
+    this gate does not treat uncertainty as a pass (see the stale-revision
+    handling in `inspect`, which fails the same way for the same reason).
+    """
+    if not head_ref:
+        return None
+    lowered = head_ref.lower()
+    return [c for c in cycles if c.lower() in lowered]
+
+
 def inspect(root, cycle, head):
     """Return a blocking reason for this cycle, or None when it passes."""
     path = os.path.join(root, CHANGES_DIR, cycle, REPORT_NAME)
@@ -220,7 +338,15 @@ def main():
         # Nothing is closing, so there is nothing this gate is responsible for.
         return 0
 
-    reasons = [r for r in (inspect(root, c, head_sha(root)) for c in cycles) if r]
+    selector, repo = merge_target(command)
+    relevant = cycles_relevant_to(cycles, pr_head_ref(root, selector, repo))
+    if relevant is None:
+        # Could not resolve which branch this PR merges. Uncertain is not
+        # the same as unrelated - check every closing cycle, same as before
+        # this branch-scoping existed.
+        relevant = cycles
+
+    reasons = [r for r in (inspect(root, c, head_sha(root)) for c in relevant) if r]
     if not reasons:
         return 0
 

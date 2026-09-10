@@ -37,6 +37,7 @@ apply it.
 | Sub-agent | `agents/claims-verifier.md` | Does the checking **cold** — receives the claims with no report, no rationale and no author summary. The author of a claim is its worst verifier, so the verifier is never the author. |
 | Hook | `hooks/claims_gate.py` | A `PreToolUse` hook that refuses `gh pr merge` while a closing cycle has unproven claims. Silent on every other tool call. |
 | Rule | `rules.md` | A `CLAUDE.md` section so the agent knows what a `claims-report.md` is and why a merge was refused. |
+| Tests | `hooks/test_claims_gate.py` | The hook's own suite. Three parsing defects once reached `main` in a gate whose job is refusing to trust unproven things; the suite exists so that stops being possible. |
 
 Three mechanisms rather than one, because they do different jobs: the skill is invoked, the
 rule is always in context, and the hook **executes** — an instruction in a rules file can
@@ -44,10 +45,21 @@ be read and ignored, which is precisely how the original failure happened.
 
 ## What the gate refuses
 
-`gh pr merge` is blocked while a **closing** cycle under `openspec/changes/` has any of
-the following. A cycle counts as closing once it carries a `verify-report.md` or
-`archive-report.md` — a cycle still in planning is not gated, because its claims are about
-intent, not about code that exists yet:
+`gh pr merge` is blocked while a **closing** cycle under `openspec/changes/` — one whose
+slug appears in the branch name of the PR being merged — has any of the following. A cycle
+counts as closing once it carries a `verify-report.md` or `archive-report.md` — a cycle
+still in planning is not gated, because its claims are about intent, not about code that
+exists yet:
+
+The branch-to-cycle link is a naming convention already followed by every PR in this
+project's history (`feat/motor-alertas-pr1-foundation`, `docs/archive-reportes`, and so on
+all carry their cycle's folder name), not a piece of metadata the hook stores anywhere. The
+hook resolves the PR's head branch with `gh pr view` and only checks cycles whose slug is a
+substring of it — an unrelated PR (`fix/backup-exclude-drizzle-schema`, say) is no longer
+blocked by an unrelated cycle's unproven claims. When `gh pr view` cannot resolve the branch
+(no network, no auth, an already-closed PR), the hook cannot tell a cycle is unrelated, and
+"can't tell" is not "isn't" — it falls back to checking every closing cycle, same as before
+this scoping existed.
 
 - no `claims-report.md`;
 - a `Verified revision` that is not `HEAD` — the report is stale, the code moved under it;
@@ -115,7 +127,27 @@ than none, and one silent `jq` failure had already cost a CI monitor in this pro
 
 ## Verifying it works
 
-With an open cycle that has no report yet, the hook should refuse:
+Run the hook's own suite from the repository root:
+
+```bash
+python -m unittest discover -s harnesses/claims-gate/hooks -p 'test_*.py'
+```
+
+65 tests, standard library only — no `pip install`, no config, nothing to add to the pnpm
+workspace. It builds real temporary git repositories and runs real `git` against them;
+`gh` is never called, so it needs no network and no auth. Roughly 25 seconds, which is why
+it is not wired into `pnpm -r test`.
+
+The suite was mutation-probed: ten defects were reintroduced into `claims_gate.py` one at
+a time — the pre-fix flag set, `pr_head_ref` dropping `--repo`, `cycles_relevant_to`
+returning `[]` instead of `None`, `main` dropping branch scoping, `merge_target` dropping
+`--repo=owner/other`/`-R=owner/other` (pflag's `=` form, as real as the space form and just
+as capable of resolving the wrong repository when silently ignored), and five others — and
+every one of them turned the suite red. **A test never seen fail is not evidence that it
+detects anything**, which is the same rule the gate itself enforces on claims.
+
+The manual checks below verify the *installation* — that the hook is registered and
+actually runs. With an open cycle that has no report yet, it should refuse:
 
 ```bash
 echo '{"tool_name":"Bash","tool_input":{"command":"gh pr merge 99 --merge"}}' \

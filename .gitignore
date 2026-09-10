@@ -29,3 +29,7 @@ pgdata/
 
 # CodeGraph local index — per-checkout, never shared
 .codegraph/
+
+# Python bytecode — the claims-gate hook and its suite are the only Python here
+__pycache__/
+*.pyc
