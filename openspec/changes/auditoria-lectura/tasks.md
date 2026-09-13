@@ -40,12 +40,12 @@ Chain strategy: pending
 
 ## Phase 2: Service Layer — batched enrichment (`listar`)
 
-- [ ] 2.1 RED: `apps/api/src/auditoria/service.test.ts` — no-N+1 pin: a 4-row page and a 40-row page spanning all four `entidad` values produce the same `findManyByIds` call counts (1 each for `alertas`, `usuarios`, `proveedores`, `productos`).
-- [ ] 2.2 RED: same file — `productos` union: one `entidad='productos'` row + one `entidad='alertas'` row (different producto) issue exactly one `productos.findManyByIds` call containing both ids.
-- [ ] 2.3 RED: same file — empty bucket issues no query for that table (fake throws if called).
-- [ ] 2.4 RED: same file — three `alertas` label cases: full label `` `${tipo}: ${nombre}` ``, producto-missing ⇒ `tipo` alone, alerta-missing ⇒ `null`.
-- [ ] 2.5 RED: same file — unresolved `entidadId` (any table) ⇒ `entidadEtiqueta === null`, never `''`.
-- [ ] 2.6 GREEN: implement `ReadRepos`, `RegistroAuditoriaConEtiquetas`, and `listar()` in `apps/api/src/auditoria/service.ts` per D4's algorithm (bucket → alertas first → union productos → 3 parallel `Promise.all` batches → pure merge), bounded at ≤6 queries per request.
+- [x] 2.1 RED: `apps/api/src/auditoria/service.test.ts` — no-N+1 pin: a 4-row page and a 40-row page spanning all four `entidad` values produce the same `findManyByIds` call counts (1 each for `alertas`, `usuarios`, `proveedores`, `productos`).
+- [x] 2.2 RED: same file — `productos` union: one `entidad='productos'` row + one `entidad='alertas'` row (different producto) issue exactly one `productos.findManyByIds` call containing both ids.
+- [x] 2.3 RED: same file — empty bucket issues no query for that table (fake throws if called).
+- [x] 2.4 RED: same file — three `alertas` label cases: full label `` `${tipo}: ${nombre}` ``, producto-missing ⇒ `tipo` alone, alerta-missing ⇒ `null`.
+- [x] 2.5 RED: same file — unresolved `entidadId` (any table) ⇒ `entidadEtiqueta === null`, never `''`.
+- [x] 2.6 GREEN: implement `ReadRepos`, `RegistroAuditoriaConEtiquetas`, and `listar()` in `apps/api/src/auditoria/service.ts` per D4's algorithm (bucket → alertas first → union productos → 3 parallel `Promise.all` batches → pure merge), bounded at ≤6 queries per request.
 
 ## Phase 3: Route + Wiring
 
