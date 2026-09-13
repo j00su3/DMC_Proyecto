@@ -538,6 +538,7 @@ describe('proveedores audit trail and atomic rollback (integration, real app + r
                 record: async () => {
                   throw new Error('forced audit failure');
                 },
+                list: async () => ({ rows: [], total: 0 }),
               },
             },
             tx,
@@ -595,6 +596,7 @@ describe('proveedores audit trail and atomic rollback (integration, real app + r
                 record: async () => {
                   throw new Error('forced audit failure');
                 },
+                list: async () => ({ rows: [], total: 0 }),
               },
             },
             tx,

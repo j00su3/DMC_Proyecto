@@ -94,7 +94,10 @@ function fakeRepos(
       deleteAllForUser: async () => {},
       ...sesiones,
     } as SesionesRepo,
-    auditoria: { record: async () => {} } as AuditoriaRepo,
+    auditoria: {
+      record: async () => {},
+      list: async () => ({ rows: [], total: 0 }),
+    } as AuditoriaRepo,
     proveedores: {
       list: async () => ({ rows: [], total: 0 }),
       findById: async () => makeProveedor(),

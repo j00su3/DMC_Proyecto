@@ -80,6 +80,7 @@ function fakeRepos(
       list: overrides.alertasList ?? (async () => ({ rows: [], total: 0 })),
       countAbiertas: async () => 0,
       countAbiertasPorTipo: async () => 0,
+      findManyByIds: async () => [],
     } as AlertasRepo,
   };
 }

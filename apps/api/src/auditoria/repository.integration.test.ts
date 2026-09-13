@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { getDb, getPool } from '../db/pool.js';
 import { auditoria, usuarios } from '../db/schema.js';
+import { createUnitOfWork } from '../db/uow.js';
 import { DrizzleAuditoriaRepo } from './repository.js';
 
 // Real Docker Postgres. Proves the migration (task 2.2/2.3) landed exactly
@@ -118,5 +119,106 @@ describe('DrizzleAuditoriaRepo (integration, real Postgres)', () => {
         datosPosteriores: { campo: 'despues' },
       }),
     ).rejects.toThrow();
+  });
+
+  // auditoria-lectura design.md D1/tasks.md 1.11: real rows, filter by
+  // entidad+entidadId, by usuarioId, and by both composed (AND) — total
+  // respects the filter in every case.
+  it('list() filters by entidad+entidadId, by usuarioId, and composes both with AND — total respects the filter', async () => {
+    const actorA = await insertUsuario();
+    const actorB = await insertUsuario();
+    const entidadIdE = randomUUID();
+
+    // Row matching only usuarioId = actorA.
+    await repo.record({
+      entidad: 'productos',
+      entidadId: randomUUID(),
+      accion: 'actualizar',
+      usuarioId: actorA.id,
+      datosPrevios: { campo: 'antes' },
+      datosPosteriores: { campo: 'despues' },
+    });
+    // Row matching only entidad+entidadId = E.
+    await repo.record({
+      entidad: 'productos',
+      entidadId: entidadIdE,
+      accion: 'actualizar',
+      usuarioId: actorB.id,
+      datosPrevios: { campo: 'antes' },
+      datosPosteriores: { campo: 'despues' },
+    });
+    // Row matching both.
+    await repo.record({
+      entidad: 'productos',
+      entidadId: entidadIdE,
+      accion: 'actualizar',
+      usuarioId: actorA.id,
+      datosPrevios: { campo: 'antes' },
+      datosPosteriores: { campo: 'despues' },
+    });
+
+    const byEntidad = await repo.list(
+      { entidad: 'productos', entidadId: entidadIdE },
+      1,
+      20,
+    );
+    expect(byEntidad.total).toBe(2);
+    expect(byEntidad.rows.every((row) => row.entidadId === entidadIdE)).toBe(
+      true,
+    );
+
+    const byUsuario = await repo.list({ usuarioId: actorA.id }, 1, 20);
+    expect(byUsuario.total).toBe(2);
+    expect(byUsuario.rows.every((row) => row.usuarioId === actorA.id)).toBe(
+      true,
+    );
+
+    const composed = await repo.list(
+      { entidad: 'productos', entidadId: entidadIdE, usuarioId: actorA.id },
+      1,
+      20,
+    );
+    expect(composed.total).toBe(1);
+    expect(composed.rows).toHaveLength(1);
+    expect(composed.rows[0]?.entidadId).toBe(entidadIdE);
+    expect(composed.rows[0]?.usuarioId).toBe(actorA.id);
+  });
+
+  // design.md D1: page-2 stability under identical creado_en. Rows are
+  // written inside ONE real transaction (createUnitOfWork) so they share
+  // the exact same creado_en — a genuine tie, not a faked timestamp.
+  // Without the desc(id) tiebreaker, OFFSET pagination over this order is
+  // free to drop or duplicate a row across pages.
+  it('paginates stably across pages when multiple rows share an identical creado_en (same-transaction ties)', async () => {
+    const actor = await insertUsuario();
+    const db = getDb();
+    const uow = createUnitOfWork(db);
+
+    await uow.run(async (repos) => {
+      for (let i = 0; i < 5; i += 1) {
+        await repos.auditoria.record({
+          entidad: 'productos',
+          entidadId: randomUUID(),
+          accion: 'actualizar',
+          usuarioId: actor.id,
+          datosPrevios: { campo: 'antes' },
+          datosPosteriores: { campo: `despues-${i}` },
+        });
+      }
+    });
+
+    const page1 = await repo.list({ usuarioId: actor.id }, 1, 2);
+    const page2 = await repo.list({ usuarioId: actor.id }, 2, 2);
+    const page3 = await repo.list({ usuarioId: actor.id }, 3, 2);
+
+    expect(page1.total).toBe(5);
+    expect(page2.total).toBe(5);
+    expect(page3.total).toBe(5);
+
+    const allIds = [...page1.rows, ...page2.rows, ...page3.rows].map(
+      (row) => row.id,
+    );
+    expect(allIds).toHaveLength(5);
+    expect(new Set(allIds).size).toBe(5); // no drops, no duplicates
   });
 });

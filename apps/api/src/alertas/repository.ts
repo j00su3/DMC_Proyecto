@@ -1,4 +1,4 @@
-import { and, desc, eq, ne, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import type { DbExecutor } from '../db/client.js';
 import { alertas } from '../db/schema.js';
 
@@ -72,6 +72,12 @@ export interface AlertasRepo {
    * predicate when only `tipo` is supplied).
    */
   countAbiertasPorTipo(tipo: TipoAlerta): Promise<number>;
+  // auditoria-lectura design.md D3: narrow projection for the audit
+  // enrichment read path — `tipo` + `productoId` are what D5's alerta label
+  // needs (`${tipo}: ${productoNombre}`), never the full row.
+  findManyByIds(
+    ids: string[],
+  ): Promise<Pick<Alerta, 'id' | 'tipo' | 'productoId'>[]>;
 }
 
 export class DrizzleAlertasRepo implements AlertasRepo {
@@ -205,5 +211,24 @@ export class DrizzleAlertasRepo implements AlertasRepo {
       .from(alertas)
       .where(and(ne(alertas.estado, 'resuelta'), eq(alertas.tipo, tipo)));
     return rows[0]?.total ?? 0;
+  }
+
+  // auditoria-lectura design.md D3: single inArray SELECT, narrow
+  // projection. Empty-ids guard mirrors the service-layer guard design.md
+  // D3/D4 also requires — never rely on Drizzle's empty-inArray behaviour.
+  async findManyByIds(
+    ids: string[],
+  ): Promise<Pick<Alerta, 'id' | 'tipo' | 'productoId'>[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+    return this.db
+      .select({
+        id: alertas.id,
+        tipo: alertas.tipo,
+        productoId: alertas.productoId,
+      })
+      .from(alertas)
+      .where(inArray(alertas.id, ids));
   }
 }

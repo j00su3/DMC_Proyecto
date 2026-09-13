@@ -230,6 +230,7 @@ describe('POST /api/productos — atomicity proof (integration, real app + real 
                 record: async () => {
                   throw new Error('forced audit failure');
                 },
+                list: async () => ({ rows: [], total: 0 }),
               },
             },
             tx,

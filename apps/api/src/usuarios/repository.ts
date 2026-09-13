@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { DbExecutor } from '../db/client.js';
 import { usuarios } from '../db/schema.js';
 import { isUniqueViolation } from '../lib/db-errors.js';
@@ -72,6 +72,11 @@ export interface UsuariosRepo {
   update(id: string, cambios: CambiosUsuario): Promise<UsuarioResumen>; // maps 23505 -> 409
   setActivo(id: string, activo: boolean): Promise<UsuarioResumen>;
   resetPassword(id: string, hash: string): Promise<UsuarioResumen>; // + clears lockout (D11)
+  // auditoria-lectura design.md D3: narrow projection for the audit
+  // enrichment read path. MUST NEVER select hashContrasena or any other
+  // sensitive column — the narrow select means it never leaves the
+  // database, not just that the DTO drops it later.
+  findManyByIds(ids: string[]): Promise<Pick<Usuario, 'id' | 'nombre'>[]>;
 }
 
 interface LockoutRow {
@@ -89,6 +94,14 @@ const usuarioResumenColumns = {
   activo: usuarios.activo,
   debeCambiarPassword: usuarios.debeCambiarPassword,
   creadoEn: usuarios.creadoEn,
+};
+
+// auditoria-lectura design.md D3: the narrowest possible projection —
+// {id, nombre} only. Never widen this to usuarioResumenColumns or a full
+// row; hashContrasena must never be read back on this path.
+const usuarioNombreColumns = {
+  id: usuarios.id,
+  nombre: usuarios.nombre,
 };
 
 // Every write here runs after the caller has locked the row (design.md D3),
@@ -328,5 +341,21 @@ export class DrizzleUsuariosRepo implements UsuariosRepo {
       .where(eq(usuarios.id, id))
       .returning(usuarioResumenColumns);
     return expectOneRow(rows, 'resetPassword');
+  }
+
+  // auditoria-lectura design.md D3: a single inArray SELECT with the
+  // narrowest projection. The empty-ids guard here mirrors the guard the
+  // service layer (design.md D3/D4) is also required to keep — never rely
+  // on Drizzle's empty-inArray behaviour, which is version-dependent.
+  async findManyByIds(
+    ids: string[],
+  ): Promise<Pick<Usuario, 'id' | 'nombre'>[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+    return this.db
+      .select(usuarioNombreColumns)
+      .from(usuarios)
+      .where(inArray(usuarios.id, ids));
   }
 }

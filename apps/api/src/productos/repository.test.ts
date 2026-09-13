@@ -1,8 +1,37 @@
-import { and, eq, isNotNull, lte } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, lte } from 'drizzle-orm';
 import { describe, expect, it, vi } from 'vitest';
 import type { DbExecutor } from '../db/client.js';
 import { productos } from '../db/schema.js';
 import { DrizzleProductosRepo } from './repository.js';
+
+// auditoria-lectura design.md D3: narrow projection for the audit
+// enrichment read path — {id, nombre} only, one inArray SELECT.
+describe('DrizzleProductosRepo.findManyByIds (D3)', () => {
+  it('returns only {id, nombre}', async () => {
+    const rows = [{ id: 'producto-1', nombre: 'Café 500g' }];
+    const where = vi.fn(async () => rows);
+    const from = vi.fn(() => ({ where }));
+    const select = vi.fn(() => ({ from }));
+    const db = { select } as unknown as DbExecutor;
+
+    const repo = new DrizzleProductosRepo(db);
+    const result = await repo.findManyByIds(['producto-1']);
+
+    expect(result).toEqual(rows);
+    expect(where).toHaveBeenCalledWith(inArray(productos.id, ['producto-1']));
+  });
+
+  it('returns an empty array for an empty id list, without querying', async () => {
+    const select = vi.fn();
+    const db = { select } as unknown as DbExecutor;
+
+    const repo = new DrizzleProductosRepo(db);
+    const result = await repo.findManyByIds([]);
+
+    expect(result).toEqual([]);
+    expect(select).not.toHaveBeenCalled();
+  });
+});
 
 // backlog #9 (anulacion-venta) tasks.md 2.1/2.2. Unit-level (fake
 // executor): proves the query builder's WHERE condition is exactly
