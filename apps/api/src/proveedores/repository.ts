@@ -1,4 +1,4 @@
-import { desc, eq, sql } from 'drizzle-orm';
+import { desc, eq, inArray, sql } from 'drizzle-orm';
 import type { DbExecutor } from '../db/client.js';
 import { proveedores } from '../db/schema.js';
 import { isUniqueViolation } from '../lib/db-errors.js';
@@ -39,6 +39,9 @@ export interface ProveedoresRepo {
   // No lock* method, deliberately (D7, D8): the only invariant here is
   // per-row, so the single findByIdForUpdate lock is the entire locking
   // surface.
+  // auditoria-lectura design.md D3: narrow projection for the audit
+  // enrichment read path.
+  findManyByIds(ids: string[]): Promise<Pick<Proveedor, 'id' | 'nombre'>[]>;
 }
 
 // Mirrors usuarios/repository.ts's expectOneRow precedent: every write here
@@ -158,5 +161,20 @@ export class DrizzleProveedoresRepo implements ProveedoresRepo {
       .where(eq(proveedores.id, id))
       .returning();
     return expectOneRow(rows, 'setActivo');
+  }
+
+  // auditoria-lectura design.md D3: single inArray SELECT, narrow
+  // projection. Empty-ids guard mirrors the service-layer guard design.md
+  // D3/D4 also requires — never rely on Drizzle's empty-inArray behaviour.
+  async findManyByIds(
+    ids: string[],
+  ): Promise<Pick<Proveedor, 'id' | 'nombre'>[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+    return this.db
+      .select({ id: proveedores.id, nombre: proveedores.nombre })
+      .from(proveedores)
+      .where(inArray(proveedores.id, ids));
   }
 }

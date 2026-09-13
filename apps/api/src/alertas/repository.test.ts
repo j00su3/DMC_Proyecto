@@ -1,4 +1,4 @@
-import { and, eq, ne } from 'drizzle-orm';
+import { and, eq, inArray, ne } from 'drizzle-orm';
 import { describe, expect, it, vi } from 'vitest';
 import type { DbExecutor } from '../db/client.js';
 import { alertas } from '../db/schema.js';
@@ -380,5 +380,36 @@ describe('DrizzleAlertasRepo.findById', () => {
     const result = await repo.findById('missing');
 
     expect(result).toBeUndefined();
+  });
+});
+
+// auditoria-lectura design.md D3: narrow projection for the audit
+// enrichment read path — {id, tipo, productoId} only, one inArray SELECT.
+describe('DrizzleAlertasRepo.findManyByIds (D3)', () => {
+  it('returns only {id, tipo, productoId}', async () => {
+    const rows = [
+      { id: 'alerta-1', tipo: 'stock_bajo' as const, productoId: 'producto-1' },
+    ];
+    const where = vi.fn(async () => rows);
+    const from = vi.fn(() => ({ where }));
+    const select = vi.fn(() => ({ from }));
+    const db = { select } as unknown as DbExecutor;
+
+    const repo = new DrizzleAlertasRepo(db);
+    const result = await repo.findManyByIds(['alerta-1']);
+
+    expect(result).toEqual(rows);
+    expect(where).toHaveBeenCalledWith(inArray(alertas.id, ['alerta-1']));
+  });
+
+  it('returns an empty array for an empty id list, without querying', async () => {
+    const select = vi.fn();
+    const db = { select } as unknown as DbExecutor;
+
+    const repo = new DrizzleAlertasRepo(db);
+    const result = await repo.findManyByIds([]);
+
+    expect(result).toEqual([]);
+    expect(select).not.toHaveBeenCalled();
   });
 });

@@ -4,6 +4,7 @@ import {
   asc,
   desc,
   eq,
+  inArray,
   isNotNull,
   lte,
   or,
@@ -101,6 +102,9 @@ export interface ProductosRepo {
   // proveedores/repository.ts's no-findByNombre precedent): any future SKU
   // selector must be written `where lower(sku) = lower($1)` at the call
   // site.
+  // auditoria-lectura design.md D3: narrow projection for the audit
+  // enrichment read path.
+  findManyByIds(ids: string[]): Promise<Pick<Producto, 'id' | 'nombre'>[]>;
 }
 
 // Mirrors proveedores/repository.ts's expectOneRow precedent: every write
@@ -318,5 +322,20 @@ export class DrizzleProductosRepo implements ProductosRepo {
       );
     }
     return row.stockActual;
+  }
+
+  // auditoria-lectura design.md D3: single inArray SELECT, narrow
+  // projection. Empty-ids guard mirrors the service-layer guard design.md
+  // D3/D4 also requires — never rely on Drizzle's empty-inArray behaviour.
+  async findManyByIds(
+    ids: string[],
+  ): Promise<Pick<Producto, 'id' | 'nombre'>[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+    return this.db
+      .select({ id: productos.id, nombre: productos.nombre })
+      .from(productos)
+      .where(inArray(productos.id, ids));
   }
 }
