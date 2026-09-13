@@ -146,6 +146,7 @@ function fakeUsuariosRepo(overrides: Partial<UsuariosRepo> = {}): UsuariosRepo {
     update: unusedUsuariosMethod,
     setActivo: unusedUsuariosMethod,
     resetPassword: unusedUsuariosMethod,
+    findManyByIds: unusedUsuariosMethod,
     ...overrides,
   };
 }
@@ -178,7 +179,10 @@ function fakeRepos(
       deleteAllForUser: async () => {},
       ...sesionesOverrides,
     } as SesionesRepo,
-    auditoria: { record: async () => {} } as AuditoriaRepo,
+    auditoria: {
+      record: async () => {},
+      list: async () => ({ rows: [], total: 0 }),
+    } as AuditoriaRepo,
     proveedores: {} as never,
     productos: {
       list: async (...args: unknown[]) => {

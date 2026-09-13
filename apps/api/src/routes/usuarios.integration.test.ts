@@ -431,6 +431,7 @@ describe('usuarios write routes (integration, real app + real Postgres)', () => 
                 record: async () => {
                   throw new Error('forced audit failure');
                 },
+                list: async () => ({ rows: [], total: 0 }),
               },
             },
             tx,

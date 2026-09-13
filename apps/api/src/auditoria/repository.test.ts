@@ -25,8 +25,8 @@ describe('DrizzleAuditoriaRepo.list (D1)', () => {
     const offset = vi.fn(async () => rows);
     const limit = vi.fn(() => ({ offset }));
     const orderBy = vi.fn(() => ({ limit }));
-    const pageWhere = vi.fn(() => ({ orderBy }));
-    const countWhere = vi.fn(async () => [{ total: 1 }]);
+    const pageWhere = vi.fn((_condition: unknown) => ({ orderBy }));
+    const countWhere = vi.fn(async (_condition: unknown) => [{ total: 1 }]);
     const from = vi
       .fn()
       .mockReturnValueOnce({ where: pageWhere })

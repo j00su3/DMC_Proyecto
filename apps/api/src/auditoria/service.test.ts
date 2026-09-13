@@ -6,7 +6,7 @@ import { pseudonymizeFields, recordAudit } from './service.js';
 // — not implemented yet at this point in the TDD cycle, only its interface
 // type is needed here).
 function stubRepo(record: (event: AuditEvent) => Promise<void>) {
-  return { record };
+  return { record, list: async () => ({ rows: [], total: 0 }) };
 }
 
 const baseEvent: AuditEvent = {

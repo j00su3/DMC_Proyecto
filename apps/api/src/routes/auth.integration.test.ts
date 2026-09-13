@@ -328,6 +328,7 @@ describe('auth routes (integration, real Postgres, real argon2)', () => {
                 record: async () => {
                   throw new Error('forced audit write failure');
                 },
+                list: async () => ({ rows: [], total: 0 }),
               },
             },
             { savepoint: async (_name, fn) => fn() },

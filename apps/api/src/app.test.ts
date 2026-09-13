@@ -60,6 +60,7 @@ function fakeRepos(sesionesOverrides: Partial<SesionesRepo> = {}) {
       update: unusedRepoMethod,
       setActivo: unusedRepoMethod,
       resetPassword: unusedRepoMethod,
+      findManyByIds: unusedRepoMethod,
     } satisfies UsuariosRepo,
     sesiones: {
       create: async () => {},
@@ -72,6 +73,7 @@ function fakeRepos(sesionesOverrides: Partial<SesionesRepo> = {}) {
     } satisfies SesionesRepo,
     auditoria: {
       record: async () => {},
+      list: unusedRepoMethod,
     } satisfies AuditoriaRepo,
     // These tests exercise logging and wiring, never supplier management
     // (same reasoning as the usuarios stub above).
@@ -82,6 +84,7 @@ function fakeRepos(sesionesOverrides: Partial<SesionesRepo> = {}) {
       create: unusedRepoMethod,
       update: unusedRepoMethod,
       setActivo: unusedRepoMethod,
+      findManyByIds: unusedRepoMethod,
     } satisfies ProveedoresRepo,
     // These tests exercise logging and wiring, never product/ledger
     // management (same reasoning as the proveedores stub above).
@@ -95,6 +98,7 @@ function fakeRepos(sesionesOverrides: Partial<SesionesRepo> = {}) {
       aplicarDelta: unusedRepoMethod,
       revertirStockPorAnulacion: unusedRepoMethod,
       bajoMinimo: unusedRepoMethod,
+      findManyByIds: unusedRepoMethod,
     } satisfies ProductosRepo,
     movimientos: {
       create: unusedRepoMethod,
@@ -124,6 +128,7 @@ function fakeRepos(sesionesOverrides: Partial<SesionesRepo> = {}) {
       list: unusedRepoMethod,
       countAbiertas: unusedRepoMethod,
       countAbiertasPorTipo: unusedRepoMethod,
+      findManyByIds: unusedRepoMethod,
     } satisfies AlertasRepo,
   };
 }

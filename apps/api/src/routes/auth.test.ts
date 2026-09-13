@@ -54,7 +54,10 @@ function fakeRepos(
       deleteOthers: async () => {},
       ...sesiones,
     } as SesionesRepo,
-    auditoria: { record: async () => {} } as AuditoriaRepo,
+    auditoria: {
+      record: async () => {},
+      list: async () => ({ rows: [], total: 0 }),
+    } as AuditoriaRepo,
     proveedores: {} as ProveedoresRepo,
     productos: {} as ProductosRepo,
     movimientos: {} as MovimientosRepo,
