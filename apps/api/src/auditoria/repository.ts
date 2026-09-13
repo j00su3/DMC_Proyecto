@@ -1,6 +1,6 @@
 import { and, desc, eq, sql } from 'drizzle-orm';
 import type { DbExecutor } from '../db/client.js';
-import { auditoria, entidadAuditoria } from '../db/schema.js';
+import { auditoria, type entidadAuditoria } from '../db/schema.js';
 import type { AuditAccion, AuditEvent } from './service.js';
 
 // auditoria-lectura design.md D1: derived from the pgEnum, NOT from
@@ -92,9 +92,7 @@ export class DrizzleAuditoriaRepo implements AuditoriaRepo {
   ): Promise<{ rows: RegistroAuditoria[]; total: number }> {
     const condition = and(
       filtro.entidad ? eq(auditoria.entidad, filtro.entidad) : undefined,
-      filtro.entidadId
-        ? eq(auditoria.entidadId, filtro.entidadId)
-        : undefined,
+      filtro.entidadId ? eq(auditoria.entidadId, filtro.entidadId) : undefined,
       filtro.usuarioId ? eq(auditoria.usuarioId, filtro.usuarioId) : undefined,
     );
 

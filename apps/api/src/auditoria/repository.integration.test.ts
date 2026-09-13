@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { createUnitOfWork } from '../db/uow.js';
 import { getDb, getPool } from '../db/pool.js';
 import { auditoria, usuarios } from '../db/schema.js';
+import { createUnitOfWork } from '../db/uow.js';
 import { DrizzleAuditoriaRepo } from './repository.js';
 
 // Real Docker Postgres. Proves the migration (task 2.2/2.3) landed exactly
@@ -163,15 +163,15 @@ describe('DrizzleAuditoriaRepo (integration, real Postgres)', () => {
       20,
     );
     expect(byEntidad.total).toBe(2);
-    expect(
-      byEntidad.rows.every((row) => row.entidadId === entidadIdE),
-    ).toBe(true);
+    expect(byEntidad.rows.every((row) => row.entidadId === entidadIdE)).toBe(
+      true,
+    );
 
     const byUsuario = await repo.list({ usuarioId: actorA.id }, 1, 20);
     expect(byUsuario.total).toBe(2);
-    expect(
-      byUsuario.rows.every((row) => row.usuarioId === actorA.id),
-    ).toBe(true);
+    expect(byUsuario.rows.every((row) => row.usuarioId === actorA.id)).toBe(
+      true,
+    );
 
     const composed = await repo.list(
       { entidad: 'productos', entidadId: entidadIdE, usuarioId: actorA.id },
