@@ -19,6 +19,7 @@ import cookiePlugin from './plugins/cookie.js';
 import dbPlugin, { type DbLike } from './plugins/db.js';
 import reposPlugin, { type Repos } from './plugins/repos.js';
 import alertasRoutes from './routes/alertas.js';
+import auditoriaRoutes from './routes/auditoria.js';
 import authRoutes from './routes/auth.js';
 import dashboardRoutes from './routes/dashboard.js';
 import healthRoutes from './routes/health.js';
@@ -174,6 +175,9 @@ export async function buildApp(
   app.register(reportesRoutes, { prefix: '/api' });
   // design.md D3 (backlog #13): one read-only dashboard summary route.
   app.register(dashboardRoutes, { prefix: '/api' });
+  // auditoria-lectura design.md D7: one read-only audit-trail route, closes
+  // drift finding D-01. encargado-only.
+  app.register(auditoriaRoutes, { prefix: '/api' });
 
   app.setErrorHandler((error, _request, reply) => {
     const { status, body } = toErrorEnvelope(error);

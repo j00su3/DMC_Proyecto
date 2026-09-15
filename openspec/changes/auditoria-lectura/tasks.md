@@ -49,20 +49,20 @@ Chain strategy: pending
 
 ## Phase 3: Route + Wiring
 
-- [ ] 3.1 RED: `apps/api/src/routes/auditoria.test.ts` — encargado `GET /api/auditoria` returns `200` with `{ data, page, pageSize, total }`.
-- [ ] 3.2 RED: same file — deposito receives `403` with no `data` key in the body.
-- [ ] 3.3 RED: same file — `entidadId` supplied without `entidad` ⇒ `400 VALIDATION_ERROR` (Zod `.refine`).
-- [ ] 3.4 RED: same file — filters reach the repo composed: spy-recording fake `list()` receives `entidad`+`entidadId`+`usuarioId` together when all three are supplied.
-- [ ] 3.5 RED: same file — response carries both raw ids and labels (`usuarioId` and `usuarioNombre`, `entidadId` and `entidadEtiqueta`), and snapshot fields pass through unfiltered.
-- [ ] 3.6 GREEN: create `apps/api/src/routes/auditoria.ts` — `auditoriaQuerySchema` with the `entidadId`-requires-`entidad` refine (D2/D7), `roles: ['encargado']`, `requireActor`, `paginated()` envelope.
-- [ ] 3.7 Register `auditoriaRoutes` in `apps/api/src/app.ts` after `authPlugin`, `prefix: '/api'`.
+- [x] 3.1 RED: `apps/api/src/routes/auditoria.test.ts` — encargado `GET /api/auditoria` returns `200` with `{ data, page, pageSize, total }`.
+- [x] 3.2 RED: same file — deposito receives `403` with no `data` key in the body.
+- [x] 3.3 RED: same file — `entidadId` supplied without `entidad` ⇒ `400 VALIDATION_ERROR` (Zod `.refine`).
+- [x] 3.4 RED: same file — filters reach the repo composed: spy-recording fake `list()` receives `entidad`+`entidadId`+`usuarioId` together when all three are supplied.
+- [x] 3.5 RED: same file — response carries both raw ids and labels (`usuarioId` and `usuarioNombre`, `entidadId` and `entidadEtiqueta`), and snapshot fields pass through unfiltered.
+- [x] 3.6 GREEN: create `apps/api/src/routes/auditoria.ts` — `auditoriaQuerySchema` with the `entidadId`-requires-`entidad` refine (D2/D7), `roles: ['encargado']`, `requireActor`, `paginated()` envelope.
+- [x] 3.7 Register `auditoriaRoutes` in `apps/api/src/app.ts` after `authPlugin`, `prefix: '/api'`.
 
 ## Phase 4: Contract Regeneration
 
-- [ ] 4.1 Run `pnpm contract` to regenerate `apps/api/openapi.json` and `apps/web/src/api/schema.d.ts`. **Verify, do not assume**: `datosPrevios`/`datosPosteriores` (`z.record(z.string(), z.unknown())`) are the first free-form JSONB fields in any route DTO in this repo — inspect the generated `schema.d.ts` type is actually usable, not just that generation didn't error.
-- [ ] 4.2 Stage the regenerated artifacts (`contract:check` compares against the INDEX, not the working tree).
+- [x] 4.1 Run `pnpm contract` to regenerate `apps/api/openapi.json` and `apps/web/src/api/schema.d.ts`. **Verify, do not assume**: `datosPrevios`/`datosPosteriores` (`z.record(z.string(), z.unknown())`) are the first free-form JSONB fields in any route DTO in this repo — inspect the generated `schema.d.ts` type is actually usable, not just that generation didn't error. Confirmed: `{ [key: string]: unknown } | null`, not `any`.
+- [x] 4.2 Stage the regenerated artifacts (`contract:check` compares against the INDEX, not the working tree).
 
 ## Phase 5: Final Verification
 
-- [ ] 5.1 Run `pnpm -r test`, `pnpm typecheck`, `pnpm lint`, `pnpm contract:check` and confirm all pass.
-- [ ] 5.2 Mutation-probe every new test added in Phases 1-3 before trusting it (CLAUDE.md convention).
+- [x] 5.1 Run `pnpm -r test`, `pnpm typecheck`, `pnpm lint`, `pnpm contract:check` and confirm all pass. (api 624/624, web 561/561, typecheck clean, lint clean after a formatting fix, contract:check clean.)
+- [x] 5.2 Mutation-probe every new test added in Phases 1-3 before trusting it (CLAUDE.md convention). Phases 1-2 already mutation-probed (see their own PRs). Phase 3: `roles: ['encargado']` and the `entidadId`-requires-`entidad` refine were each mutated, confirmed the corresponding test went red, then reverted and re-confirmed green.
