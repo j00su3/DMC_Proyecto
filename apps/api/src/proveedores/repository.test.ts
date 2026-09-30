@@ -21,6 +21,11 @@ describe('DrizzleProveedoresRepo.findManyByIds (D3)', () => {
     expect(where).toHaveBeenCalledWith(
       inArray(proveedores.id, ['proveedor-1']),
     );
+    // The fake ignores the projection; pin the one actually requested.
+    expect(select).toHaveBeenCalledWith({
+      id: proveedores.id,
+      nombre: proveedores.nombre,
+    });
   });
 
   it('returns an empty array for an empty id list, without querying', async () => {

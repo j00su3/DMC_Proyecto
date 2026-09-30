@@ -195,7 +195,7 @@ describe('DrizzleAuditoriaRepo (integration, real Postgres)', () => {
     const uow = createUnitOfWork(db);
 
     await uow.run(async (repos) => {
-      for (let i = 0; i < 5; i += 1) {
+      for (let i = 0; i < 8; i += 1) {
         await repos.auditoria.record({
           entidad: 'productos',
           entidadId: randomUUID(),
@@ -207,18 +207,27 @@ describe('DrizzleAuditoriaRepo (integration, real Postgres)', () => {
       }
     });
 
-    const page1 = await repo.list({ usuarioId: actor.id }, 1, 2);
-    const page2 = await repo.list({ usuarioId: actor.id }, 2, 2);
-    const page3 = await repo.list({ usuarioId: actor.id }, 3, 2);
+    const page1 = await repo.list({ usuarioId: actor.id }, 1, 3);
+    const page2 = await repo.list({ usuarioId: actor.id }, 2, 3);
+    const page3 = await repo.list({ usuarioId: actor.id }, 3, 3);
 
-    expect(page1.total).toBe(5);
-    expect(page2.total).toBe(5);
-    expect(page3.total).toBe(5);
+    expect(page1.total).toBe(8);
+    expect(page2.total).toBe(8);
+    expect(page3.total).toBe(8);
 
     const allIds = [...page1.rows, ...page2.rows, ...page3.rows].map(
       (row) => row.id,
     );
-    expect(allIds).toHaveLength(5);
-    expect(new Set(allIds).size).toBe(5); // no drops, no duplicates
+    expect(allIds).toHaveLength(8);
+    expect(new Set(allIds).size).toBe(8); // no drops, no duplicates
+
+    // No drops/duplicates alone cannot tell the tiebreaker is there: without
+    // it Postgres still returns the tied rows in a stable physical order, so
+    // the check above passes either way (a claims-gate mutation proved it).
+    // Pin the order itself: within one creado_en, rows come by id desc. The
+    // ids are random UUIDs, so physical insertion order matches that by chance
+    // only 1 time in 8! (40320).
+    const expectedOrder = [...allIds].sort().reverse();
+    expect(allIds).toEqual(expectedOrder);
   });
 });

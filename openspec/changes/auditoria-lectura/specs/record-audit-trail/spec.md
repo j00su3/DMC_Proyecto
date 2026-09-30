@@ -50,8 +50,11 @@ Each returned row MUST include, alongside the raw `usuarioId` and `entidadId`, a
 human-readable label for each. `usuarioId` resolves via `usuarios.nombre`. `entidadId` resolves
 from whichever table `entidad` names: `usuarios.nombre`, `proveedores.nombre`, or `productos.nombre`
 respectively. For `entidad = 'alertas'`, which has no single label column of its own, the label
-MUST resolve via that alerta's `productoId` joined to `productos.nombre`. Enrichment is additive:
-raw ids MUST remain present in the response alongside their labels, never replaced by them.
+MUST be the alerta's `tipo` followed by its producto's name, formatted `<tipo>: <productos.nombre>`
+and resolved through the alerta's `productoId`. If the alerta resolves but its producto does not,
+the label MUST be the `tipo` alone. The `tipo` is kept in the label so that two alertas on the same
+producto (for example `stock_bajo` and `quiebre`) stay distinguishable. Enrichment is additive: raw
+ids MUST remain present in the response alongside their labels, never replaced by them.
 
 #### Scenario: Usuario actor enriched with name
 
@@ -61,9 +64,15 @@ raw ids MUST remain present in the response alongside their labels, never replac
 
 #### Scenario: Entidad=alertas enriched via its linked producto
 
-- GIVEN an audit row with `entidad = 'alertas'`, `entidadId = A.id`, and alerta A has `productoId = P.id` where `productos.nombre = "Harina"`
+- GIVEN an audit row with `entidad = 'alertas'`, `entidadId = A.id`, and alerta A has `tipo = 'stock_bajo'` and `productoId = P.id` where `productos.nombre = "Harina"`
 - WHEN the row is returned
-- THEN its entidad label is `"Harina"`, resolved through the alerta's linked producto, not a column on `alertas` itself
+- THEN its entidad label is `"stock_bajo: Harina"`, resolved through the alerta's linked producto, not a column on `alertas` itself
+
+#### Scenario: Entidad=alertas whose producto cannot be resolved
+
+- GIVEN an audit row with `entidad = 'alertas'` whose alerta A has `tipo = 'quiebre'`, but A's `productoId` matches no producto
+- WHEN the row is returned
+- THEN its entidad label is `"quiebre"`, the `tipo` alone
 
 #### Scenario: Referenced row no longer exists
 
