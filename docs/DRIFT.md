@@ -43,40 +43,37 @@ contra `claims_gate.py`), así que no hay drift ahí pese a ser un cambio recien
 
 | Severidad | Cantidad |
 |---|---|
-| Crítico | 2 |
+| Crítico | 1 |
 | Advertencia | 8 |
 | Sugerencia | 3 |
 
+La tabla cuenta los hallazgos abiertos. **Actualización 2026-09-15:** D-01 se resolvió después de
+esta pasada (ciclo `auditoria-lectura`, PRs #185–#187) y ya no se cuenta; ver D-01 abajo.
+
 ## Hallazgos
 
-### D-01 — El rastro de auditoría sigue siendo de solo escritura: nadie puede leerlo desde la aplicación
+### D-01 — El rastro de auditoría ya se puede leer desde la aplicación: RESUELTO
 
-- **Severidad:** Crítico
-- **Tipo:** Feature fantasma
-- **Estado:** Abierto (sin cambios desde el 2026-09-04).
-- **Prometido:** el ADR-0012 justifica la denylist de campos sensibles precisamente por quién va a
-  consultar la tabla: *"Un snapshot ingenuo de la fila de `usuarios` copiaría el hash de
+- **Severidad:** ~~Crítico~~ — cerrado.
+- **Estado:** **RESUELTO el 2026-09-15**, por el ciclo `auditoria-lectura` (PRs #185, #186 y #187,
+  mergeados a `main`), después de la fecha de esta pasada.
+- **Lo que estaba abierto:** el ADR-0012 justifica la denylist de campos sensibles precisamente por
+  quién va a consultar la tabla: *"Un snapshot ingenuo de la fila de `usuarios` copiaría el hash de
   contraseña a **una tabla pensada para que el encargado la lea**"*
-  (`docs/adrs/0012-frontera-auditoria-y-ledger.md:50-53`). El PRD pone la auditabilidad en sus
-  criterios de éxito (`docs/PRD.md:158-159`).
-- **Real:** `AuditoriaRepo` sigue exponiendo un único método, de escritura —
-  `apps/api/src/auditoria/repository.ts:13-15`, `record(event)` y nada más. `apps/api/src/app.ts:156-176`
-  registra diez grupos de rutas (`health`, `auth`, `usuarios`, `proveedores`, `productos`,
-  `movimientos`, `ventas`, `alertas`, `reportes`, `dashboard`) y ninguno de auditoría.
-  `apps/api/src/auditoria/fields.ts:29-97` sigue en exactamente las cuatro entidades del pase
-  anterior (`usuarios`, `proveedores`, `productos`, `alertas`) — no se agregó ninguna quinta desde
-  el 2026-09-04, así que el volumen sin lector no creció esta vez, pero tampoco se redujo.
-- **Por qué importa:** igual que antes — el no-repudio no es una propiedad de que la fila exista,
-  sino de que alguien pueda exhibirla. Ninguno de los nueve commits desde la auditoría anterior tocó
-  este hueco.
-- **Opciones:**
-  - `CORREGIR CÓDIGO` — agregar `AuditoriaRepo.list(filtros)` + `GET /api/auditoria` con
-    `roles: ['encargado']`, paginado, filtrable por `entidad`+`entidad_id` y por `usuario_id` (los
-    índices `auditoria_entidad_entidad_id_creado_en_idx` y `auditoria_usuario_id_creado_en_idx` ya
-    existen para exactamente estas consultas).
-  - `ACTUALIZAR PRD/ADR` — declarar en el ADR-0012 que en v1 la consulta del rastro es
-    administrativa y fuera de la aplicación (SQL directo contra Neon).
-  - **Recomendación:** sin cambios — corregir el código.
+  (`docs/adrs/0012-frontera-auditoria-y-ledger.md:50-53`), y el PRD pone la auditabilidad en sus
+  criterios de éxito (`docs/PRD.md:158-159`). Al 2026-09-09, `AuditoriaRepo` solo exponía `record`
+  y ninguna ruta de la API permitía leer el rastro.
+- **Lo que se verificó el 2026-09-30:**
+  - `AuditoriaRepo` expone `record` y `list(filtro, page, pageSize)`
+    (`apps/api/src/auditoria/repository.ts:46-56`); `list` es una consulta de solo lectura.
+  - `apps/api/src/app.ts:157-180` registra once grupos de rutas; el undécimo es `auditoria`
+    (`apps/api/src/app.ts:180`).
+  - `GET /api/auditoria` (`apps/api/src/routes/auditoria.ts:80-105`) está restringido a
+    `roles: ['encargado']`, devuelve el sobre paginado y filtra por `entidad`+`entidadId` y por
+    `usuarioId`; `entidadId` sin `entidad` se rechaza (`apps/api/src/routes/auditoria.ts:16-27`).
+- **Por qué se cierra:** se adoptó la opción `CORREGIR CÓDIGO` que este mismo hallazgo recomendaba,
+  con la forma exacta que proponía: `AuditoriaRepo.list` + `GET /api/auditoria` solo para
+  `encargado`, paginado y con esos dos filtros.
 
 ### D-02 — Sigue sin existir el procedimiento de rescate del último encargado que el ADR-0007 dice documentar
 
@@ -337,6 +334,9 @@ contra `claims_gate.py`), así que no hay drift ahí pese a ser un cambio recien
   arriba. Decisión tomada y workflow desplegado el mismo día que se escribió el reporte anterior
   (2026-09-04, vía `deploy-pass`, PRs #176/#177), con cuatro correcciones operativas posteriores
   (PRs #178-#182) que no cambian la conclusión, solo la endurecen.
+- **D-01 (Crítico) — el rastro de auditoría no tenía lector en la aplicación.** Resuelto el
+  2026-09-15, después de esta pasada: `GET /api/auditoria` (PRs #185–#187). Ver detalle en D-01
+  arriba.
 
 ## Corregidos desde la auditoría anterior (evidencia, no severidad)
 
@@ -388,8 +388,8 @@ Priorizados por consecuencia, no por esfuerzo:
 
 1. **D-02 (Crítico) — decisión del dueño del producto, hoy.** Sigue siendo la única promesa
    incumplida que puede dejar el sistema desplegado sin vía de acceso.
-2. **D-01 (Crítico) — decisión de producto/arquitectura.** Definir si el rastro de auditoría se lee
-   desde la app o por SQL directo.
+2. ~~**D-01 (Crítico) — decisión de producto/arquitectura.**~~ Resuelto el 2026-09-15: el rastro se
+   lee desde la app (`GET /api/auditoria`). Ver D-01 arriba.
 3. **D-16 (Advertencia, nuevo) — cerrar el condicional del ADR-0007.** La condición que el propio ADR
    fijó para revisar el bloqueo por IP ya se cumplió hace más de una semana.
 4. **D-15 (Advertencia, nuevo) — una edición de cinco minutos.** Reconciliar las dos secciones de
