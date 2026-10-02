@@ -21,6 +21,14 @@ describe('DrizzleUsuariosRepo.findManyByIds (D3)', () => {
     expect(result).toEqual(rows);
     expect(result[0]).not.toHaveProperty('hashContrasena');
     expect(where).toHaveBeenCalledWith(inArray(usuarios.id, ['usuario-1']));
+    // The fake returns fixture rows regardless of the projection, so the
+    // assertions above cannot see it. This one pins what is actually asked of
+    // the database: {id, nombre} and nothing else — never the full row, which
+    // would read hashContrasena.
+    expect(select).toHaveBeenCalledWith({
+      id: usuarios.id,
+      nombre: usuarios.nombre,
+    });
   });
 
   it('returns an empty array for an empty id list, without querying', async () => {

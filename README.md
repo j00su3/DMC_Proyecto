@@ -76,6 +76,8 @@ Backlog #1 al #14 archivados y en producción (fundaciones, autenticación, usua
 vista maestro-detalle, productos, movimientos de inventario, punto de venta, recibo interno,
 anulación de venta, motor de alertas de stock, sugerencia de reposición, reportes, panel general
 con KPIs, verificación periódica de consistencia stock ↔ ledger, y backup semanal de la base). El
+#15 (lectura del rastro de auditoría, `GET /api/auditoria` solo para el encargado) ya está en
+`main`; falta archivar su ciclo. El
 #3.5 (recuperación de contraseña por email) está bloqueado por infraestructura (falta un dominio
 propio con DNS que soporte SPF/DKIM), no por
 esfuerzo. Ver [`docs/BACKLOG.md`](docs/BACKLOG.md) para el detalle completo.

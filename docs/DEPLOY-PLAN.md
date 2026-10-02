@@ -141,17 +141,17 @@ propósito**, jamás por valor. Para demostrar que no hay secretos commiteados s
 `.env.local`, y `git ls-files` no lista ningún `.env` real.
 
 **Inventario de variables de la API** (derivado de `apps/api/src/lib/env.ts:4-11`,
-`render.yaml:11-23`, `.github/workflows/ci.yml:26-28`, `apps/api/src/app.ts:63-69` y
+`render.yaml:11-23`, `.github/workflows/ci.yml:26-28`, `apps/api/src/app.ts:72-78` y
 `apps/api/src/plugins/cookie.ts:19-28`):
 
 | Variable | Clasificación | Propósito | Dónde vive en producción |
 | --- | --- | --- | --- |
 | `DATABASE_URL` | **Secreto** | Cadena de conexión a Neon; la consume el pool (`apps/api/src/db/pool.ts:12`) y Drizzle Kit para migrar (`apps/api/drizzle.config.ts:9`) | Panel de Render, marcada `sync: false` en `render.yaml:20-21` — es decir, **deliberadamente ausente del blueprint** para que no viaje en el repositorio |
 | `COOKIE_SECRET` | **Secreto** | Firma de la cookie de sesión; mínimo 32 caracteres (`lib/env.ts:10`) | Render la genera sola: `generateValue: true` (`render.yaml:22-23`). Nadie la escribe a mano y nadie necesita conocerla |
-| `NODE_ENV` | Config | `production` activa el flag `Secure` de la cookie (`apps/api/src/auth/session.ts:23`), el fallo duro por secreto faltante (`plugins/cookie.ts:24-28`) y el logging de requests (`app.ts:64-68`) | `render.yaml:18-19`, valor `production` |
+| `NODE_ENV` | Config | `production` activa el flag `Secure` de la cookie (`apps/api/src/auth/session.ts:23`), el fallo duro por secreto faltante (`plugins/cookie.ts:24-28`) y el logging de requests (`app.ts:73-77`) | `render.yaml:18-19`, valor `production` |
 | `NODE_VERSION` | Config | Runtime de Node del servicio | `render.yaml:12-13`, valor `"22"` |
 | `PORT` | Config | Puerto de escucha; por defecto `3000` (`lib/env.ts:6`) | Lo inyecta Render automáticamente; no está en el blueprint |
-| `LOG_LEVEL` | Config | Nivel del logger de Fastify, por defecto `info` (`app.ts:68`) | Opcional. Su valor puede cambiarse **en el panel de Render sin redeploy** — así está documentado en `render.yaml:14-17` |
+| `LOG_LEVEL` | Config | Nivel del logger de Fastify, por defecto `info` (`app.ts:77`) | Opcional. Su valor puede cambiarse **en el panel de Render sin redeploy** — así está documentado en `render.yaml:14-17` |
 | `SEED_ENCARGADO_EMAIL` / `SEED_ENCARGADO_NOMBRE` | Config | Identidad del primer usuario `encargado` | Solo en la máquina que corre `pnpm seed:encargado`; no es una variable del servicio |
 | `SEED_ENCARGADO_PASSWORD` | **Secreto** | Contraseña del bootstrap. El script **se niega explícitamente** a aceptarla por argumento de CLI para que no quede en el historial del shell ni en el listado de procesos (`apps/api/scripts/seed-encargado.ts:34-40`) | Solo en el entorno de quien ejecuta el seed |
 
@@ -169,7 +169,7 @@ consecuencia que se trata más abajo, en **Entornos**.
 - El secreto de desarrollo commiteado (`plugins/cookie.ts:7`) está marcado como tal en el propio
   código y es inalcanzable en producción por la rama anterior.
 - El logger de Fastify registra línea de request, estado y tiempo, **no cuerpos**, lo cual está
-  verificado por sonda y documentado en `app.ts:58-62` — la contraseña de login no llega al log.
+  verificado por sonda y documentado en `app.ts:67-70` — la contraseña de login no llega al log.
 
 **Huecos:**
 
@@ -221,8 +221,8 @@ sirviendo también la SPA; dominio propio con CORS y `SameSite=None`). No se rea
    `apps/api/src/plugins/cookie.ts` mientras esta arquitectura de proxy siga vigente
    (ADR-0010:68-70).
 2. **Una sola instancia.** El rate limiting de `@fastify/rate-limit` es en memoria
-   (`apps/api/src/app.ts:99`); con más de una instancia el límite se multiplicaría por el número de
-   instancias. Hoy es correcto. Escalar horizontalmente exigiría un store compartido.
+   (`apps/api/src/app.ts:146-154`); con más de una instancia el límite se multiplicaría por el
+   número de instancias. Hoy es correcto. Escalar horizontalmente exigiría un store compartido.
 3. **Sin almacenamiento persistente en el servicio.** El proceso de Render no guarda estado en
    disco: todo el estado está en Neon. Esto es lo que hace que un redeploy sea seguro.
 4. **Cold start.** El plan gratuito de Render suspende el proceso tras ~15 minutos de inactividad y
@@ -472,8 +472,8 @@ Lo que **no** existe:
 
 | Señal | Dónde | Estado |
 | --- | --- | --- |
-| Logs de la API | Panel de Render. El logger de Fastify solo está activo en producción (`apps/api/src/app.ts:63-69`), con nivel ajustable vía `LOG_LEVEL` **sin redeploy** (`render.yaml:14-17`). Registra línea de request, estado y tiempo — no cuerpos (`app.ts:58-62`) | ✅ existe |
-| Errores 5xx | `app.setErrorHandler` los envía a `app.log.error` (`app.ts:110-116`), así que quedan en el log de Render | ✅ existe, pero solo visible mirando el panel |
+| Logs de la API | Panel de Render. El logger de Fastify solo está activo en producción (`apps/api/src/app.ts:72-78`), con nivel ajustable vía `LOG_LEVEL` **sin redeploy** (`render.yaml:14-17`). Registra línea de request, estado y tiempo — no cuerpos (`app.ts:67-70`) | ✅ existe |
+| Errores 5xx | `app.setErrorHandler` los envía a `app.log.error` (`app.ts:182-188`), así que quedan en el log de Render | ✅ existe, pero solo visible mirando el panel |
 | Logs del frontend / proxy | Panel de Vercel | ✅ existe |
 | Métricas de la base | Consola de Neon | ✅ existe |
 | **Seguimiento de errores** (Sentry o equivalente) | — | ❌ no existe |

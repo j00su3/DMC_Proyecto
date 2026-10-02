@@ -74,7 +74,7 @@ Estos controles ya funcionan y no deberían tocarse al remediar lo demás:
 
 - **Autorización server-side por defecto denegada.** `apps/api/src/plugins/auth.ts:39-70` exige
   sesión en toda ruta que no declare `auth: false` explícitamente, y el comentario de
-  `apps/api/src/app.ts:94-96` documenta la restricción de orden de registro que sostiene la garantía.
+  `apps/api/src/app.ts:118-119` documenta la restricción de orden de registro que sostiene la garantía.
   El plugin está cubierto por once tests dedicados (`apps/api/src/plugins/auth.test.ts:49-213`),
   incluida la ruta no emparejada que debe seguir dando 404 y no un 401 falso.
 - **La frontera cliente/servidor está documentada como tal, no confundida.**
@@ -88,10 +88,10 @@ Estos controles ya funcionan y no deberían tocarse al remediar lo demás:
   comentario de `apps/api/src/auth/repository.ts:79-83` explica por qué ambas cosas, y no una,
   son necesarias.
 - **El hash nunca sale por una respuesta HTTP.** Proyección explícita sin la columna
-  (`apps/api/src/usuarios/repository.ts:84-92`), tipo de retorno sin el campo
+  (`apps/api/src/usuarios/repository.ts:89-97`), tipo de retorno sin el campo
   (`apps/api/src/usuarios/repository.ts:28-36`), esquema Zod de respuesta que descarta claves
   desconocidas (`apps/api/src/routes/usuarios.ts:30-38`) y denylist en la auditoría
-  (`apps/api/src/auditoria/fields.ts:10,33`). El comentario de `apps/api/src/routes/usuarios.ts:21-29`
+  (`apps/api/src/auditoria/fields.ts:10,42`). El comentario de `apps/api/src/routes/usuarios.ts:21-29`
   documenta que la redundancia fue medida, no supuesta.
 - **Defensa contra enumeración por temporización en el login.**
   `apps/api/src/auth/service.ts:48-53` verifica contra un hash señuelo fijo para un correo
@@ -100,9 +100,9 @@ Estos controles ya funcionan y no deberían tocarse al remediar lo demás:
   abierta, por otro camino.)
 - **Toda escritura pasa por una transacción con su fila de auditoría.**
   `apps/api/src/db/uow.ts:9-21` entrega repositorios ya ligados a la transacción y nunca el ejecutor
-  crudo, de modo que un servicio no puede eludir la frontera. El repositorio de auditoría solo expone
-  `record` (`apps/api/src/auditoria/repository.ts:13-15`): no hay ruta de código que modifique o borre
-  una fila del rastro.
+  crudo, de modo que un servicio no puede eludir la frontera. El repositorio de auditoría expone
+  `record` y una consulta de solo lectura, `list` (`apps/api/src/auditoria/repository.ts:46-56`): no
+  hay ruta de código que modifique o borre una fila del rastro.
 - **La contraseña temporal se trata como credencial de un solo uso.** Sale por una única respuesta
   con `Cache-Control: no-store` (`apps/api/src/routes/usuarios.ts:187,214`), en un DTO deliberadamente
   disjunto del de lectura (`apps/api/src/routes/usuarios.ts:57-65`), y la SPA se niega a copiarla al
@@ -117,9 +117,11 @@ Estos controles ya funcionan y no deberían tocarse al remediar lo demás:
   desarrollo etiquetado en `apps/api/src/plugins/cookie.ts:5-7`. `COOKIE_SECRET` se genera en la
   plataforma (`render.yaml:22-23`) y `DATABASE_URL` está marcado `sync: false` (`render.yaml:20-21`).
 - **Sin sinks de XSS.** No hay `dangerouslySetInnerHTML`, `innerHTML`, `eval` ni `new Function` en
-  todo `apps/web/src` ni en `apps/api/src`. Toda consulta pasa por Drizzle con parámetros ligados,
-  incluido el único `sql` crudo (`apps/api/src/usuarios/repository.ts:128-137`), que interpola el id
-  como parámetro y no como texto.
+  todo `apps/web/src` ni en `apps/api/src`. Toda consulta pasa por Drizzle, y en el código de
+  producción ningún fragmento de `sql` crudo concatena texto: los valores viajan como parámetros
+  ligados (`apps/api/src/usuarios/repository.ts:141-150` interpola el id como parámetro) y el nombre
+  del savepoint, como identificador escapado (`apps/api/src/db/uow.ts:42`). `sql.raw` solo aparece
+  en tests de integración, con nombres de tabla fijos.
 - **Sin CORS permisivo.** No hay `@fastify/cors` registrado, de modo que el navegador bloquea por
   defecto toda lectura con credenciales desde otro origen. Es la postura correcta para esta
   arquitectura y conviene no relajarla.
@@ -137,7 +139,7 @@ Estos controles ya funcionan y no deberían tocarse al remediar lo demás:
 **Confidence**: HIGH
 **Category**: Abuso de lógica de negocio / denegación de servicio dirigida; brecha de disponibilidad no considerada en los requisitos
 **Affected artifact**: Código (API), ADR, spec
-**Location**: `apps/api/src/auth/service.ts:55-69`, `apps/api/src/usuarios/repository.ts:127-149`,
+**Location**: `apps/api/src/auth/service.ts:55-69`, `apps/api/src/usuarios/repository.ts:140-162`,
 `openspec/specs/auth-sessions/spec.md:98`, `docs/adrs/0007-sesion-cookie-rbac-propio.md:52-58`
 
 **Description**
@@ -151,7 +153,7 @@ reset de contraseña es posible mientras dure.
 **Evidence**
 - `apps/api/src/auth/service.ts:55-60` — el bloqueo se evalúa al inicio de `login`, antes de verificar
   la contraseña, y lanza `accountLocked` para cualquier intento posterior.
-- `apps/api/src/usuarios/repository.ts:132-135` — al alcanzar `intentos_fallidos >= 5` se fija
+- `apps/api/src/usuarios/repository.ts:145-147` — al alcanzar `intentos_fallidos >= 5` se fija
   `bloqueado_hasta = now() + interval '5 minutes'`. El contador solo se reinicia con un login
   **exitoso** (`apps/api/src/auth/service.ts:75`), que el titular legítimo no puede realizar mientras
   esté bloqueado.
@@ -162,10 +164,10 @@ reset de contraseña es posible mientras dure.
 - `docs/adrs/0007-sesion-cookie-rbac-propio.md:56-58` — la única vía de rescate documentada cuando el
   único `encargado` pierde el acceso es "resetear el hash directo en base", un procedimiento manual
   fuera de la aplicación. No hay ruta de auto-servicio.
-- `apps/api/src/usuarios/repository.ts:300-304` — reactivar un usuario deja deliberadamente intactos
+- `apps/api/src/usuarios/repository.ts:313-325` — reactivar un usuario deja deliberadamente intactos
   `intentos_fallidos` y `bloqueado_hasta`, de modo que un segundo `encargado` tampoco puede
   desbloquear a un colega por esa vía; solo `resetPassword` limpia el bloqueo
-  (`apps/api/src/usuarios/repository.ts:319-331`), y eso exige una sesión de `encargado` que quizá ya
+  (`apps/api/src/usuarios/repository.ts:332-344`), y eso exige una sesión de `encargado` que quizá ya
   no exista.
 
 **Attack scenario**
@@ -321,7 +323,7 @@ Hoy no existe (ver SEC-012).
 **Confidence**: HIGH
 **Category**: Control de límites ineficaz; brecha de disponibilidad; promesa de spec no cumplida en la forma desplegada
 **Affected artifact**: Código (API), configuración de despliegue, spec
-**Location**: `apps/api/src/app.ts:74-76`, `apps/api/src/app.ts:99-100`,
+**Location**: `apps/api/src/app.ts:83-85`, `apps/api/src/app.ts:146-154`,
 `apps/api/src/routes/auth.ts:59`, `vercel.json:5-9`, `openspec/specs/auth-sessions/spec.md:52-55`
 
 **Description**
@@ -333,9 +335,9 @@ cubo de diez peticiones por minuto**, mientras que un atacante que golpee la URL
 directamente obtiene un cubo propio por cada IP que controle.
 
 **Evidence**
-- `apps/api/src/app.ts:74-76` — la instancia se construye con `Fastify({ logger })` y ninguna opción
-  `trustProxy`. Una búsqueda sobre todo `apps/api/src` no encuentra `trustProxy` ni ninguna lectura
-  de `X-Forwarded-For`.
+- `apps/api/src/app.ts:83-85` — la instancia se construye con `Fastify({ logger })` y ninguna opción
+  `trustProxy`. En el momento de la auditoría, una búsqueda sobre todo `apps/api/src` no encontraba
+  `trustProxy` ni ninguna lectura de `X-Forwarded-For`; la resolución de abajo añadió esa lectura.
 - `node_modules/.pnpm/@fastify+rate-limit@11.2.0/.../index.js:58` —
   `const defaultKeyGenerator = (req, ipv6Subnet) => normalizeIP(req.ip, ipv6Subnet)`; y la línea 249
   confirma que se usa el generador por defecto cuando la ruta no aporta uno. `apps/api/src/routes/auth.ts:59`
@@ -360,7 +362,7 @@ pretende frenar y sí degrada a los usuarios legítimos. Combinado con SEC-001, 
 dos palancas independientes de denegación sobre la autenticación.
 
 **Existing mitigation**
-El bloqueo por cuenta (`apps/api/src/usuarios/repository.ts:132-135`) sigue limitando la adivinación
+El bloqueo por cuenta (`apps/api/src/usuarios/repository.ts:145-147`) sigue limitando la adivinación
 de contraseñas contra una cuenta concreta con independencia de la IP, así que el ataque de fuerza
 bruta *vertical* está contenido. Lo que queda descubierto es la disponibilidad y el barrido
 horizontal sobre muchas cuentas.
@@ -465,7 +467,7 @@ secreto sólo decide a quién se le cree la cabecera, no cierra el origen.
 **Confidence**: MEDIUM
 **Category**: Agotamiento de recursos; ausencia de un control que este sistema necesita
 **Affected artifact**: Código (API)
-**Location**: `apps/api/src/app.ts:97-100`, `apps/api/src/routes/auth.ts:125-139`,
+**Location**: `apps/api/src/app.ts:146-154`, `apps/api/src/routes/auth.ts:125-139`,
 `apps/api/src/auth/password.ts:4-9`, `apps/api/src/auth/service.ts:127-135`,
 `apps/api/src/routes/health.ts:14-24`, `render.yaml:4-5`
 
@@ -477,8 +479,9 @@ petición (un verify y un hash) y está abierta a cualquier sesión autenticada,
 usuario `deposito` sin privilegios.
 
 **Evidence**
-- `apps/api/src/app.ts:97-99` — `await app.register(rateLimit, { global: false })`, con el comentario
-  que confirma que solo el login opta por él.
+- `apps/api/src/app.ts:146-154` — `await app.register(rateLimit, { global: false, … })` (hoy también
+  con un `keyGenerator`, añadido por SEC-003), con el comentario de `apps/api/src/app.ts:136-137`
+  que declara que solo el login opta por él.
 - `apps/api/src/routes/auth.ts:125-139` — el bloque `config` de `POST /auth/password` declara
   `allowPasswordChangePending` y ningún `rateLimit`.
 - `apps/api/src/auth/service.ts:127-135` — `verifyPassword` seguido de `hashPassword`, ambos fuera de
@@ -531,7 +534,7 @@ usa `apps/api/src/routes/auth.test.ts:177` con `rateLimitMax` sobreescrito a 1.
 **Confidence**: HIGH
 **Category**: Configuración insegura; ausencia de defensa en profundidad frente a XSS y clickjacking
 **Affected artifact**: Configuración de despliegue, código (API)
-**Location**: `vercel.json:1-15`, `apps/api/package.json:17-29`, `apps/api/src/app.ts:71-108`,
+**Location**: `vercel.json:1-15`, `apps/api/package.json:17-29`, `apps/api/src/app.ts:90-154`,
 `apps/web/index.html:1-12`
 
 **Description**
@@ -546,8 +549,10 @@ llevan `Content-Security-Policy`, `X-Frame-Options`/`frame-ancestors`, `X-Conten
 - `apps/api/package.json:17-29` — las dependencias son `@fastify/cookie`, `@fastify/rate-limit`,
   `@fastify/swagger`, `argon2`, `dotenv`, `drizzle-orm`, `fastify`, `fastify-plugin`,
   `fastify-type-provider-zod`, `pg` y `zod`. No figura `@fastify/helmet`.
-- `apps/api/src/app.ts:81-108` — la secuencia de registro de plugins no incluye ninguno de cabeceras
-  ni ningún hook `onSend` que las añada.
+- `apps/api/src/app.ts` — en el momento de la auditoría, la secuencia de registro de plugins no
+  incluía ninguno de cabeceras ni ningún hook `onSend` que las añadiera. Cambió con la resolución de
+  abajo: la secuencia vive hoy en `apps/api/src/app.ts:90-154` y ya registra `@fastify/helmet`
+  (`apps/api/src/app.ts:106-114`).
 - `apps/web/index.html:3-7` — el `<head>` no lleva ninguna `<meta http-equiv>` que supla la ausencia.
 
 **Attack scenario**
@@ -582,6 +587,19 @@ verificación manual de las cabeceras del documento servido por Vercel tras el d
 
 **Required change type**: `CODE FIX`
 
+**Resuelto el 2026-09-01** (commit `7bfc4b4`). La API registra `@fastify/helmet` antes de las rutas
+(`apps/api/src/app.ts:106-114`) con una CSP estricta —`default-src 'none'` y `frame-ancestors
+'none'`, porque la API solo sirve JSON— y `Referrer-Policy: same-origin`; el resto de los valores por
+defecto de helmet, `X-Content-Type-Options: nosniff` entre ellos, se conserva. La dependencia figura
+ahora en `apps/api/package.json`. Para el documento de la SPA, `vercel.json:15-33` declara un bloque
+`headers` con `Content-Security-Policy` (incluido `frame-ancestors 'none'`),
+`X-Content-Type-Options: nosniff` y `Referrer-Policy: same-origin`.
+
+Verificación: el test *"emits a strict CSP, nosniff and a same-origin referrer policy on every
+response"* de `apps/api/src/app.test.ts` afirma las tres cabeceras sobre una respuesta de
+`buildApp`. La comprobación manual de las cabeceras que sirve Vercel tras el despliegue no queda
+registrada en este informe.
+
 ---
 
 **ID**: SEC-006
@@ -612,7 +630,9 @@ antes de llegar al navegador.
 - Una búsqueda de `Cache-Control` en todo `apps/api/src` produce exactamente esas dos apariciones, y
   ambas en el mismo archivo.
 - `vercel.json:5-9` — todas las respuestas de la API pasan por el reescritor de Vercel.
-- `apps/api/src/app.ts:71-108` — no hay hook `onSend` global que supla la ausencia por defecto.
+- `apps/api/src/app.ts` — en el momento de la auditoría no había hook `onSend` global que supliera
+  la ausencia por defecto. Cambió con la resolución de abajo: el hook vive hoy en
+  `apps/api/src/app.ts:129-135`.
 
 **Attack scenario**
 Si el proxy de Vercel —o cualquier caché compartida en el camino: un proxy corporativo, un caché de
@@ -645,6 +665,18 @@ comprobación de las cabeceras reales que devuelve el dominio de Vercel para `/a
 desplegar.
 
 **Required change type**: `CODE FIX`
+
+**Resuelto el 2026-09-01** (commit `7bfc4b4`), con la remediación recomendada. Un hook `onSend`
+global en `buildApp` (`apps/api/src/app.ts:129-135`) fija `Cache-Control: no-store` en toda
+respuesta de una ruta que no declare `auth: false`; quedan fuera `/api/health`,
+`POST /api/auth/login` y `POST /api/auth/logout`. Las dos cabeceras explícitas de
+`apps/api/src/routes/usuarios.ts` se conservan: misma cabecera, mismo valor, y el resultado es
+idempotente en cualquier orden.
+
+Verificación: el test *"sets no-store on an authenticated GET route, and leaves /api/health unset"*
+de `apps/api/src/app.test.ts` afirma la cabecera en `GET /api/auth/me` y su ausencia en
+`/api/health`. La comprobación de las cabeceras reales que devuelve el dominio de Vercel no queda
+registrada en este informe.
 
 ---
 
@@ -965,7 +997,7 @@ El propio paso de CI es la verificación.
 **Confidence**: HIGH
 **Category**: Brecha de privacidad; operación irreversible sin salvaguarda declarada
 **Affected artifact**: Esquema de base de datos, requisitos de producto
-**Location**: `apps/api/src/db/schema.ts:113-115`, `apps/api/src/auditoria/fields.ts:20-34`,
+**Location**: `apps/api/src/db/schema.ts:113-115`, `apps/api/src/auditoria/fields.ts:30-48`,
 `apps/api/src/usuarios/service.ts:215-222`, `openspec/specs/record-audit-trail/spec.md:7`
 
 **Status (2026-09-01)**: la mitad del correo del hallazgo está implementada — backlog #2.5,
@@ -984,12 +1016,12 @@ inalcanzable por diseño, y esa consecuencia no está escrita en ninguna spec ni
 
 **Evidence**
 - `apps/api/src/db/schema.ts:113-115` — `usuarioId ... .references(() => usuarios.id, { onDelete: 'restrict' })`.
-- `apps/api/src/auditoria/fields.ts:23-32` — `email` figura entre los `auditableFields` de `usuarios`,
-  y `excludedFields` contiene únicamente `hashContrasena` (`apps/api/src/auditoria/fields.ts:33`).
+- `apps/api/src/auditoria/fields.ts:31-41` — `email` figura entre los `auditableFields` de `usuarios`,
+  y `excludedFields` contiene únicamente `hashContrasena` (`apps/api/src/auditoria/fields.ts:42`).
 - `apps/api/src/usuarios/service.ts:215-222` — cada actualización escribe el diff en `datosPrevios` y
   `datosPosteriores`; un cambio de correo deja ambos valores registrados de forma permanente.
-- `apps/api/src/auditoria/repository.ts:13-15` — el puerto expone únicamente `record`: no hay
-  operación de borrado ni de purga en toda la capa.
+- `apps/api/src/auditoria/repository.ts:46-56` — el puerto expone `record` y una consulta de solo
+  lectura, `list`: no hay operación de borrado ni de purga en toda la capa.
 - `openspec/specs/record-audit-trail/spec.md:7` — la capacidad se justifica por "non-repudiation",
   objetivo legítimo que sin embargo no aborda la retención.
 
@@ -1008,9 +1040,10 @@ crezca.
 
 **Existing mitigation**
 El hash de contraseña está excluido de ambas instantáneas
-(`apps/api/src/auditoria/fields.ts:33`), y `apps/api/src/auditoria/service.ts:49-58` aplica la
-denylist en tiempo de ejecución. Es decir, el dato más sensible sí está protegido; lo que falta es la
-política sobre el resto.
+(`apps/api/src/auditoria/fields.ts:42`), y `recordAudit` aplica la denylist en tiempo de ejecución
+(`filterExcluded`, `apps/api/src/auditoria/service.ts:41-49`, invocada en
+`apps/api/src/auditoria/service.ts:130-146`). Es decir, el dato más sensible sí está protegido; lo
+que falta es la política sobre el resto.
 
 **Recommended remediation**
 Requiere una decisión de producto sobre dos preguntas que hoy nadie ha respondido: cuánto tiempo debe
