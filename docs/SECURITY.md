@@ -336,8 +336,8 @@ directamente obtiene un cubo propio por cada IP que controle.
 
 **Evidence**
 - `apps/api/src/app.ts:83-85` — la instancia se construye con `Fastify({ logger })` y ninguna opción
-  `trustProxy`. Una búsqueda sobre todo `apps/api/src` no encuentra `trustProxy` ni ninguna lectura
-  de `X-Forwarded-For`.
+  `trustProxy`. En el momento de la auditoría, una búsqueda sobre todo `apps/api/src` no encontraba
+  `trustProxy` ni ninguna lectura de `X-Forwarded-For`; la resolución de abajo añadió esa lectura.
 - `node_modules/.pnpm/@fastify+rate-limit@11.2.0/.../index.js:58` —
   `const defaultKeyGenerator = (req, ipv6Subnet) => normalizeIP(req.ip, ipv6Subnet)`; y la línea 249
   confirma que se usa el generador por defecto cuando la ruta no aporta uno. `apps/api/src/routes/auth.ts:59`
@@ -997,7 +997,7 @@ El propio paso de CI es la verificación.
 **Confidence**: HIGH
 **Category**: Brecha de privacidad; operación irreversible sin salvaguarda declarada
 **Affected artifact**: Esquema de base de datos, requisitos de producto
-**Location**: `apps/api/src/db/schema.ts:113-115`, `apps/api/src/auditoria/fields.ts:20-34`,
+**Location**: `apps/api/src/db/schema.ts:113-115`, `apps/api/src/auditoria/fields.ts:30-48`,
 `apps/api/src/usuarios/service.ts:215-222`, `openspec/specs/record-audit-trail/spec.md:7`
 
 **Status (2026-09-01)**: la mitad del correo del hallazgo está implementada — backlog #2.5,
@@ -1016,8 +1016,8 @@ inalcanzable por diseño, y esa consecuencia no está escrita en ninguna spec ni
 
 **Evidence**
 - `apps/api/src/db/schema.ts:113-115` — `usuarioId ... .references(() => usuarios.id, { onDelete: 'restrict' })`.
-- `apps/api/src/auditoria/fields.ts:23-32` — `email` figura entre los `auditableFields` de `usuarios`,
-  y `excludedFields` contiene únicamente `hashContrasena` (`apps/api/src/auditoria/fields.ts:33`).
+- `apps/api/src/auditoria/fields.ts:31-41` — `email` figura entre los `auditableFields` de `usuarios`,
+  y `excludedFields` contiene únicamente `hashContrasena` (`apps/api/src/auditoria/fields.ts:42`).
 - `apps/api/src/usuarios/service.ts:215-222` — cada actualización escribe el diff en `datosPrevios` y
   `datosPosteriores`; un cambio de correo deja ambos valores registrados de forma permanente.
 - `apps/api/src/auditoria/repository.ts:46-56` — el puerto expone `record` y una consulta de solo

@@ -63,7 +63,7 @@ esta pasada (ciclo `auditoria-lectura`, PRs #185–#187) y ya no se cuenta; ver 
   (`docs/adrs/0012-frontera-auditoria-y-ledger.md:50-53`), y el PRD pone la auditabilidad en sus
   criterios de éxito (`docs/PRD.md:158-159`). Al 2026-09-09, `AuditoriaRepo` solo exponía `record`
   y ninguna ruta de la API permitía leer el rastro.
-- **Lo que se verificó el 2026-09-30:**
+- **Lo que se verificó el 2026-10-01:**
   - `AuditoriaRepo` expone `record` y `list(filtro, page, pageSize)`
     (`apps/api/src/auditoria/repository.ts:46-56`); `list` es una consulta de solo lectura.
   - `apps/api/src/app.ts:157-180` registra once grupos de rutas; el undécimo es `auditoria`

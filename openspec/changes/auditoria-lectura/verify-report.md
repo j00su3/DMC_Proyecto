@@ -7,8 +7,8 @@
 
 This report replaces a first version written at `b67a10d`. The claims gate refuted that version: it
 miscounted the tasks (22), listed 7 requirements where the delta spec has 5, and missed that one
-spec scenario disagreed with the code. `claims-report.md` records those verdicts. The fixes are in
-commits `ccc446e` and `419c223`, and this report describes the result.
+spec scenario disagreed with the code. `claims-report.md` records those verdicts. The test and spec fixes
+are in `ccc446e`, the docs fixes in `419c223`, and the two miscounts are corrected by this rewrite.
 
 Delivered across 3 chained PRs, all merged to `main`: PR #185 (repository layer), PR #186
 (`auditoria/service.ts::listar()`), PR #187 (`GET /api/auditoria` route, `app.ts` registration,
