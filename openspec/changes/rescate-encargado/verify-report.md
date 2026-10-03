@@ -4,7 +4,7 @@
 | --- | --- |
 | Cycle | `rescate-encargado` |
 | Branch | `docs/rescate-encargado-docs` |
-| Verified revision | `4f37e14c3581149a5f55bf07067d0f6f1071c7d8` |
+| Verified revision | `ba6013994b1af050b24aac28dde1e75f65087ae7` |
 | Date | 2026-10-02 |
 | PRs | #190 (planning, PR 0), #191 (PR 1), #192 (PR 2a), #193 (PR 2b), #194 (PR 3), PR 4 (docs, this branch) |
 | Verdict | **PASS WITH WARNINGS** (0 CRITICAL, 1 WARNING, 5 SUGGESTION) |
@@ -48,7 +48,7 @@ PR #194 rehearsal adds evidence on top of the automated test.
 
 | Scenario | Evidence |
 | --- | --- |
-| Email matched after normalization | `U` "looks the target up by the normalized email"; `src/usuarios/service.test.ts` `normalizeEmail` export test |
+| Email matched after normalization | `I` "rescues the encargado stored as ana@tienda.com when given "  Ana@Tienda.COM "" (added in `ba60139`); `U` "looks the target up by the normalized email"; `src/usuarios/service.test.ts` `normalizeEmail` export test |
 | Missing email refused | `S` parseArgs "requires --email"; `S` run "usage error: exit 2, stderr only, nothing executed" |
 | Missing DATABASE_URL refused | `S` run "missing DATABASE_URL (%o): exit 2, Spanish message, nothing executed" (cases `{}` and `''`); MANUAL: empty `DATABASE_URL` in the rehearsal |
 | Password flag rejected | `S` parseArgs password-flag cases in both forms and the attached `-pVALUE`; `S` run "password flag: exit 2 and the value is nowhere in the output" |
@@ -114,7 +114,7 @@ PR #194 rehearsal adds evidence on top of the automated test.
 | --- | --- |
 | Password appears exactly once | `S` run "rescatado: ..." (exactly one occurrence across stdout and stderr, one stdout write); MANUAL: once across the captured process output |
 | Password not persisted | `I` I1 searches every row of `usuarios`, `sesiones` and `auditoria` for the temporary password (`I:223-227`, added in `4f37e14`) |
-| Two rescues produce different passwords | `I` "rescuing twice prints two passwords and only the second one works" (`I:254`, added in `4f37e14`); `U:238` |
+| Two rescues produce different passwords | `I` "rescuing twice prints two passwords and only the second one works" (`I:263`, added in `4f37e14`); `U:238` |
 
 **R9 Runs Without COOKIE_SECRET**
 
@@ -136,8 +136,8 @@ PR #194 rehearsal adds evidence on top of the automated test.
 
 | Scenario | Evidence |
 | --- | --- |
-| D-02 closed | `DRIFT.md:81` heading ends in RESUELTO; severity table shows Crítico 0 |
-| New drift items recorded | D-17 at `DRIFT.md:343`, D-18 at `DRIFT.md:370`, both Advertencia; open counts 10 Advertencia, 3 Sugerencia |
+| D-02 closed | `DRIFT.md:84` heading ends in RESUELTO; severity table shows Crítico 0 |
+| New drift items recorded | D-17 at `DRIFT.md:346`, D-18 at `DRIFT.md:373`, both Advertencia; the table counts findings still marked open (10 Advertencia, 3 Sugerencia), and `DRIFT.md:50-53` records that the closures claimed by commit `537865c` were never reconciled |
 | Stale citations resolve | ADR-0007 `61-63` lands on the rescue promise; `SECURITY.md:207-208` is recommendation 4 with its resolution marker; the moved citations into `usuarios/service.ts`, `auditoria/service.ts`, `usuarios/repository.ts` and `auth/service.ts` were re-checked by the docs task (4.7); the claims gate re-checks them |
 
 The ADR-0007 addendum is at `docs/adrs/0007-sesion-cookie-rbac-propio.md:156-178`; lines 61-63 are
@@ -157,12 +157,12 @@ unchanged. `README.md:63-67` and `docs/BACKLOG.md:51` (row 16) are present.
 
 ## 3. Gate evidence
 
-Run at `4f37e14` with `export PATH="/c/Users/User/.corepack-shims:$PATH"`.
+Run at `ba60139` with `export PATH="/c/Users/User/.corepack-shims:$PATH"`.
 
 | Gate | Result |
 | --- | --- |
 | `pnpm -r test` | exit 0; api 687 tests, web 561 tests |
-| `pnpm test:integration` | exit 0; 212 tests (211 at PR 3 plus the twice-rescue test) |
+| `pnpm test:integration` | exit 0; 213 tests (211 at PR 3, plus the twice-rescue and normalized-email tests) |
 | `pnpm typecheck` | exit 0 |
 | `pnpm lint` | exit 0 |
 | `pnpm contract:check` | exit 0, no change to `openapi.json` or `schema.d.ts` |
@@ -234,14 +234,36 @@ None.
 - **S3, rehearsal against task 3.8:** the #194 rehearsal did not log in with the printed password
   (covered by `I`), tested an empty rather than unset `DATABASE_URL`, and did not exercise exit 1
   (covered by `S`).
-- **S4, stale sentence in `DRIFT.md:422`:** "Ningún commit desde entonces tocó estos archivos" is
+- **S4, stale sentence in `DRIFT.md:425`:** "Ningún commit desde entonces tocó estos archivos" is
   no longer literally true after #191; the cited lines still land. Not edited by this cycle.
 - **S5, socket URLs:** `describeTarget` refuses a URL with an empty host (`postgres:///db`) as a usage
   error. Acceptable for a runbook that assumes a network host; not documented.
 
 ## 7. Verdict
 
-**PASS WITH WARNINGS.** All gates are green at `4f37e14`: api 687, web 561, integration 212,
+**PASS WITH WARNINGS.** All gates are green at `ba60139`: api 687, web 561, integration 213,
 typecheck, lint, byte-identical contract. All 48 scenarios are covered and none is contradicted by
 the code. The one open warning is the PR 4 size. The known gaps in section 5 were accepted by
 the owner on 2026-10-03.
+
+## 8. Corrections made during the claims gate (2026-10-03)
+
+The claims gate settled 412 claims at `ecb1d43`; 16 were refuted. All 16 were fixed in `ba60139`:
+
+- **Coverage:** "none partial" was false for "Email is matched after normalization": no test ran a
+  confirmed rescue with a non-normalized email. `ba60139` adds one; dropping `normalizeEmail` from
+  `rescate.ts` turns it red (reverted).
+- **tasks.md:** task 1.10 claimed no integration test drove `POST /api/auth/password` (one does:
+  `routes/auth.integration.test.ts`); task 1.14 listed five files for an `rg -l` that returns seven;
+  task 3.8 was ticked without its two deviations. All three now state what happened.
+- **docs/SECURITY.md:** SEC-001 and SEC-008 locations pointed at code that has moved; "the counter
+  only resets on a successful login" omitted the password reset; "the per-account lock still bounds
+  guessing" is false since the password is verified while locked (D-17); "without a rate limit" was
+  false for the user-creation and password-reset routes; recommendation 4 was marked resolved
+  although it asks for an in-band path and the rescue is out of band. Each now matches the code.
+- **docs/DRIFT.md:** the severity table was described as counting open findings, but commit
+  `537865c` says it closed eight of them without marking their entries; the text now says the table
+  counts findings still marked open and that reconciliation is pending. D-15's recommendation cited
+  stale line ranges; it now names the sections. "No ADR was modified during this audit" was false
+  for the 2026-09-09 commit; corrected.
+
