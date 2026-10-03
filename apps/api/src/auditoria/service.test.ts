@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AlertasRepo } from '../alertas/repository.js';
 import type { ProductosRepo } from '../productos/repository.js';
 import type { ProveedoresRepo } from '../proveedores/repository.js';
@@ -211,6 +211,149 @@ describe('recordAudit', () => {
     // @ts-expect-error — the audit event type has no quantity-shaped field;
     // this must fail to compile, not just fail at runtime.
     await recordAudit(repo, { ...baseEvent, cantidad: 5 });
+  });
+});
+
+// rescate-encargado design.md D1: the pseudonym key is resolved lazily, at the
+// one line that computes an HMAC. A snapshot with no string value under a
+// pseudonymized field must record without COOKIE_SECRET; a snapshot with one
+// must still refuse, before anything reaches the repo.
+describe('recordAudit pseudonym key resolution', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('A1: records reset-shaped usuarios snapshots (no email) without COOKIE_SECRET, unchanged', async () => {
+    vi.stubEnv('COOKIE_SECRET', undefined);
+    const record = vi.fn(async (_event: AuditEvent) => {});
+    const datosPrevios = { debeCambiarPassword: false, intentosFallidos: 5 };
+    const datosPosteriores = {
+      debeCambiarPassword: true,
+      intentosFallidos: 0,
+      bloqueadoHasta: null,
+    };
+
+    await recordAudit(stubRepo(record), {
+      ...baseEvent,
+      accion: 'cambiar_password',
+      datosPrevios,
+      datosPosteriores,
+    });
+
+    expect(record).toHaveBeenCalledTimes(1);
+    const recorded = record.mock.calls[0]?.[0];
+    expect(recorded?.datosPrevios).toEqual(datosPrevios);
+    expect(recorded?.datosPosteriores).toEqual(datosPosteriores);
+  });
+
+  it('A2: rejects without COOKIE_SECRET when email is a string in datosPosteriores only, and records nothing', async () => {
+    vi.stubEnv('COOKIE_SECRET', undefined);
+    const record = vi.fn(async (_event: AuditEvent) => {});
+
+    await expect(
+      recordAudit(stubRepo(record), {
+        ...baseEvent,
+        datosPrevios: { nombre: 'Old Name' },
+        datosPosteriores: { email: 'new@example.com' },
+      }),
+    ).rejects.toThrow(/COOKIE_SECRET must be set/);
+    expect(record).not.toHaveBeenCalled();
+  });
+
+  it('A3: rejects without COOKIE_SECRET when email is a string in datosPrevios only, and records nothing', async () => {
+    vi.stubEnv('COOKIE_SECRET', undefined);
+    const record = vi.fn(async (_event: AuditEvent) => {});
+
+    await expect(
+      recordAudit(stubRepo(record), {
+        ...baseEvent,
+        datosPrevios: { email: 'old@example.com' },
+        datosPosteriores: { nombre: 'New Name' },
+      }),
+    ).rejects.toThrow(/COOKIE_SECRET must be set/);
+    expect(record).not.toHaveBeenCalled();
+  });
+
+  it('A4: rejects a crear with a full created row (it carries email) without COOKIE_SECRET', async () => {
+    vi.stubEnv('COOKIE_SECRET', undefined);
+    const record = vi.fn(async (_event: AuditEvent) => {});
+
+    await expect(
+      recordAudit(stubRepo(record), {
+        ...baseEvent,
+        accion: 'crear',
+        datosPrevios: null,
+        datosPosteriores: {
+          id: baseEvent.entidadId,
+          nombre: 'New User',
+          email: 'new@example.com',
+        },
+      }),
+    ).rejects.toThrow(/COOKIE_SECRET must be set/);
+    expect(record).not.toHaveBeenCalled();
+  });
+
+  it('A5: records email: null without COOKIE_SECRET and stores the null as is', async () => {
+    vi.stubEnv('COOKIE_SECRET', undefined);
+    const record = vi.fn(async (_event: AuditEvent) => {});
+
+    await recordAudit(stubRepo(record), {
+      ...baseEvent,
+      datosPrevios: { email: null },
+      datosPosteriores: { email: null },
+    });
+
+    const recorded = record.mock.calls[0]?.[0];
+    expect(recorded?.datosPrevios).toEqual({ email: null });
+    expect(recorded?.datosPosteriores).toEqual({ email: null });
+  });
+
+  it('A6: an empty COOKIE_SECRET is not a key: a string email still rejects', async () => {
+    vi.stubEnv('COOKIE_SECRET', '');
+    const record = vi.fn(async (_event: AuditEvent) => {});
+
+    await expect(
+      recordAudit(stubRepo(record), {
+        ...baseEvent,
+        datosPosteriores: { email: 'new@example.com' },
+      }),
+    ).rejects.toThrow(/COOKIE_SECRET must be set/);
+    expect(record).not.toHaveBeenCalled();
+  });
+
+  it('A7: records a proveedores event without COOKIE_SECRET', async () => {
+    vi.stubEnv('COOKIE_SECRET', undefined);
+    const record = vi.fn(async (_event: AuditEvent) => {});
+
+    await recordAudit(stubRepo(record), {
+      ...baseEvent,
+      entidad: 'proveedores',
+      datosPrevios: { nombre: 'Old' },
+      datosPosteriores: { nombre: 'New' },
+    });
+
+    expect(record).toHaveBeenCalledTimes(1);
+  });
+
+  it('with a key available, stores the HMAC pseudonym of usuarios.email, not the plaintext', async () => {
+    const key = 'a-test-hmac-key-that-is-at-least-32-characters-long';
+    vi.stubEnv('COOKIE_SECRET', key);
+    const record = vi.fn(async (_event: AuditEvent) => {});
+
+    await recordAudit(stubRepo(record), {
+      ...baseEvent,
+      datosPrevios: { email: 'old@example.com' },
+      datosPosteriores: { email: 'new@example.com' },
+    });
+
+    const recorded = record.mock.calls[0]?.[0];
+    const expected = pseudonymizeFields(
+      { email: 'new@example.com' },
+      ['email'],
+      key,
+    );
+    expect(recorded?.datosPosteriores).toEqual(expected);
+    expect(recorded?.datosPosteriores.email).not.toBe('new@example.com');
   });
 });
 

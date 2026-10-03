@@ -58,7 +58,7 @@ interface Diff {
   after: Record<string, unknown>;
 }
 
-function normalizeEmail(email: string): string {
+export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
@@ -277,6 +277,9 @@ export async function setUsuarioActivo(
 export async function resetUsuarioPassword(
   uow: UnitOfWork,
   input: ResetUsuarioPasswordInput,
+  // Set only by the operator rescue script; in-app callers omit it and their
+  // audit rows stay byte-identical (rescate-encargado D2).
+  origen?: 'rescate',
 ): Promise<UsuarioConPassword> {
   const passwordTemporal = generateTempPassword();
   const hashContrasena = await hashPassword(passwordTemporal);
@@ -316,6 +319,7 @@ export async function resetUsuarioPassword(
         debeCambiarPassword: true,
         intentosFallidos: 0,
         bloqueadoHasta: null,
+        ...(origen !== undefined ? { origen } : {}),
       },
     });
     return posterior;

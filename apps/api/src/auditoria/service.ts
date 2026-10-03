@@ -68,22 +68,34 @@ const PSEUDONYM_PREFIX = 'hmac-sha256:';
 // patterns. This project already treats that class of risk seriously
 // (argon2id for passwords, HMAC-shaped session tokens), so the pseudonym
 // gets the same treatment.
-export function pseudonymizeFields(
+//
+// The key is a provider, not a value: `getKey` is called only on the line that
+// computes an HMAC, so a snapshot with no string under a listed field never
+// needs the key at all (rescate-encargado design.md D1).
+function pseudonymizeWith(
   data: Record<string, unknown>,
   pseudonymizedFields: readonly string[],
-  key: string,
+  getKey: () => string,
 ): Record<string, unknown> {
   const result = { ...data };
   for (const field of pseudonymizedFields) {
     const value = result[field];
     if (typeof value === 'string') {
-      const digest = createHmac('sha256', key)
+      const digest = createHmac('sha256', getKey())
         .update(PSEUDONYM_DOMAIN_TAG + value)
         .digest('hex');
       result[field] = `${PSEUDONYM_PREFIX}${digest}`;
     }
   }
   return result;
+}
+
+export function pseudonymizeFields(
+  data: Record<string, unknown>,
+  pseudonymizedFields: readonly string[],
+  key: string,
+): Record<string, unknown> {
+  return pseudonymizeWith(data, pseudonymizedFields, () => key);
 }
 
 // COOKIE_SECRET reused as the HMAC key (backlog #2.5): it is already
@@ -93,9 +105,11 @@ export function pseudonymizeFields(
 // `resolveCookieSecret` — importing the full env schema here would drag
 // DATABASE_URL et al. into every unit test that exercises `recordAudit`
 // (see that file's comment). The unit test suite sets COOKIE_SECRET in
-// `vitest.config.ts` for exactly this reason; production sets it as a real
-// deployment secret, validated by `lib/env.ts` before the server accepts
-// any request.
+// `vitest.config.ts` for exactly this reason (every test whose snapshot
+// carries `email` needs it); production sets it as a real deployment
+// secret, validated by `lib/env.ts` before the server accepts any request.
+// It is only read when a snapshot actually holds a string to pseudonymize,
+// so an operator script with no COOKIE_SECRET can record a password reset.
 function resolvePseudonymKey(): string {
   const key = process.env.COOKIE_SECRET;
   if (!key) {
@@ -120,21 +134,23 @@ export async function recordAudit(
 ): Promise<void> {
   const { excludedFields, pseudonymizedFields } =
     FIELD_CLASSIFICATION[event.entidad];
-  const hasPseudonymizedFields = (pseudonymizedFields?.length ?? 0) > 0;
-  // Resolved at most once per call, and only when this entity actually has
-  // fields to pseudonymize — proveedores/productos never need COOKIE_SECRET.
-  const pseudonymKey = hasPseudonymizedFields
-    ? resolvePseudonymKey()
-    : undefined;
+  // Resolved at most once per call, and only when a string value is about to
+  // be hashed — a throw here happens before `repo.record`, so nothing is
+  // written and the enclosing transaction rolls back.
+  let key: string | undefined;
+  const getKey = (): string => {
+    key ??= resolvePseudonymKey();
+    return key;
+  };
 
   const applyClassification = (
     data: Record<string, unknown>,
-  ): Record<string, unknown> => {
-    const filtered = filterExcluded(data, excludedFields);
-    return pseudonymKey && pseudonymizedFields
-      ? pseudonymizeFields(filtered, pseudonymizedFields, pseudonymKey)
-      : filtered;
-  };
+  ): Record<string, unknown> =>
+    pseudonymizeWith(
+      filterExcluded(data, excludedFields),
+      pseudonymizedFields ?? [],
+      getKey,
+    );
 
   const filteredEvent: AuditEvent = {
     ...event,
