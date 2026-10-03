@@ -412,6 +412,52 @@ describe('usuarios write routes (integration, real app + real Postgres)', () => 
     expect(JSON.stringify(rows[0])).not.toContain('hashContrasena');
   });
 
+  // rescate-encargado D2: the origin marker belongs to the operator rescue
+  // alone. Both in-app password paths must leave it out of either snapshot.
+  it('files the in-app admin reset without an origen marker, actor distinct from subject', async () => {
+    const encargado = await seedUsuario('encargado');
+    const objetivo = await seedUsuario('deposito', 'Objetivo');
+    app = await buildApp({ cookieSecret: COOKIE_SECRET });
+    await app.ready();
+    const sid = await loginAs(app, encargado.email);
+
+    const reset = await app.inject({
+      method: 'POST',
+      url: `/api/usuarios/${objetivo.id}/password-reset`,
+      cookies: { sid },
+    });
+    expect(reset.statusCode).toBe(200);
+
+    const rows = await auditRows(objetivo.id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.usuario_id).not.toBe(objetivo.id);
+    expect(rows[0]?.datos_previos).not.toHaveProperty('origen');
+    expect(rows[0]?.datos_posteriores).not.toHaveProperty('origen');
+  });
+
+  it('files the self-service password change without an origen marker', async () => {
+    const deposito = await seedUsuario('deposito', 'Self Service');
+    app = await buildApp({ cookieSecret: COOKIE_SECRET });
+    await app.ready();
+    const sid = await loginAs(app, deposito.email);
+
+    const changed = await app.inject({
+      method: 'POST',
+      url: '/api/auth/password',
+      payload: {
+        currentPassword: PASSWORD,
+        newPassword: 'a-brand-new-password-1',
+      },
+      cookies: { sid },
+    });
+    expect(changed.statusCode).toBe(200);
+
+    const rows = await auditRows(deposito.id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.datos_previos).not.toHaveProperty('origen');
+    expect(rows[0]?.datos_posteriores).not.toHaveProperty('origen');
+  });
+
   it('rolls back the whole reset when the audit write fails', async () => {
     const encargado = await seedUsuario('encargado');
     const objetivo = await seedUsuario('deposito', 'Objetivo');

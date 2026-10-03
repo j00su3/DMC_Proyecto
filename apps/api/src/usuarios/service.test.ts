@@ -6,6 +6,7 @@ import {
   createUsuario,
   getUsuario,
   listUsuarios,
+  normalizeEmail,
   resetUsuarioPassword,
   setUsuarioActivo,
   updateUsuario,
@@ -487,6 +488,42 @@ describe('resetUsuarioPassword', () => {
     await expect(
       resetUsuarioPassword(h.uow, { id: TARGET_ID, actorId: ACTOR_ID }),
     ).rejects.toMatchObject({ code: 'USER_NOT_FOUND', status: 404 });
+  });
+
+  // rescate-encargado D2. `toMatchObject` above would not notice an extra
+  // key, so the in-app shape is pinned with `toEqual` plus an absence check.
+  it('B1: a two-argument call adds no origen key to the post-state', async () => {
+    const h = harness();
+
+    await resetUsuarioPassword(h.uow, { id: TARGET_ID, actorId: ACTOR_ID });
+
+    const datosPosteriores = auditEvent(h.auditoria)?.datosPosteriores;
+    expect(datosPosteriores).toEqual({
+      debeCambiarPassword: true,
+      intentosFallidos: 0,
+      bloqueadoHasta: null,
+    });
+    expect(datosPosteriores).not.toHaveProperty('origen');
+  });
+
+  it("B2: origen 'rescate' lands in datosPosteriores only, never in datosPrevios", async () => {
+    const h = harness();
+
+    await resetUsuarioPassword(
+      h.uow,
+      { id: TARGET_ID, actorId: TARGET_ID },
+      'rescate',
+    );
+
+    const event = auditEvent(h.auditoria);
+    expect(event?.datosPosteriores.origen).toBe('rescate');
+    expect(event?.datosPrevios).not.toHaveProperty('origen');
+  });
+});
+
+describe('normalizeEmail', () => {
+  it('trims and lowercases, as login does', () => {
+    expect(normalizeEmail('  ANA@Example.COM ')).toBe('ana@example.com');
   });
 });
 

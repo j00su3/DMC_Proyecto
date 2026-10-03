@@ -147,6 +147,7 @@ function fakeUsuariosRepo(overrides: Partial<UsuariosRepo> = {}): UsuariosRepo {
     setActivo: unusedUsuariosMethod,
     resetPassword: unusedUsuariosMethod,
     findManyByIds: unusedUsuariosMethod,
+    countActiveEncargados: unusedUsuariosMethod,
     ...overrides,
   };
 }

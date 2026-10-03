@@ -77,6 +77,10 @@ export interface UsuariosRepo {
   // sensitive column — the narrow select means it never leaves the
   // database, not just that the DTO drops it later.
   findManyByIds(ids: string[]): Promise<Pick<Usuario, 'id' | 'nombre'>[]>;
+  // rescate-encargado D5: informational count of active encargados. A plain
+  // SELECT, NOT lockActiveEncargados — no FOR UPDATE, so it also works under
+  // a read-only role and never contends with the guard.
+  countActiveEncargados(): Promise<number>;
 }
 
 interface LockoutRow {
@@ -357,5 +361,13 @@ export class DrizzleUsuariosRepo implements UsuariosRepo {
       .select(usuarioNombreColumns)
       .from(usuarios)
       .where(inArray(usuarios.id, ids));
+  }
+
+  async countActiveEncargados(): Promise<number> {
+    const rows = await this.db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(usuarios)
+      .where(and(eq(usuarios.rol, 'encargado'), eq(usuarios.activo, true)));
+    return rows[0]?.n ?? 0;
   }
 }

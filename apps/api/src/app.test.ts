@@ -61,6 +61,7 @@ function fakeRepos(sesionesOverrides: Partial<SesionesRepo> = {}) {
       setActivo: unusedRepoMethod,
       resetPassword: unusedRepoMethod,
       findManyByIds: unusedRepoMethod,
+      countActiveEncargados: unusedRepoMethod,
     } satisfies UsuariosRepo,
     sesiones: {
       create: async () => {},
