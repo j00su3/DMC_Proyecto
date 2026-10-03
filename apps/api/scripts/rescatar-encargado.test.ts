@@ -319,6 +319,8 @@ describe('run', () => {
       email: 'Ana@Tienda.com',
       confirmar: true,
     });
+    // Two writes in total: the target line, then the whole result at once.
+    expect(out).toHaveLength(2);
     expect(out.filter((t) => t.includes(TEMPORAL))).toHaveLength(1);
     const todo = out.join('') + err.join('');
     expect(todo.split(TEMPORAL)).toHaveLength(2);

@@ -266,4 +266,12 @@ The claims gate settled 412 claims at `ecb1d43`; 16 were refuted. All 16 were fi
   counts findings still marked open and that reconciliation is pending. D-15's recommendation cited
   stale line ranges; it now names the sections. "No ADR was modified during this audit" was false
   for the 2026-09-09 commit; corrected.
-
+- **Mutation probes re-run (2026-10-03):** all probes listed in section 4 were repeated at `015ca3c`
+  by a single process, each reverted; all held except one. Writing the rescue result one line at a
+  time went undetected, although task 3.4 says the result is emitted in a single write. The test
+  "rescatado: target line first, before any query; one stdout write carries the password" now also
+  asserts exactly two stdout writes, and that mutation turns it red (reverted).
+- **Manual rehearsal re-run (2026-10-03)** in a throwaway database, dropped afterwards: preview exit 0
+  with the row unchanged; empty `DATABASE_URL` exit 2; `--password x` and `--password=x` exit 2;
+  confirmed rescue exit 0 with the password printed once, absent from a data dump of `usuarios`,
+  `sesiones` and `auditoria`, verifying against the stored hash while `RESCUE_PASSWORD` does not.
