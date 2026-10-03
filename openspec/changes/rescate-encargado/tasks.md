@@ -35,7 +35,7 @@ Flags:
 
 ## Phase 0: PR 0 - Planning artifacts
 
-- [ ] 0.1 Add `openspec/changes/rescate-encargado/tasks.md` to PR 0 (proposal, specs and design are already committed as f1fbe3a). Open PR 0 with an explicit `size:exception` note (docs-only). Satisfies: process only.
+- [x] 0.1 Add `openspec/changes/rescate-encargado/tasks.md` to PR 0 (proposal, specs and design are already committed as f1fbe3a). Open PR 0 with an explicit `size:exception` note (docs-only). Satisfies: process only.
 
 Gate 0: no code changed; nothing to run beyond `pnpm lint` (`biome ci .`) to confirm no stray file.
 
