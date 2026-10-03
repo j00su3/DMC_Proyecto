@@ -23,11 +23,11 @@ Counted as lines matching `^- \[[ x]\]` under each `## Phase N` heading.
 | 1 (PR 1) | 15 (1.1-1.15) | 15 | 0 |
 | 2 (PR 2a/2b) | 17 (2.1-2.17) | 17 | 0 |
 | 3 (PR 3) | 9 (3.1-3.9) | 9 | 0 |
-| 4 (PR 4) | 10 (4.1-4.10) | 7 (4.1-4.7) | 3 (4.8, 4.9, 4.10) |
-| **Total** | **52** | **49** | **3** |
+| 4 (PR 4) | 10 (4.1-4.10) | 8 (4.1-4.8) | 2 (4.9, 4.10) |
+| **Total** | **52** | **50** | **2** |
 
-4.8 is this report, 4.9 is `claims-report.md`, 4.10 is the final gate; all three are open at this
-point by construction.
+4.8 is this report, ticked in the commit that adds it; 4.9 is `claims-report.md` and 4.10 the
+final gate, both open at this point by construction.
 
 ## 2. Requirement and scenario coverage
 
@@ -192,7 +192,7 @@ From the PR bodies; each probe was applied, seen red, then reverted.
   printed once and found in no table, stored hash verifies it and not `RESCUE_PASSWORD`, one audit
   row with `origen: 'rescate'` and actor = subject.
 
-## 5. Known gaps (pending owner acceptance)
+## 5. Known gaps (accepted by the owner on 2026-10-03)
 
 1. The `main()` wiring of `rescatar-encargado.ts` has no automated end-to-end test. It is covered by
    unit tests of `run` through an injected I/O seam plus the manual rehearsal.
@@ -243,5 +243,5 @@ None.
 
 **PASS WITH WARNINGS.** All gates are green at `4f37e14`: api 687, web 561, integration 212,
 typecheck, lint, byte-identical contract. All 48 scenarios are covered and none is contradicted by
-the code. The one open warning is the PR 4 size. The known gaps in section 5 need the owner's
-acceptance on the record.
+the code. The one open warning is the PR 4 size. The known gaps in section 5 were accepted by
+the owner on 2026-10-03.
