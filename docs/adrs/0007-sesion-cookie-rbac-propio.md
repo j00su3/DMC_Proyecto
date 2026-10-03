@@ -152,3 +152,27 @@ la revisión no ocurrió); la decisión de agregar o no ese refuerzo queda para 
 - **Trade-off:** rate-limit/lockout y el bootstrap manual del primer encargado son piezas de
   seguridad más para mantener a mano, coherente con haber elegido auth propia en vez de un
   proveedor externo (ver alternativas).
+
+### Actualizado 2026-10-02 — el procedimiento de rescate del último encargado existe y está probado
+
+La Decisión promete que, "como vía de rescate si el único encargado pierde su contraseña, se
+documenta un procedimiento administrativo manual (resetear el hash directo en base) fuera de la
+aplicación". Ese procedimiento no existía (hallazgo D-02 de `docs/DRIFT.md`). La promesa se cumple
+ahora con un script probado, no con una edición manual del hash en la base:
+
+```bash
+pnpm --filter @inventienda/api rescatar:encargado --email <correo> [--confirmar]
+```
+
+El script (`apps/api/scripts/rescatar-encargado.ts`) reutiliza el mismo restablecimiento de
+contraseña que usa la aplicación: contraseña temporal mostrada una sola vez, cambio obligatorio en el
+primer inicio de sesión, bloqueo limpio y sesiones cerradas, todo en una transacción con su fila de
+auditoría. Como no hay un usuario autenticado, la fila tiene como actor a la propia cuenta rescatada
+y lleva `origen: 'rescate'` en el estado posterior. Sin `--confirmar` solo simula. Rechaza, sin
+escribir nada, un correo inexistente, una cuenta que no es de encargado y una cuenta inactiva (no
+reactiva cuentas).
+
+Sigue siendo un procedimiento fuera de la aplicación, sin ruta HTTP. El operador es el único control:
+debe confirmar la identidad de quien pide el rescate por un canal independiente antes de ejecutarlo.
+Runbook completo: `docs/DEPLOY-PLAN.md` § Recovery → *Rescate del último encargado*. Ciclo SDD
+`rescate-encargado` (PRs #190 a #194). El texto original de la Decisión se conserva sin cambios.

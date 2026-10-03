@@ -88,14 +88,14 @@ Estos controles ya funcionan y no deberían tocarse al remediar lo demás:
   comentario de `apps/api/src/auth/repository.ts:79-83` explica por qué ambas cosas, y no una,
   son necesarias.
 - **El hash nunca sale por una respuesta HTTP.** Proyección explícita sin la columna
-  (`apps/api/src/usuarios/repository.ts:89-97`), tipo de retorno sin el campo
+  (`apps/api/src/usuarios/repository.ts:93-101`), tipo de retorno sin el campo
   (`apps/api/src/usuarios/repository.ts:28-36`), esquema Zod de respuesta que descarta claves
   desconocidas (`apps/api/src/routes/usuarios.ts:30-38`) y denylist en la auditoría
   (`apps/api/src/auditoria/fields.ts:10,42`). El comentario de `apps/api/src/routes/usuarios.ts:21-29`
   documenta que la redundancia fue medida, no supuesta.
 - **Defensa contra enumeración por temporización en el login.**
   `apps/api/src/auth/service.ts:48-53` verifica contra un hash señuelo fijo para un correo
-  desconocido, y `apps/api/src/auth/service.ts:71-73` comprueba `activo` **después** del verify para
+  desconocido, y `apps/api/src/auth/service.ts:109-111` comprueba `activo` **después** del verify para
   que `ACCOUNT_INACTIVE` no sea un oráculo. (El hallazgo SEC-002 documenta la vía que sí queda
   abierta, por otro camino.)
 - **Toda escritura pasa por una transacción con su fila de auditoría.**
@@ -119,7 +119,7 @@ Estos controles ya funcionan y no deberían tocarse al remediar lo demás:
 - **Sin sinks de XSS.** No hay `dangerouslySetInnerHTML`, `innerHTML`, `eval` ni `new Function` en
   todo `apps/web/src` ni en `apps/api/src`. Toda consulta pasa por Drizzle, y en el código de
   producción ningún fragmento de `sql` crudo concatena texto: los valores viajan como parámetros
-  ligados (`apps/api/src/usuarios/repository.ts:141-150` interpola el id como parámetro) y el nombre
+  ligados (`apps/api/src/usuarios/repository.ts:145-154` interpola el id como parámetro) y el nombre
   del savepoint, como identificador escapado (`apps/api/src/db/uow.ts:42`). `sql.raw` solo aparece
   en tests de integración, con nombres de tabla fijos.
 - **Sin CORS permisivo.** No hay `@fastify/cors` registrado, de modo que el navegador bloquea por
@@ -139,8 +139,8 @@ Estos controles ya funcionan y no deberían tocarse al remediar lo demás:
 **Confidence**: HIGH
 **Category**: Abuso de lógica de negocio / denegación de servicio dirigida; brecha de disponibilidad no considerada en los requisitos
 **Affected artifact**: Código (API), ADR, spec
-**Location**: `apps/api/src/auth/service.ts:55-69`, `apps/api/src/usuarios/repository.ts:140-162`,
-`openspec/specs/auth-sessions/spec.md:98`, `docs/adrs/0007-sesion-cookie-rbac-propio.md:52-58`
+**Location**: `apps/api/src/auth/service.ts:55-69`, `apps/api/src/usuarios/repository.ts:144-166`,
+`openspec/specs/auth-sessions/spec.md:98`, `docs/adrs/0007-sesion-cookie-rbac-propio.md:57-63`
 
 **Description**
 El bloqueo por intentos fallidos se aplica **a la cuenta**, se dispara con cinco fallos consecutivos
@@ -153,21 +153,21 @@ reset de contraseña es posible mientras dure.
 **Evidence**
 - `apps/api/src/auth/service.ts:55-60` — el bloqueo se evalúa al inicio de `login`, antes de verificar
   la contraseña, y lanza `accountLocked` para cualquier intento posterior.
-- `apps/api/src/usuarios/repository.ts:145-147` — al alcanzar `intentos_fallidos >= 5` se fija
+- `apps/api/src/usuarios/repository.ts:149-151` — al alcanzar `intentos_fallidos >= 5` se fija
   `bloqueado_hasta = now() + interval '5 minutes'`. El contador solo se reinicia con un login
-  **exitoso** (`apps/api/src/auth/service.ts:75`), que el titular legítimo no puede realizar mientras
+  **exitoso** (`apps/api/src/auth/service.ts:113`), que el titular legítimo no puede realizar mientras
   esté bloqueado.
 - `apps/api/src/auth/service.ts:66-69` — `registerFailedAttempt` se invoca en toda contraseña
   incorrecta contra un usuario existente, sin requerir autenticación previa alguna.
-- `docs/adrs/0007-sesion-cookie-rbac-propio.md:52-53` — el ADR especifica el bloqueo "por usuario y/o
+- `docs/adrs/0007-sesion-cookie-rbac-propio.md:57-58` — el ADR especifica el bloqueo "por usuario y/o
   IP"; lo implementado es exclusivamente por usuario.
-- `docs/adrs/0007-sesion-cookie-rbac-propio.md:56-58` — la única vía de rescate documentada cuando el
+- `docs/adrs/0007-sesion-cookie-rbac-propio.md:61-63` — la única vía de rescate documentada cuando el
   único `encargado` pierde el acceso es "resetear el hash directo en base", un procedimiento manual
   fuera de la aplicación. No hay ruta de auto-servicio.
-- `apps/api/src/usuarios/repository.ts:313-325` — reactivar un usuario deja deliberadamente intactos
+- `apps/api/src/usuarios/repository.ts:317-329` — reactivar un usuario deja deliberadamente intactos
   `intentos_fallidos` y `bloqueado_hasta`, de modo que un segundo `encargado` tampoco puede
   desbloquear a un colega por esa vía; solo `resetPassword` limpia el bloqueo
-  (`apps/api/src/usuarios/repository.ts:332-344`), y eso exige una sesión de `encargado` que quizá ya
+  (`apps/api/src/usuarios/repository.ts:336-348`), y eso exige una sesión de `encargado` que quizá ya
   no exista.
 
 **Attack scenario**
@@ -205,7 +205,7 @@ opciones que cierran el hueco, para que el propietario elija:
    defensa contra adivinación y no en una negación de servicio. (Requiere evaluar el coste de argon2
    en la ruta bloqueada; ver SEC-004.)
 4. Añadir una vía de rescate en banda para el último `encargado`, de modo que la recuperación no
-   dependa de acceso directo a la base.
+   dependa de acceso directo a la base. **Resuelta el 2026-10-02** con `rescatar:encargado`; ver *Resolución posterior*.
 
 **Suggested verification**
 Un test de integración que, tras cinco fallos contra un `encargado`, afirme que el titular con la
@@ -362,7 +362,7 @@ pretende frenar y sí degrada a los usuarios legítimos. Combinado con SEC-001, 
 dos palancas independientes de denegación sobre la autenticación.
 
 **Existing mitigation**
-El bloqueo por cuenta (`apps/api/src/usuarios/repository.ts:145-147`) sigue limitando la adivinación
+El bloqueo por cuenta (`apps/api/src/usuarios/repository.ts:149-151`) sigue limitando la adivinación
 de contraseñas contra una cuenta concreta con independencia de la IP, así que el ataque de fuerza
 bruta *vertical* está contenido. Lo que queda descubierto es la disponibilidad y el barrido
 horizontal sobre muchas cuentas.
@@ -468,7 +468,7 @@ secreto sólo decide a quién se le cree la cabecera, no cierra el origen.
 **Category**: Agotamiento de recursos; ausencia de un control que este sistema necesita
 **Affected artifact**: Código (API)
 **Location**: `apps/api/src/app.ts:146-154`, `apps/api/src/routes/auth.ts:125-139`,
-`apps/api/src/auth/password.ts:4-9`, `apps/api/src/auth/service.ts:127-135`,
+`apps/api/src/auth/password.ts:4-9`, `apps/api/src/auth/service.ts:165-173`,
 `apps/api/src/routes/health.ts:14-24`, `render.yaml:4-5`
 
 **Description**
@@ -484,10 +484,10 @@ usuario `deposito` sin privilegios.
   que declara que solo el login opta por él.
 - `apps/api/src/routes/auth.ts:125-139` — el bloque `config` de `POST /auth/password` declara
   `allowPasswordChangePending` y ningún `rateLimit`.
-- `apps/api/src/auth/service.ts:127-135` — `verifyPassword` seguido de `hashPassword`, ambos fuera de
+- `apps/api/src/auth/service.ts:165-173` — `verifyPassword` seguido de `hashPassword`, ambos fuera de
   la transacción y ambos con el coste completo.
 - `apps/api/src/auth/password.ts:4-9` — `memoryCost: 19456` (19 MiB), `parallelism: 1`.
-- `apps/api/src/usuarios/service.ts:138-139` y `apps/api/src/usuarios/service.ts:281-282` —
+- `apps/api/src/usuarios/service.ts:138-139` y `apps/api/src/usuarios/service.ts:284-285` —
   `POST /api/usuarios` y `POST /api/usuarios/:id/password-reset` ejecutan cada una un `hashPassword`
   sin límite de tasa; requieren rol `encargado`, así que su exposición es menor.
 - `apps/api/src/routes/health.ts:16,24` — `/api/health` es público (`auth: false`), sin límite de
@@ -754,7 +754,7 @@ otro que afirme que `resolveCookieSecret` lanza cuando no hay `COOKIE_SECRET`, s
 **Category**: Manejo inseguro de tokens; dato sensible sin protección en reposo
 **Affected artifact**: Esquema de base de datos, ADR
 **Location**: `apps/api/src/db/schema.ts:68-84`, `apps/api/src/auth/session.ts:4-12`,
-`apps/api/src/auth/service.ts:80-85`, `docs/adrs/0007-sesion-cookie-rbac-propio.md:11-14`
+`apps/api/src/auth/service.ts:80-85`, `docs/adrs/0007-sesion-cookie-rbac-propio.md:16-19`
 
 **Description**
 El valor de la cookie **es** la clave primaria de la fila de sesión, guardada tal cual. Cualquiera que
@@ -770,7 +770,7 @@ que entrega las sesiones mismas.
 - `apps/api/src/auth/service.ts:80-85` — el token generado se inserta como `id` y se devuelve al
   llamador sin más.
 - `apps/api/src/routes/auth.ts:73` — ese mismo valor se fija en la cookie.
-- `docs/adrs/0007-sesion-cookie-rbac-propio.md:11-14` — el ADR ratifica la decisión de forma
+- `docs/adrs/0007-sesion-cookie-rbac-propio.md:16-19` — el ADR ratifica la decisión de forma
   explícita, con su justificación: "no hay un segundo secreto de sesión que mantener sincronizado con
   la fila".
 
@@ -795,7 +795,7 @@ listón: el atacante necesita base **y** secreto. Eso, junto con la ventana de 1
 mantiene el hallazgo en LOW.
 
 **Recommended remediation**
-Es una decisión de ADR porque `docs/adrs/0007-sesion-cookie-rbac-propio.md:11-14` ratificó
+Es una decisión de ADR porque `docs/adrs/0007-sesion-cookie-rbac-propio.md:16-19` ratificó
 expresamente lo contrario. La alternativa estándar es almacenar `sha256(token)` como clave primaria y
 enviar el token en claro solo en la cookie: `findValid` pasa a hashear el valor recibido antes de
 buscar, el coste es despreciable frente a argon2, y una lectura de la base deja de rendir
@@ -1042,7 +1042,7 @@ crezca.
 El hash de contraseña está excluido de ambas instantáneas
 (`apps/api/src/auditoria/fields.ts:42`), y `recordAudit` aplica la denylist en tiempo de ejecución
 (`filterExcluded`, `apps/api/src/auditoria/service.ts:41-49`, invocada en
-`apps/api/src/auditoria/service.ts:130-146`). Es decir, el dato más sensible sí está protegido; lo
+`apps/api/src/auditoria/service.ts:146-162`). Es decir, el dato más sensible sí está protegido; lo
 que falta es la política sobre el resto.
 
 **Recommended remediation**
@@ -1187,14 +1187,14 @@ del propietario, así que quedaron abiertos de forma deliberada.
 > resolución. La **implementación** de SEC-001 y SEC-008 es trabajo pendiente, anotado en
 > `docs/BACKLOG.md`: la decisión está cerrada, el código todavía no.
 
-- **SEC-001 — `DESIGN / ADR CHANGE`.** `docs/adrs/0007-sesion-cookie-rbac-propio.md:52-53` dejó
+- **SEC-001 — `DESIGN / ADR CHANGE`.** `docs/adrs/0007-sesion-cookie-rbac-propio.md:57-58` dejó
   explícitamente abierta la elección entre bloqueo "por usuario y/o IP", y la implementación tomó solo
   una de las dos ramas. Cerrar el hueco exige elegir entre cuatro políticas de bloqueo con
   compensaciones reales y distintas entre sí —seguridad frente a adivinación contra disponibilidad de
   la cuenta administrativa—, y esa elección pertenece al ADR, no a un informe de seguridad. Además,
   la mitigación operativa propuesta (mantener un segundo `encargado` activo) es una decisión de
   operación de la tienda.
-- **SEC-008 — `DESIGN / ADR CHANGE`.** `docs/adrs/0007-sesion-cookie-rbac-propio.md:11-14` ratificó de
+- **SEC-008 — `DESIGN / ADR CHANGE`.** `docs/adrs/0007-sesion-cookie-rbac-propio.md:16-19` ratificó de
   forma expresa que el `id` de la fila de sesión sea el valor que viaja en la cookie, con una
   justificación explícita. Cambiarlo por un hash almacenado es revertir una decisión ratificada y
   requiere una actualización del ADR, no un parche.
@@ -1218,3 +1218,18 @@ propuesta; ninguno se cerró declarándolo tolerable por cuenta de este análisi
 **SEC-001 y SEC-008 siguen sin implementar.** Esta sección registra decisiones, no código. Ningún
 hallazgo de este pase quedó cerrado declarándolo tolerable.
 
+### Resolución posterior (2026-10-02)
+
+**SEC-001, recomendación 4 — resuelta el 2026-10-02.** La vía de rescate del último `encargado` ya
+existe, aunque no en banda: sigue siendo un procedimiento fuera de la aplicación, como promete el
+ADR-0007 (`docs/adrs/0007-sesion-cookie-rbac-propio.md:61-63`), pero ya no consiste en editar el hash
+a mano en la base. Lo ejecuta un script probado,
+`pnpm --filter @inventienda/api rescatar:encargado --email <correo> [--confirmar]`
+(`apps/api/scripts/rescatar-encargado.ts`), que reutiliza el restablecimiento de contraseña de la
+aplicación: contraseña temporal mostrada una sola vez, cambio obligatorio en el primer inicio de
+sesión, bloqueo limpio, sesiones cerradas y una fila de auditoría marcada `origen: 'rescate'`, todo
+en una transacción. Sin `--confirmar` solo simula; rechaza, sin escribir nada, un correo inexistente,
+una cuenta que no es de encargado y una cuenta inactiva. El operador es el único control y debe
+confirmar la identidad del solicitante por un canal independiente. Runbook: `docs/DEPLOY-PLAN.md`
+§ Recovery → *Rescate del último encargado*. Cierra D-02 de `docs/DRIFT.md` (ciclo
+`rescate-encargado`, PRs #190–#194).
