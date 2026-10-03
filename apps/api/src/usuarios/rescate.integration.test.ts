@@ -251,6 +251,15 @@ describe('rescatarEncargado (integration, real Postgres, no COOKIE_SECRET)', () 
     expect(await auditRows(target.id)).toHaveLength(1);
   });
 
+  it('rescues the encargado stored as ana@tienda.com when given "  Ana@Tienda.COM "', async () => {
+    const target = await seedUsuario('encargado', { email: 'ana@tienda.com' });
+
+    const result = await rescued('  Ana@Tienda.COM ');
+
+    expect(result.objetivo.id).toBe(target.id);
+    expectRescueRow(await auditRows(target.id), target.id);
+  });
+
   it('rescuing twice prints two passwords and only the second one works', async () => {
     const target = await seedUsuario('encargado');
 

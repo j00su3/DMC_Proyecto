@@ -47,7 +47,10 @@ contra `claims_gate.py`), así que no hay drift ahí pese a ser un cambio recien
 | Advertencia | 10 |
 | Sugerencia | 3 |
 
-La tabla cuenta los hallazgos abiertos. **Actualización 2026-09-15:** D-01 se resolvió después de
+La tabla cuenta los hallazgos que este reporte todavía marca como abiertos. **Aclaración 2026-10-03:**
+el mensaje del commit `537865c` (2026-09-09) dice que cerró D-03, D-05, D-06, D-10, D-11, D-13, D-14
+y D-15, pero sus entradas no se marcaron como resueltas; reconciliarlas queda para una nueva pasada
+de esta auditoría. **Actualización 2026-09-15:** D-01 se resolvió después de
 esta pasada (ciclo `auditoria-lectura`, PRs #185–#187) y ya no se cuenta; ver D-01 abajo.
 **Actualización 2026-10-02:** D-02 se resolvió (ciclo `rescate-encargado`, PRs #190–#194) y ya no
 se cuenta; ese ciclo registró dos hallazgos nuevos, D-17 y D-18 (ambos Advertencia), que sí se
@@ -292,8 +295,8 @@ cuentan.
 - **Opciones:**
   - `CORREGIR CÓDIGO` — no aplica.
   - `ACTUALIZAR PRD/ADR` — no aplica en sentido estricto (no es PRD ni ADR), pero el mismo principio
-    corre: reemplazar la sección `:639-655` por una referencia corta a la entrada `:1101` ("decisión
-    tomada, ver más abajo"), o fusionar ambas en una sola sección fechada.
+    corre: reemplazar la sección "Backup independiente — decisión pendiente" por una referencia corta a
+    la entrada que registra la decisión ("decisión tomada, ver más abajo"), o fusionar ambas en una sola sección fechada.
   - **Recomendación:** actualizar el documento. Es la propia inconsistencia que el ítem 3 de "Próximos
     pasos" de la auditoría anterior ya advertía en general (D-13) — este es el mismo patrón, dentro
     de un documento distinto.
@@ -475,5 +478,5 @@ Priorizados por consecuencia, no por esfuerzo:
     primer encargado que nunca inicia sesión; y registrar en el ADR-0007 la resolución de S01 sobre
     la cuenta bloqueada con contraseña correcta.
 
-Ningún archivo de `docs/PRD.md`, ningún ADR, ni ningún archivo de código fue modificado durante esta
-auditoría, salvo la reescritura de este mismo reporte.
+La pasada del 2026-09-09 no modificó `docs/PRD.md` ni código; su commit (`537865c`) sí corrigió
+`docs/BACKLOG.md`, `docs/DEPLOY-PLAN.md`, `docs/TECH-DESIGNv2.md` y los ADR 0004 y 0007.

@@ -139,8 +139,8 @@ Estos controles ya funcionan y no deberían tocarse al remediar lo demás:
 **Confidence**: HIGH
 **Category**: Abuso de lógica de negocio / denegación de servicio dirigida; brecha de disponibilidad no considerada en los requisitos
 **Affected artifact**: Código (API), ADR, spec
-**Location**: `apps/api/src/auth/service.ts:55-69`, `apps/api/src/usuarios/repository.ts:144-166`,
-`openspec/specs/auth-sessions/spec.md:98`, `docs/adrs/0007-sesion-cookie-rbac-propio.md:57-63`
+**Location**: `apps/api/src/auth/service.ts:96-107`, `apps/api/src/usuarios/repository.ts:144-166`,
+`openspec/specs/auth-sessions/spec.md:102-111`, `docs/adrs/0007-sesion-cookie-rbac-propio.md:57-63`
 
 **Description**
 El bloqueo por intentos fallidos se aplica **a la cuenta**, se dispara con cinco fallos consecutivos
@@ -154,9 +154,9 @@ reset de contraseña es posible mientras dure.
 - `apps/api/src/auth/service.ts:55-60` — el bloqueo se evalúa al inicio de `login`, antes de verificar
   la contraseña, y lanza `accountLocked` para cualquier intento posterior.
 - `apps/api/src/usuarios/repository.ts:149-151` — al alcanzar `intentos_fallidos >= 5` se fija
-  `bloqueado_hasta = now() + interval '5 minutes'`. El contador solo se reinicia con un login
-  **exitoso** (`apps/api/src/auth/service.ts:113`), que el titular legítimo no puede realizar mientras
-  esté bloqueado.
+  `bloqueado_hasta = now() + interval '5 minutes'`. El contador se reinicia con un login **exitoso**
+  (`apps/api/src/auth/service.ts:113`), que el titular no puede realizar mientras esté bloqueado, o con
+  un restablecimiento de contraseña (`apps/api/src/usuarios/repository.ts:342`).
 - `apps/api/src/auth/service.ts:66-69` — `registerFailedAttempt` se invoca en toda contraseña
   incorrecta contra un usuario existente, sin requerir autenticación previa alguna.
 - `docs/adrs/0007-sesion-cookie-rbac-propio.md:57-58` — el ADR especifica el bloqueo "por usuario y/o
@@ -205,7 +205,7 @@ opciones que cierran el hueco, para que el propietario elija:
    defensa contra adivinación y no en una negación de servicio. (Requiere evaluar el coste de argon2
    en la ruta bloqueada; ver SEC-004.)
 4. Añadir una vía de rescate en banda para el último `encargado`, de modo que la recuperación no
-   dependa de acceso directo a la base. **Resuelta el 2026-10-02** con `rescatar:encargado`; ver *Resolución posterior*.
+   dependa de acceso directo a la base. **Atendida en parte el 2026-10-02** con `rescatar:encargado`, que no es en banda; ver *Resolución posterior*.
 
 **Suggested verification**
 Un test de integración que, tras cinco fallos contra un `encargado`, afirme que el titular con la
@@ -362,9 +362,9 @@ pretende frenar y sí degrada a los usuarios legítimos. Combinado con SEC-001, 
 dos palancas independientes de denegación sobre la autenticación.
 
 **Existing mitigation**
-El bloqueo por cuenta (`apps/api/src/usuarios/repository.ts:149-151`) sigue limitando la adivinación
-de contraseñas contra una cuenta concreta con independencia de la IP, así que el ataque de fuerza
-bruta *vertical* está contenido. Lo que queda descubierto es la disponibilidad y el barrido
+El bloqueo por cuenta (`apps/api/src/usuarios/repository.ts:149-151`) ya no limita la adivinación:
+con la cuenta bloqueada la contraseña se sigue verificando (`apps/api/src/auth/service.ts:68-107`), así
+que solo el límite de tasa de la ruta de login acota la fuerza bruta *vertical* (ver D-17 en DRIFT). Lo que queda descubierto es la disponibilidad y el barrido
 horizontal sobre muchas cuentas.
 
 **Recommended remediation**
@@ -488,8 +488,8 @@ usuario `deposito` sin privilegios.
   la transacción y ambos con el coste completo.
 - `apps/api/src/auth/password.ts:4-9` — `memoryCost: 19456` (19 MiB), `parallelism: 1`.
 - `apps/api/src/usuarios/service.ts:138-139` y `apps/api/src/usuarios/service.ts:284-285` —
-  `POST /api/usuarios` y `POST /api/usuarios/:id/password-reset` ejecutan cada una un `hashPassword`
-  sin límite de tasa; requieren rol `encargado`, así que su exposición es menor.
+  `POST /api/usuarios` y `POST /api/usuarios/:id/password-reset` ejecutan cada una un `hashPassword`;
+  hoy tienen límite de tasa (`apps/api/src/routes/usuarios.ts:174`, `:214`) y requieren rol `encargado`.
 - `apps/api/src/routes/health.ts:16,24` — `/api/health` es público (`auth: false`), sin límite de
   tasa, y ejecuta una consulta contra Postgres en cada llamada.
 - `render.yaml:4-5` — `plan: free`, cuyo contenedor dispone de 512 MB de memoria.
@@ -754,7 +754,7 @@ otro que afirme que `resolveCookieSecret` lanza cuando no hay `COOKIE_SECRET`, s
 **Category**: Manejo inseguro de tokens; dato sensible sin protección en reposo
 **Affected artifact**: Esquema de base de datos, ADR
 **Location**: `apps/api/src/db/schema.ts:68-84`, `apps/api/src/auth/session.ts:4-12`,
-`apps/api/src/auth/service.ts:80-85`, `docs/adrs/0007-sesion-cookie-rbac-propio.md:16-19`
+`apps/api/src/auth/service.ts:118-123`, `docs/adrs/0007-sesion-cookie-rbac-propio.md:16-19`
 
 **Description**
 El valor de la cookie **es** la clave primaria de la fila de sesión, guardada tal cual. Cualquiera que
@@ -1220,8 +1220,8 @@ hallazgo de este pase quedó cerrado declarándolo tolerable.
 
 ### Resolución posterior (2026-10-02)
 
-**SEC-001, recomendación 4 — resuelta el 2026-10-02.** La vía de rescate del último `encargado` ya
-existe, aunque no en banda: sigue siendo un procedimiento fuera de la aplicación, como promete el
+**SEC-001, recomendación 4 — atendida en parte el 2026-10-02.** La vía en banda que pide no se
+implementó; sí existe una vía de rescate del último `encargado`, fuera de banda: sigue siendo un procedimiento fuera de la aplicación, como promete el
 ADR-0007 (`docs/adrs/0007-sesion-cookie-rbac-propio.md:61-63`), pero ya no consiste en editar el hash
 a mano en la base. Lo ejecuta un script probado,
 `pnpm --filter @inventienda/api rescatar:encargado --email <correo> [--confirmar]`
