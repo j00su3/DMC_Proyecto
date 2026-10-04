@@ -4,7 +4,7 @@
 | --- | --- |
 | Cycle | `rescate-encargado` |
 | Branch | `docs/rescate-encargado-docs` |
-| Verified revision | `ba6013994b1af050b24aac28dde1e75f65087ae7` |
+| Verified revision | `6c9981cb5fabdcb6f3896c7d9e45af93faefadc2` |
 | Date | 2026-10-02 |
 | PRs | #190 (planning, PR 0), #191 (PR 1), #192 (PR 2a), #193 (PR 2b), #194 (PR 3), PR 4 (docs, this branch) |
 | Verdict | **PASS WITH WARNINGS** (0 CRITICAL, 1 WARNING, 5 SUGGESTION) |
@@ -157,7 +157,7 @@ unchanged. `README.md:63-67` and `docs/BACKLOG.md:51` (row 16) are present.
 
 ## 3. Gate evidence
 
-Run at `ba60139` with `export PATH="/c/Users/User/.corepack-shims:$PATH"`.
+Run at `6c9981c` with `export PATH="/c/Users/User/.corepack-shims:$PATH"`.
 
 | Gate | Result |
 | --- | --- |
@@ -241,21 +241,22 @@ None.
 
 ## 7. Verdict
 
-**PASS WITH WARNINGS.** All gates are green at `ba60139`: api 687, web 561, integration 213,
+**PASS WITH WARNINGS.** All gates are green at `6c9981c`: api 687, web 561, integration 213,
 typecheck, lint, byte-identical contract. All 48 scenarios are covered and none is contradicted by
 the code. The one open warning is the PR 4 size. The known gaps in section 5 were accepted by
 the owner on 2026-10-03.
 
 ## 8. Corrections made during the claims gate (2026-10-03)
 
-The claims gate settled 412 claims at `ecb1d43`; 16 were refuted. All 16 were fixed in `ba60139`:
+The claims gate settled 412 claims at `ecb1d43`; 16 were refuted. All 16 were fixed in `ba60139`,
+and a re-verification at `6c9981c` refuted two of those fixes, corrected in `5c5fe7d`:
 
 - **Coverage:** "none partial" was false for "Email is matched after normalization": no test ran a
   confirmed rescue with a non-normalized email. `ba60139` adds one; dropping `normalizeEmail` from
   `rescate.ts` turns it red (reverted).
 - **tasks.md:** task 1.10 claimed no integration test drove `POST /api/auth/password` (one does:
   `routes/auth.integration.test.ts`); task 1.14 listed five files for an `rg -l` that returns seven;
-  task 3.8 was ticked without its two deviations. All three now state what happened.
+  task 3.8 was ticked without its deviations. All three now state what happened.
 - **docs/SECURITY.md:** SEC-001 and SEC-008 locations pointed at code that has moved; "the counter
   only resets on a successful login" omitted the password reset; "the per-account lock still bounds
   guessing" is false since the password is verified while locked (D-17); "without a rate limit" was
