@@ -1,482 +1,613 @@
 # Drift Report: InvenTienda
 
-**Fecha:** 2026-09-09
+**Fecha:** 2026-10-04
 
 **Comparado contra:** `docs/PRD.md`, `docs/TECH-DESIGNv2.md` (documento vigente; `docs/TECH-DESIGN.md`
-v1 está superseded y **no** se usó como fuente de promesas), `docs/REVISION-ADVERSARIAL.md`
-(Rondas 1 y 2) + los 12 ADRs de `docs/adrs/`, contra el estado actual de `apps/api/src` y
-`apps/web/src`. `docs/DEPLOY-PLAN.md`, `docs/BACKLOG.md` y `docs/SECURITY.md` se usaron como
-evidencia de apoyo (no como fuente de promesas) donde el propio reporte anterior ya los citaba.
+v1 está superseded y **no** se usó como fuente de promesas) + los 12 ADRs de `docs/adrs/`, contra el
+estado de `apps/api` y `apps/web` en `main` a la altura de `9c80bdb`. `docs/BACKLOG.md`,
+`docs/DEPLOY-PLAN.md`, `docs/SECURITY.md`, `SECURITY-REPORT.md` y `openspec/specs/` se usaron como
+evidencia de apoyo, no como fuente de promesas.
 
-**Continuidad con la auditoría anterior:** existía un `docs/DRIFT.md` fechado 2026-09-04 (hallazgos
-D-01 a D-14, más D-07/D-12 ya resueltos/sin objeto). Ninguno de `docs/PRD.md`, los 12 ADRs ni
-`docs/TECH-DESIGNv2.md` cambió desde entonces (`git log --since=2026-09-04` sobre esos archivos no
-devuelve commits), así que esta pasada **re-verificó cada hallazgo abierto contra el código como
-está hoy** en vez de asumir que seguían vigentes, y buscó drift nuevo en los nueve commits mergeados
-desde la auditoría anterior (PRs #176–#183: backup semanal de Neon, cuatro correcciones operativas
-al workflow de backup/consistencia, y el scoping del hook de claims-gate por ciclo). Los IDs
-`D-01`…`D-14` se conservan **exactamente** donde el hallazgo original sigue vigente, porque
-`docs/BACKLOG.md` (fila #14) y el propio `docs/DEPLOY-PLAN.md` ya citan varios de estos IDs por
-número — renumerar rompería esas referencias. `D-15`/`D-16` son hallazgos nuevos de esta pasada.
+**Continuidad con la pasada anterior:** la última refrescada completa es del 2026-09-09, con
+actualizaciones parciales el 2026-09-15, 2026-10-02 y 2026-10-03. El mensaje del commit `537865c`
+(2026-09-09) afirma que cerró D-03, D-05, D-06, D-10, D-11, D-13, D-14, D-15 y "la mitad
+documentable" de D-16, pero el reporte seguía marcándolos abiertos. **Esta pasada no tomó ese
+mensaje como evidencia:** para cada hallazgo abierto se releyó lo que el hallazgo decía que estaba
+mal, se abrió el documento o el código citado tal como está hoy, y se decidió RESUELTO (con la cita
+que lo prueba) o sigue abierto (con la cita actual). Varios quedaron **resueltos solo en parte**: en
+esos casos el hallazgo sigue abierto con el alcance reducido a lo que falta, y la severidad se bajó
+cuando lo que falta pesa menos que lo original (D-03, D-15, D-16). Los IDs `D-NN` se conservan
+exactamente — `docs/BACKLOG.md`, `docs/DEPLOY-PLAN.md` y el ADR-0007 los citan por número. D-07 y
+D-12 se cerraron en la pasada del 2026-09-04 y no se reutilizan. Los hallazgos nuevos toman los IDs
+D-19 a D-25.
 
 ## Resumen ejecutivo
 
-De los 12 hallazgos abiertos de la auditoría anterior, **1 se resolvió por completo** (D-04: la
-decisión de backup se tomó y se implementó — ver detalle abajo) y **1 quedó con evidencia corregida
-porque la auditoría anterior citó código que ya no correspondía a la realidad al momento de
-escribirse** (D-03: el fix de `secure` fail-closed es del 2026-09-01, tres días *antes* de la fecha
-del reporte anterior, que igual citó la versión vieja de la línea). **Los 10 restantes siguen
-abiertos sin cambios de fondo.** Se encontraron **2 hallazgos nuevos**: una auto-contradicción
-dentro de `docs/DEPLOY-PLAN.md` sobre el propio backup que acaba de cerrarse, y un mecanismo de
-seguridad real (IP verificada por proxy para el rate-limit, más el default fail-closed de `secure`)
-que existe, está probado y desplegado, pero no aparece en el ADR-0007 — que además tiene su propia
-condición de revisión ("una vez corregido SEC-003") ya cumplida desde hace más de una semana sin que
-nadie la haya retomado.
+Se re-verificaron los 16 IDs presentes en el reporte anterior (D-01 a D-18, sin D-07 ni D-12) y se
+buscó drift nuevo en ambas direcciones, con foco en lo entregado desde el 2026-09-09: la ruta de
+lectura `GET /api/auditoria` (ciclo `auditoria-lectura`), el script `rescatar:encargado` y su
+addendum en el ADR-0007 (ciclo `rescate-encargado`), la clave diferida de seudonimización, los
+rate-limits por sesión de las rutas de gestión de usuarios y el harness `claims-gate`.
 
-Se verificó explícitamente, y **no es drift**, que: (a) los nueve commits mergeados desde la
-auditoría anterior son correcciones operativas sobre lo que el ciclo #14 ya había cerrado (versión
-de Postgres del contenedor de backup, `set -o pipefail`, exclusión del schema `drizzle`, logging
-honesto de `verificar-consistencia.ts`) y el scoping del hook `claims-gate` por ciclo — ninguno
-introduce una promesa nueva del PRD/ADR que verificar; (b) el propio `harnesses/claims-gate/README.md`
-ya documenta con precisión el scoping por rama que el PR #183 implementó (verificado línea por línea
-contra `claims_gate.py`), así que no hay drift ahí pese a ser un cambio reciente.
+**Pre-existentes:** 9 resueltos (D-01, D-02, D-04 ya lo estaban; D-05, D-06, D-10, D-11, D-13 y D-14
+se confirman resueltos hoy, por el commit `537865c`) y 7 siguen abiertos (D-03, D-08, D-09, D-15,
+D-16, D-17, D-18), tres de ellos reducidos. **Nuevos:** 7 (D-19 a D-25). Los dos más relevantes:
+la tabla `auditoria` guarda en claro el **nombre** de los usuarios aunque el PRD afirma que el rastro
+"no conserva datos personales" (D-22), y la Venta no tiene los campos fiscales reservados que el
+ADR-0003 y el TECH-DESIGNv2 dan por existentes (D-19). No hay hallazgos críticos: el drift que queda
+es casi todo documentación que se quedó atrás de decisiones ya tomadas, más dos reglas (D-18, D-22)
+que piden una decisión del propietario.
 
 | Severidad | Cantidad |
 |---|---|
 | Crítico | 0 |
-| Advertencia | 10 |
-| Sugerencia | 3 |
+| Advertencia | 6 |
+| Sugerencia | 8 |
 
-La tabla cuenta los hallazgos que este reporte todavía marca como abiertos. **Aclaración 2026-10-03:**
-el mensaje del commit `537865c` (2026-09-09) dice que cerró D-03, D-05, D-06, D-10, D-11, D-13, D-14
-y D-15, pero sus entradas no se marcaron como resueltas; reconciliarlas queda para una nueva pasada
-de esta auditoría. **Actualización 2026-09-15:** D-01 se resolvió después de
-esta pasada (ciclo `auditoria-lectura`, PRs #185–#187) y ya no se cuenta; ver D-01 abajo.
-**Actualización 2026-10-02:** D-02 se resolvió (ciclo `rescate-encargado`, PRs #190–#194) y ya no
-se cuenta; ese ciclo registró dos hallazgos nuevos, D-17 y D-18 (ambos Advertencia), que sí se
-cuentan.
+La tabla cuenta **exactamente los 14 hallazgos que este reporte deja abiertos**: Advertencia — D-09,
+D-17, D-18, D-19, D-22, D-24; Sugerencia — D-03, D-08, D-15, D-16, D-20, D-21, D-23, D-25. Los
+resueltos (D-01, D-02, D-04, D-05, D-06, D-10, D-11, D-13, D-14) no se cuentan.
+
+### Estado de cada hallazgo pre-existente
+
+| ID | Estado al 2026-10-04 | Evidencia en una línea |
+|---|---|---|
+| D-01 | RESUELTO (2026-09-15) | `GET /api/auditoria`, solo encargado (`apps/api/src/routes/auditoria.ts:80-105`) |
+| D-02 | RESUELTO (2026-10-02) | script `rescatar:encargado` (`apps/api/package.json:17`) + runbook |
+| D-03 | Sigue abierto, reducido → Sugerencia | el riesgo ya describe `Secure` fail-closed, pero `TECH-DESIGNv2.md:100-102` y `ADR-0007:34-36` siguen atándolo a ADR-0009 |
+| D-04 | RESUELTO (2026-09-04) | `.github/workflows/backup-neon.yml` |
+| D-05 | RESUELTO (2026-09-09) | `TECH-DESIGNv2.md:92-98`, `:137-139`, `:177-179`, `:182-190` |
+| D-06 | RESUELTO (2026-09-09) | `TECH-DESIGNv2.md:105-111` |
+| D-08 | Sigue abierto | `AppShell.module.css:99-111` sigue con un único `.avatar` |
+| D-09 | Sigue abierto | `tasks.md:77-79,82` sin marcar; `ADR-0010:79-81` sigue "Pendiente" |
+| D-10 | RESUELTO (2026-09-09) | excepción escrita en `ADR-0004:32-43` (enumeración incompleta → D-20) |
+| D-11 | RESUELTO (2026-09-09) | `BACKLOG.md:37` ya no cita Firebase Hosting |
+| D-13 | RESUELTO (2026-09-09) | `TECH-DESIGNv2.md:192-193` separa las dos fuentes |
+| D-14 | RESUELTO (2026-09-09) | `TECH-DESIGNv2.md:383-387` en pasado y con rutas reales |
+| D-15 | Sigue abierto, reducido → Sugerencia | nota agregada, pero el título `DEPLOY-PLAN.md:639` sigue diciendo "decisión pendiente" |
+| D-16 | Sigue abierto, reducido → Sugerencia | mecanismo documentado en `ADR-0007:100-116`; la decisión sobre bloqueo por IP sigue sin tomarse (`:118-122`) |
+| D-17 | Sigue abierto | `ADR-0007:76-79` (y ahora también `TECH-DESIGNv2.md:95-97`) vs `auth/service.ts:102-107` |
+| D-18 | Sigue abierto | `seed-encargado.ts:85` inserta el correo sin normalizar |
 
 ## Hallazgos
 
 ### D-01 — El rastro de auditoría ya se puede leer desde la aplicación: RESUELTO
 
 - **Severidad:** ~~Crítico~~ — cerrado.
-- **Estado:** **RESUELTO el 2026-09-15**, por el ciclo `auditoria-lectura` (PRs #185, #186 y #187,
-  mergeados a `main`), después de la fecha de esta pasada.
-- **Lo que estaba abierto:** el ADR-0012 justifica la denylist de campos sensibles precisamente por
-  quién va a consultar la tabla: *"Un snapshot ingenuo de la fila de `usuarios` copiaría el hash de
-  contraseña a **una tabla pensada para que el encargado la lea**"*
-  (`docs/adrs/0012-frontera-auditoria-y-ledger.md:50-53`), y el PRD pone la auditabilidad en sus
-  criterios de éxito (`docs/PRD.md:158-159`). Al 2026-09-09, `AuditoriaRepo` solo exponía `record`
-  y ninguna ruta de la API permitía leer el rastro.
-- **Lo que se verificó el 2026-10-01:**
+- **Estado:** **RESUELTO el 2026-09-15**, por el ciclo `auditoria-lectura` (PRs #185, #186 y #187).
+- **Lo que estaba abierto:** el ADR-0012 justifica la denylist de campos sensibles por quién va a
+  consultar la tabla: *"una tabla pensada para que el encargado la lea"*
+  (`docs/adrs/0012-frontera-auditoria-y-ledger.md:50-53`). Al 2026-09-09, `AuditoriaRepo` solo
+  exponía `record` y ninguna ruta permitía leer el rastro.
+- **Re-verificado el 2026-10-04:**
   - `AuditoriaRepo` expone `record` y `list(filtro, page, pageSize)`
-    (`apps/api/src/auditoria/repository.ts:46-56`); `list` es una consulta de solo lectura.
+    (`apps/api/src/auditoria/repository.ts:46-56`).
   - `apps/api/src/app.ts:157-180` registra once grupos de rutas; el undécimo es `auditoria`
     (`apps/api/src/app.ts:180`).
   - `GET /api/auditoria` (`apps/api/src/routes/auditoria.ts:80-105`) está restringido a
     `roles: ['encargado']`, devuelve el sobre paginado y filtra por `entidad`+`entidadId` y por
     `usuarioId`; `entidadId` sin `entidad` se rechaza (`apps/api/src/routes/auditoria.ts:16-27`).
-- **Por qué se cierra:** se adoptó la opción `CORREGIR CÓDIGO` que este mismo hallazgo recomendaba,
-  con la forma exacta que proponía: `AuditoriaRepo.list` + `GET /api/auditoria` solo para
-  `encargado`, paginado y con esos dos filtros.
+- **Ver también:** D-22 — lo que esta ruta devuelve incluye datos personales que el PRD dice que el
+  rastro no conserva.
 
 ### D-02 — El procedimiento de rescate del último encargado ya existe y está probado: RESUELTO
 
 - **Severidad:** ~~Crítico~~ — cerrado.
-- **Estado:** **RESUELTO el 2026-10-02**, por el ciclo `rescate-encargado` (PRs #190 a #194,
-  mergeados a `main`), después de la fecha de esta pasada.
-- **Lo que estaba abierto:** el ADR-0007 promete que, *"como vía de rescate si el único encargado
-  pierde su contraseña, **se documenta un procedimiento administrativo manual** (resetear el hash
-  directo en base) fuera de la aplicación"* (`docs/adrs/0007-sesion-cookie-rbac-propio.md:61-63`).
-  Al 2026-09-09 no existía ningún runbook, y `docs/SECURITY.md:207` listaba el rescate como
-  recomendación #4 de SEC-001 sin resolver.
-- **Lo que se verificó el 2026-10-02:**
-  - `apps/api/package.json:17` declara el script `rescatar:encargado`
-    (`tsx scripts/rescatar-encargado.ts`).
+- **Estado:** **RESUELTO el 2026-10-02**, por el ciclo `rescate-encargado` (PRs #190 a #194).
+- **Lo que estaba abierto:** el ADR-0007 promete que *"como vía de rescate si el único encargado
+  pierde su contraseña, se documenta un procedimiento administrativo manual"*
+  (`docs/adrs/0007-sesion-cookie-rbac-propio.md:61-63`), y no existía.
+- **Re-verificado el 2026-10-04:**
+  - `apps/api/package.json:17` declara `rescatar:encargado` (`tsx scripts/rescatar-encargado.ts`).
   - `apps/api/src/usuarios/rescate.ts:51-62` busca el correo normalizado y rechaza, antes de
     cualquier escritura, un correo inexistente, una cuenta que no es de encargado y una cuenta
     inactiva; sin `--confirmar` devuelve una simulación (`apps/api/src/usuarios/rescate.ts:72-78`);
     con `--confirmar` llama a `resetUsuarioPassword` con la propia cuenta como actor y la marca
     `'rescate'` (`apps/api/src/usuarios/rescate.ts:82-86`), que solo se agrega al estado posterior
     de la fila de auditoría (`apps/api/src/usuarios/service.ts:318-323`).
-  - `apps/api/scripts/rescatar-encargado.ts:190` imprime la base de destino antes de cualquier
-    consulta, y `apps/api/scripts/rescatar-encargado.ts:120-159` muestra la contraseña temporal solo
-    en el resultado `rescatado`.
+  - `apps/api/scripts/rescatar-encargado.ts:190` imprime la base de destino antes de ejecutar, y
+    `apps/api/scripts/rescatar-encargado.ts:120-159` arma la salida por resultado.
   - Runbook en `docs/DEPLOY-PLAN.md:536-637` (§ Recovery → *Rescate del último encargado*), con
-    addendum en el ADR-0007 (`docs/adrs/0007-sesion-cookie-rbac-propio.md:156-178`).
-- **Por qué se cierra:** se adoptó la opción `CORREGIR CÓDIGO` que este mismo hallazgo recomendaba,
-  en su variante de script explícito y testeable (separado de `seed-encargado.ts`, no un modo de
-  él), más el runbook.
-- **Ver también:** D-17 y D-18, dos hallazgos que este ciclo encontró y registró sin resolverlos.
+    addendum en `docs/adrs/0007-sesion-cookie-rbac-propio.md:156-178`.
 
-### D-03 — El TECH-DESIGNv2 sigue describiendo la cookie de sesión sin `Secure`; la evidencia de la auditoría anterior ya estaba desactualizada cuando se escribió
+### D-03 — Quedan dos lugares que atan `Secure` al despliegue local, y el riesgo A11 sigue "abierto" contra lo que dicen el ADR-0009 y el propio TECH-DESIGNv2
 
-- **Severidad:** Advertencia
-- **Tipo:** Documentación que describe el sistema de forma inexacta
-- **Estado:** Abierto, **con evidencia corregida** (ver nota de proceso abajo).
-- **Prometido/afirmado:** *"**Despliegue local sin HTTPS:** ... la cookie de sesión no tiene
-  `Secure`"* (`docs/TECH-DESIGNv2.md:380-382`). El riesgo A11 sigue cerrando con *"El riesgo queda
-  abierto hasta que ese hito llegue y la decisión se tome"* (`:390`).
-- **Real:** `apps/api/src/auth/session.ts:45-54` (`sessionCookieOptions`) hoy emite
-  `secure: process.env.ALLOW_INSECURE_COOKIES !== 'true'` — **no** `process.env.NODE_ENV ===
-  'production'` como citaba el reporte del 2026-09-04. El cambio es el commit `5520779`
-  ("fix(api): fail closed on cookie Secure and the dev fallback secret"), fechado **2026-09-01**,
-  es decir **tres días antes** de la fecha del reporte anterior. `render.yaml:1-20` no define
-  `ALLOW_INSECURE_COOKIES`, así que en producción el default fail-closed aplica sin nada que lo
-  desactive: la cookie **es** `Secure` hoy, y lo es incluso en desarrollo local salvo que alguien
-  active la variable explícitamente.
-- **Nota de proceso:** la auditoría anterior declaró este hallazgo "sin cambios desde el 2026-08-29"
-  y citó la línea vieja como si siguiera vigente el día que se escribió el reporte — pero el código
-  ya había cambiado tres días antes. Esto no es una regresión del código; es una verificación que no
-  se hizo, exactamente el tipo de error que `CLAUDE.md` § *La regla* le pide a este proceso que no
-  cometa ("una afirmación... se prueba leyendo las líneas citadas... nunca porque suena razonable").
-  Se corrige aquí con la línea leída hoy.
-- **Por qué importa:** el TECH-DESIGNv2 sigue mal, y ahora de forma más clara — no solo el
-  despliegue de producción tiene `Secure` (vía ADR-0010, ya señalado en agosto), sino que el propio
-  código ya no depende de `NODE_ENV` para decidirlo: el default es `Secure` en cualquier entorno
-  salvo opt-out explícito. El riesgo A11 describe un estado que dejó de ser cierto en dos frentes
-  independientes (infraestructura y código), no solo uno.
+- **Severidad:** Sugerencia (bajada desde Advertencia: lo central se corrigió).
+- **Tipo:** Documentación que describe el sistema de forma inexacta.
+- **Estado:** **Sigue abierto, con alcance reducido.**
+- **Lo que se resolvió:** el registro de riesgos ya no dice que la cookie carece de `Secure`:
+  `docs/TECH-DESIGNv2.md:407-415` describe el fail-closed y `ALLOW_INSECURE_COOKIES`, y coincide con
+  `apps/api/src/auth/session.ts:45-54` (`secure: process.env.ALLOW_INSECURE_COOKIES !== 'true'`,
+  `:51`). Esa era la queja original.
+- **Lo que sigue mal hoy:**
+  - `docs/TECH-DESIGNv2.md:100-102` (entidad **Sesión**): *"`Secure` queda condicionado al
+    despliegue, ver ADR-0009"*. `docs/adrs/0007-sesion-cookie-rbac-propio.md:34-36` repite la misma
+    frase. El código no condiciona `Secure` a ningún despliegue, y el ADR-0009 está reemplazado.
+  - `docs/TECH-DESIGNv2.md:405-407` sigue titulando el riesgo *"Despliegue local sin HTTPS: mientras
+    el sistema corra solo en la máquina del desarrollador (ADR-0009)"*.
+  - El riesgo **(A11)** cierra con *"El riesgo queda abierto hasta que ese hito llegue y la decisión
+    se tome"* (`docs/TECH-DESIGNv2.md:416-423`), mientras el mismo documento dice que el despliegue
+    del ADR-0010 *"resuelve la condición de revisión de producto agregada en v2 (A11)"*
+    (`docs/TECH-DESIGNv2.md:63-65`) y el ADR-0009 se declara reemplazado precisamente porque esa
+    condición *"se resolvió con el nuevo despliegue"* (`docs/adrs/0009-despliegue-local.md:5-8`).
+  - Fuera de PRD/ADR, la misma idea vieja aparece en `docs/DEPLOY-PLAN.md:151` (*"`production`
+    activa el flag `Secure` de la cookie"*) y en el comentario de `render.yaml:14-15` (*"Gates the
+    cookie's Secure flag"* sobre `NODE_ENV`).
+- **Por qué importa:** quien llega a la entidad Sesión o al ADR-0007 para saber cuándo la cookie es
+  `Secure` recibe una respuesta que ya no es cierta, y el TECH-DESIGNv2 se contradice sobre si A11
+  está abierto.
 - **Opciones:**
   - `CORREGIR CÓDIGO` — no aplica.
-  - `ACTUALIZAR PRD/ADR` — reescribir el riesgo como cerrado por ADR-0010 + el fail-closed de
-    `sessionCookieOptions`, marcar A11 resuelto con fecha, y documentar `ALLOW_INSECURE_COOKIES`
-    como el mecanismo de opt-out para desarrollo local (ver también D-16).
-  - **Recomendación:** actualizar el documento — sin cambios en la recomendación de fondo, pero con
-    la evidencia correcta esta vez.
+  - `ACTUALIZAR PRD/ADR` — reemplazar la frase de `TECH-DESIGNv2.md:100-102` y `ADR-0007:34-36` por
+    una referencia al fail-closed; retitular el riesgo de despliegue local y marcar A11 resuelto con
+    fecha, coherente con `:63-65` y con el ADR-0009.
+  - **Recomendación:** actualizar los documentos.
 
 ### D-04 — La decisión de backup se tomó y se implementó: RESUELTO
 
 - **Severidad:** ~~Advertencia~~ — cerrado.
-- **Estado:** **RESUELTO el 2026-09-04**, verificado contra el código y los tres documentos que lo
-  registran.
-- **Lo que estaba abierto:** el ADR-0009 formalizaba un backup vía `pg_dump`/Task Scheduler sobre
-  disco local que quedó huérfano cuando el ADR-0010 movió la base a Neon sin heredar esa decisión.
-- **Lo que se verificó hoy:**
-  - `.github/workflows/backup-neon.yml` existe, corre `schedule: '0 9 * * 0'` (domingo 09:00 UTC,
-    una hora después de `consistencia-stock.yml` para no competir por la misma conexión) +
-    `workflow_dispatch` para disparo manual; hace `pg_dump` dentro de un contenedor
-    `postgres:18-alpine` (misma versión mayor que Neon, corregido tras una falla real de versión el
-    2026-09-05) con `--no-owner --no-privileges --exclude-schema=drizzle`, comprime con `gzip` bajo
-    `set -o pipefail`, y sube el resultado como GitHub Actions artifact con `retention-days: 90`.
-  - `docs/BACKLOG.md` fila #14 (mitad B) documenta la decisión, la investigación previa contra la
-    documentación oficial de Neon (PITR de 6 horas, sin export propio), y cita este mismo reporte
-    por su ID D-04 como el hueco que cierra.
-  - `docs/DEPLOY-PLAN.md:1101-1139` (entrada "2026-09-04 — Backup independiente... decisión tomada
-    vía `deploy-pass`") documenta el diseño completo y la restauración.
-  - Reutiliza el mismo rol/secreto read-only de `consistencia-stock.yml` (`NEON_READONLY_DATABASE_URL`)
-    sin credencial nueva — el único paso manual pendiente (crear el rol en Neon + cargar el secreto)
-    es infraestructura compartida con D-14, no una decisión sin tomar.
-- **Por qué se cierra:** la pregunta que D-04 planteaba — "¿el propietario va a decidir Opción A o
-  Opción B?" — ya tiene respuesta y código desplegado. Lo que queda pendiente (el rol de Neon) es un
-  paso operativo del propietario, ya rastreado en **Autorizaciones pendientes #11** de
-  `docs/DEPLOY-PLAN.md`, no una promesa incumplida de un documento de arquitectura.
-- **Ver también:** D-15 — el propio `docs/DEPLOY-PLAN.md` conserva una sección anterior que sigue
-  describiendo esta misma decisión como "pendiente", contradiciendo su entrada del 2026-09-04.
+- **Estado:** **RESUELTO el 2026-09-04.**
+- **Lo que estaba abierto:** el backup del ADR-0009 (`pg_dump` vía Task Scheduler a disco local)
+  quedó huérfano cuando el ADR-0010 movió la base a Neon.
+- **Re-verificado el 2026-10-04:** `.github/workflows/backup-neon.yml` corre `cron: '0 9 * * 0'`
+  (`:11`) más `workflow_dispatch` (`:12`), hace `pg_dump` dentro de `postgres:18-alpine` con
+  `--no-owner --no-privileges --exclude-schema=drizzle` bajo `set -o pipefail` (`:40-42`) y sube el
+  artefacto con `retention-days: 90` (`:50`). La decisión está registrada en
+  `docs/DEPLOY-PLAN.md:1101-1139`. Queda pendiente un paso operativo del propietario (rol read-only de
+  Neon), rastreado en `docs/DEPLOY-PLAN.md` § Autorizaciones pendientes #11 (`:891`), no una promesa
+  incumplida.
 
-### D-05 — El modelo de datos del TECH-DESIGNv2 sigue incompleto
+### D-05 — El modelo de datos del TECH-DESIGNv2 ya lista las columnas y la entidad que faltaban: RESUELTO
 
-- **Severidad:** Advertencia
-- **Tipo:** Documentación que describe el sistema de forma inexacta
-- **Estado:** Abierto (sin cambios desde el 2026-09-04 — ningún commit tocó `schema.ts` ni
-  `TECH-DESIGNv2.md` desde entonces).
-- **Prometido/afirmado:** el modelo de datos vigente enumera **Usuario** sin `intentos_fallidos`,
-  `bloqueado_hasta` ni `debe_cambiar_password` (`docs/TECH-DESIGNv2.md:92-94`), no tiene entidad
-  **Auditoría** propia, y describe **Movimiento** (`:123-129`) y **Alerta** (`:164-167`) sin
-  `es_merma` ni `movimiento_id` respectivamente.
-- **Real:** re-verificado contra `apps/api/src/db/schema.ts` — `intentosFallidos` (:31),
-  `bloqueadoHasta` (:32), `debeCambiarPassword` (:39), `esMerma` (:206) y `movimientoId` (:425) siguen
-  presentes y sin reflejo en el TECH-DESIGNv2.
-- **Opciones:** igual que la auditoría anterior — completar el modelo de datos con las columnas
-  faltantes y agregar **Auditoría** como entidad propia.
-- **Recomendación:** actualizar el documento — sin cambios.
+- **Severidad:** ~~Advertencia~~ — cerrado.
+- **Estado:** **RESUELTO el 2026-09-09** (commit `537865c`), verificado hoy.
+- **Lo que estaba abierto:** **Usuario** sin `intentos_fallidos`/`bloqueado_hasta`/
+  `debe_cambiar_password`, **Movimiento** sin `es_merma`, **Alerta** sin `movimiento_id`, y sin
+  entidad **Auditoría**.
+- **Evidencia:** `docs/TECH-DESIGNv2.md:92-98` (Usuario con las tres columnas), `:137-139`
+  (`es_merma` y `CHECK movimientos_merma_solo_salida`), `:177-179` (`movimiento_id` nulo), `:182-190`
+  (entidad Auditoría). Coinciden con `apps/api/src/db/schema.ts:31`, `:32`, `:39`, `:206`, `:253-255`,
+  `:425-427` y `:105-141`.
+- **Nota:** la línea que se agregó a Usuario (`TECH-DESIGNv2.md:95-97`) trajo consigo la afirmación
+  desactualizada sobre la cuenta bloqueada — ver D-17. Y el modelo de **Venta** tiene su propio
+  desajuste — ver D-19.
 
-### D-06 — La unicidad case-insensitive sigue sin documentarse
+### D-06 — La unicidad case-insensitive ya está documentada: RESUELTO
 
-- **Severidad:** Advertencia
-- **Tipo:** Feature no documentada (drift inverso)
-- **Estado:** Abierto (sin cambios).
-- **Real:** re-verificado — `proveedores_nombre_lower_unique` (`apps/api/src/db/schema.ts:64-67`) y
-  `productos_sku_lower_unique` (`:188`) siguen sin mención en `docs/TECH-DESIGNv2.md:98-101`.
-- **Recomendación:** actualizar el documento — sin cambios.
+- **Severidad:** ~~Advertencia~~ — cerrado.
+- **Estado:** **RESUELTO el 2026-09-09** (commit `537865c`), verificado hoy.
+- **Evidencia:** `docs/TECH-DESIGNv2.md:105-111` nombra `proveedores_nombre_lower_unique` y
+  `productos_sku_lower_unique` como índices funcionales sobre `lower(...)`, que es lo que definen
+  `apps/api/src/db/schema.ts:64-66` y `:188`.
 
 ### D-08 — El avatar del shell sigue sin distinguir color por rol
 
 - **Severidad:** Sugerencia
-- **Tipo:** Feature fantasma (implementada de forma materialmente distinta)
-- **Estado:** Abierto (sin cambios).
-- **Real:** re-verificado — `apps/web/src/components/ui/AppShell.module.css:99-111` sigue con un
-  único `.avatar` sin variante por rol.
-- **Recomendación:** corregir el código — sin cambios.
+- **Tipo:** Feature fantasma (implementada de forma materialmente distinta).
+- **Estado:** Sigue abierto, sin cambios.
+- **Prometido:** *"(El Design.md muestra avatar con iniciales y color por rol: azul encargado, verde
+  depósito.)"* (`docs/TECH-DESIGNv2.md:99`).
+- **Real:** `apps/web/src/components/ui/AppShell.module.css:99-111` define un único `.avatar` con
+  `background: var(--color-accent)`, y `apps/web/src/components/ui/AppShell.tsx:119` lo aplica sin
+  variante por rol.
+- **Por qué importa:** menor; el rol ya se muestra como texto (`AppShell.tsx:124`).
+- **Opciones:**
+  - `CORREGIR CÓDIGO` — agregar una variante de `.avatar` por rol.
+  - `ACTUALIZAR PRD/ADR` — quitar la nota del TECH-DESIGNv2 si el color por rol dejó de ser intención.
+  - **Recomendación:** corregir el código — sin cambios.
 
 ### D-09 — La verificación del `Set-Cookie` post-deploy (tarea 5.9) sigue sin registrarse
 
 - **Severidad:** Advertencia
-- **Tipo:** Documentación que describe el sistema de forma inexacta
-- **Estado:** Abierto (sin cambios).
-- **Real:** re-verificado — `openspec/changes/archive/2026-08-24-fundaciones-monorepo/tasks.md:75-82`
-  conserva las tareas 5.4-5.6 y 5.9 sin marcar; `docs/adrs/0010-despliegue-tiers-gratuitos.md:79`
-  conserva la misma línea **"Pendiente:"** textual.
-- **Recomendación:** ejecutar la verificación 5.9 y registrar el resultado; marcar 5.4-5.6 completadas
-  con evidencia — sin cambios.
+- **Tipo:** Documentación que describe el sistema de forma inexacta.
+- **Estado:** Sigue abierto, sin cambios.
+- **Prometido:** *"**Pendiente:** registrar aquí el resultado del smoke test post-deploy (tarea 5.9
+  de `fundaciones-monorepo`)"* (`docs/adrs/0010-despliegue-tiers-gratuitos.md:79-81`).
+- **Real:** `openspec/changes/archive/2026-08-24-fundaciones-monorepo/tasks.md:77-79` (5.4-5.6) y
+  `:82` (5.9) siguen sin marcar, aunque 5.4 está hecha de hecho: `vercel.json:8` ya apunta a
+  `https://inventienda-api.onrender.com`. `docs/DEPLOY-PLAN.md:466-469` también dice *"Sigue
+  pendiente"*.
+- **Por qué importa:** la única verificación que confirma que el proxy de Vercel no altera la cookie
+  de sesión no tiene resultado registrado; el ADR la sigue declarando pendiente.
+- **Opciones:**
+  - `CORREGIR CÓDIGO` — no aplica; es una verificación manual.
+  - `ACTUALIZAR PRD/ADR` — ejecutar 5.9, registrar el resultado en `ADR-0010:79-81` y marcar 5.4-5.6
+    con evidencia.
+  - **Recomendación:** ejecutar y registrar — sin cambios.
 
-### D-10 — Las rutas de acción POST se apartan de la convención REST del ADR-0004; el patrón ya son cuatro instancias, no tres
+### D-10 — La convención `POST /<recurso>/:id/<transición>` ya está escrita en el ADR-0004: RESUELTO
 
-- **Severidad:** Advertencia
-- **Tipo:** Feature no documentada (drift inverso)
-- **Estado:** Abierto, **con un conteo corregido** — la auditoría anterior contó tres replicas y
-  omitió una cuarta que ya existía en esa fecha.
-- **Prometido:** *"La API es **REST sobre JSON**... con **verbos HTTP estándar**"*
-  (`docs/adrs/0004-rest-json-openapi.md:17-18`).
-- **Real:** el patrón `POST /<recurso>/:id/<transición>` existe hoy en **cuatro** dominios, no tres:
-  `apps/api/src/routes/usuarios.ts:209` (`/usuarios/:id/password-reset`),
-  `apps/api/src/routes/proveedores.ts:194-195` (`/proveedores/:id/deactivate` y `/reactivate`, vía
-  loop),  `apps/api/src/routes/ventas.ts:258` (`/ventas/:id/anular`), y
-  **`apps/api/src/routes/alertas.ts:150`** (`/alertas/:id/resolver`) — esta última mergeada el
-  **2026-09-02** (`git log`), es decir **dos días antes** de la fecha del reporte anterior
-  (2026-09-04), que solo contó tres. No es drift nuevo introducido desde la auditoría anterior; es
-  una instancia que ya existía y no se contó.
-- **Por qué importa:** el argumento de la auditoría anterior — "el patrón se está replicando sin una
-  línea escrita en el ADR-0004" — es aún más fuerte con cuatro instancias confirmadas que con tres.
-- **Opciones:** igual que antes — no destruir el patrón (`CORREGIR CÓDIGO` no aplica); documentar la
-  convención en el ADR-0004.
-- **Recomendación:** actualizar el ADR — sin cambios en la recomendación, con el conteo corregido.
+- **Severidad:** ~~Advertencia~~ — cerrado.
+- **Estado:** **RESUELTO el 2026-09-09** (commit `537865c`), verificado hoy.
+- **Evidencia:** `docs/adrs/0004-rest-json-openapi.md:32-43` acepta explícitamente el patrón *"para
+  acciones de cambio de estado"*. Todas las rutas de transición con `:id` del código caen dentro de
+  esa regla general.
+- **Nota:** la enumeración que acompaña la regla es incompleta, y el conteo de "cuatro" que traía este
+  hallazgo también lo era. Se registra aparte como D-20.
 
-### D-11 — El backlog sigue justificando el bloqueo del #3.5 citando Firebase Hosting
+### D-11 — El backlog ya no justifica el bloqueo del #3.5 con Firebase Hosting: RESUELTO
 
-- **Severidad:** Sugerencia
-- **Estado:** Abierto (sin cambios). `docs/BACKLOG.md:37` sigue citando el `*.web.app` de Firebase
-  Hosting; el proyecto sigue en Vercel + Render.
-- **Recomendación:** actualizar el documento — sin cambios.
+- **Severidad:** ~~Sugerencia~~ — cerrado.
+- **Estado:** **RESUELTO el 2026-09-09** (commit `537865c`), verificado hoy.
+- **Evidencia:** `docs/BACKLOG.md:37` ahora dice *"el proyecto corre en Vercel (SPA) + Render (API) +
+  Neon (Postgres), y ninguno de los tres da un dominio propio con ese control de DNS"*; Firebase solo
+  aparece como alternativa descartada.
 
-### D-13 — La nota de trazabilidad del TECH-DESIGNv2 sigue agrupando los KPI del dashboard (Alerta) con los chips de productos (Producto) bajo la misma flecha
+### D-13 — La trazabilidad del TECH-DESIGNv2 ya separa KPIs (Alerta) de chips (Producto): RESUELTO
 
-- **Severidad:** Advertencia
-- **Estado:** Abierto (sin cambios). Re-verificado: `apps/web/src/features/productos/ProductosTable.tsx:62-67`
-  sigue derivando los chips de `stock_actual`/`stock_minimo`; `apps/api/src/dashboard/service.ts:46-47`
-  sigue llamando `AlertasRepo.countAbiertasPorTipo` para las KPI cards. `docs/TECH-DESIGNv2.md:169-171`
-  sigue sin separar las dos fuentes.
-- **Recomendación:** actualizar el documento — sin cambios.
+- **Severidad:** ~~Advertencia~~ — cerrado.
+- **Estado:** **RESUELTO el 2026-09-09** (commit `537865c`), verificado hoy.
+- **Evidencia:** `docs/TECH-DESIGNv2.md:192-193` asigna las KPI cards a `Alerta` y los chips a
+  `stock_actual`/`stock_minimo` calculados en el cliente. Coincide con
+  `apps/api/src/dashboard/service.ts:46-48` (`countAbiertasPorTipo`, `countAbiertas`) y
+  `apps/web/src/features/productos/ProductosTable.tsx:62-67`.
 
-### D-14 — El registro de riesgos del TECH-DESIGNv2 describe la verificación de consistencia en tiempo futuro, y ya está cerrada y corriendo
+### D-14 — El registro de riesgos describe la verificación de consistencia como ya hecha: RESUELTO
 
-- **Severidad:** Sugerencia
-- **Estado:** Abierto (sin cambios de fondo; nueva evidencia de que el trabajo posterior al cierre
-  fue exclusivamente de endurecimiento operativo, no de alcance). `docs/TECH-DESIGNv2.md:359-362`
-  sigue en tiempo futuro ("se agrega una verificación periódica... Revisar antes de producción").
-  Desde el 2026-09-04, cuatro commits corrigieron el propio mecanismo (versión de Postgres del
-  contenedor de backup — que comparte cron adyacente —, `set -o pipefail`, exclusión del schema
-  `drizzle`, logging honesto de conteos en `verificar-consistencia.ts`, y `workflow_dispatch` manual
-  en ambos workflows), reforzando que la verificación existe y corre — no cambiando la conclusión de
-  este hallazgo.
-- **Recomendación:** cambiar el tiempo verbal a "se agregó" — sin cambios.
+- **Severidad:** ~~Sugerencia~~ — cerrado.
+- **Estado:** **RESUELTO el 2026-09-09** (commit `537865c`), verificado hoy.
+- **Evidencia:** `docs/TECH-DESIGNv2.md:383-387` dice *"se agregó una verificación periódica de
+  consistencia"* y nombra `apps/api/scripts/verificar-consistencia.ts` y
+  `.github/workflows/consistencia-stock.yml`; ambos archivos existen.
 
-### D-15 (nuevo) — `docs/DEPLOY-PLAN.md` conserva una sección que describe el backup como "decisión pendiente", contradicha 470 líneas más abajo por su propia entrada que registra la decisión ya tomada
+### D-15 — `docs/DEPLOY-PLAN.md` conserva el título "decisión pendiente" sobre el backup, y la nota que lo corrige describe mal lo que sigue
 
-- **Severidad:** Advertencia
-- **Tipo:** Documentación que describe el sistema de forma inexacta (auto-contradicción dentro del
-  mismo documento, no PRD/ADR vs código)
-- **Prometido/afirmado:** `docs/DEPLOY-PLAN.md:639` abre una sección titulada **"Backup
-  independiente — decisión pendiente (backlog #14, mitad B)"** y dice textualmente: *"Dos caminos,
-  ninguno adoptado todavía"* (`:537`), cerrando con *"es una decisión del dueño, no mía: confirmar
-  antes de generar el workflow"* (`:549`).
-- **Real:** el mismo archivo, en su entrada fechada **"2026-09-04 — Backup independiente (backlog
-  #14, mitad B) — decisión tomada vía `deploy-pass`"** (`:1101-1139`), registra que **Opción B fue
-  adoptada** y que el workflow **ya fue generado**: `.github/workflows/backup-neon.yml` existe en el
-  repositorio (verificado arriba, D-04) con exactamente el diseño que esa segunda entrada describe.
-  Las dos secciones coexisten en el mismo archivo describiendo el mismo backlog item con
-  conclusiones opuestas sobre si la decisión está tomada.
-- **Por qué importa:** un lector que entre a `docs/DEPLOY-PLAN.md` buscando el estado del backup y se
-  detenga en la primera sección (más arriba en el archivo, dentro de "Recovery") sale creyendo que
-  la decisión sigue abierta y que hay una pregunta pendiente para el propietario — exactamente lo
-  contrario de lo que ya ocurrió. Es el mismo tipo de defecto que este documento le exige a los
-  ADRs (D-03, D-09, D-14): una sección que quedó en el tiempo verbal de cuando se escribió, sin
-  actualizarse cuando el resto del mismo archivo avanzó.
+- **Severidad:** Sugerencia (bajada desde Advertencia).
+- **Tipo:** Documentación que describe el sistema de forma inexacta (no es PRD/ADR).
+- **Estado:** **Sigue abierto, con alcance reducido.**
+- **Lo que se resolvió:** el texto que decía *"Dos caminos, ninguno adoptado todavía"* se eliminó, y
+  una nota aclara que la decisión ya se tomó (`docs/DEPLOY-PLAN.md:641-645`). Un lector ya no sale
+  creyendo que la decisión sigue abierta.
+- **Lo que sigue mal hoy:**
+  - El título sigue siendo *"Backup independiente — decisión pendiente (backlog #14, mitad B)"*
+    (`docs/DEPLOY-PLAN.md:639`).
+  - La nota dice que *"Lo que sigue describe el estado antes de decidir"* (`:641-642`), pero lo que
+    sigue (`:647-676`) es guía de recuperación vigente (la asimetría código/datos y el primer
+    diagnóstico ante un incidente), no contexto histórico.
+  - La nota remite a la entrada del 2026-09-04 *"más abajo (sección Recovery)"* (`:643-644`), pero esa
+    entrada (`:1101`) está bajo `## Registro de ejecución y verificación` (`:896`), no bajo Recovery.
+- **Por qué importa:** poco, pero un lector puede saltarse guía de incidentes vigente creyéndola
+  histórica.
 - **Opciones:**
   - `CORREGIR CÓDIGO` — no aplica.
-  - `ACTUALIZAR PRD/ADR` — no aplica en sentido estricto (no es PRD ni ADR), pero el mismo principio
-    corre: reemplazar la sección "Backup independiente — decisión pendiente" por una referencia corta a
-    la entrada que registra la decisión ("decisión tomada, ver más abajo"), o fusionar ambas en una sola sección fechada.
-  - **Recomendación:** actualizar el documento. Es la propia inconsistencia que el ítem 3 de "Próximos
-    pasos" de la auditoría anterior ya advertía en general (D-13) — este es el mismo patrón, dentro
-    de un documento distinto.
+  - `ACTUALIZAR PRD/ADR` — no aplica en sentido estricto; retitular la sección (p. ej. "Recuperación
+    ante incidentes") y corregir la nota y su referencia.
+  - **Recomendación:** actualizar el documento.
 
-### D-16 (nuevo) — El endurecimiento de seguridad del 2026-08-30/09-01 (IP verificada por proxy, `secure` fail-closed) no está en ningún ADR, y la propia condición de revisión que el ADR-0007 fijó para el bloqueo por IP ya se cumplió sin que nadie la retomara
+### D-16 — El mecanismo de IP verificada ya está en el ADR-0007; la revisión del bloqueo por IP que el propio ADR prometió sigue sin hacerse
 
-- **Severidad:** Advertencia
-- **Tipo:** Feature no documentada (drift inverso) + Regla omitida
-- **Prometido/afirmado:** el ADR-0007, actualizado 2026-08-29, descarta el bloqueo por IP porque
-  "hoy no hay `trustProxy`... [esto] queda disponible como refuerzo posterior, **una vez corregido
-  SEC-003**" (`docs/adrs/0007-sesion-cookie-rbac-propio.md:81-84`). El ADR no vuelve a mencionar
-  `trustProxy`, IP ni SEC-003 en ninguna sección posterior.
-- **Real:** SEC-003 fue corregido el **2026-08-30** (`docs/SECURITY.md:385-419`, "RESUELTO el
-  2026-08-30 — ambas mitades, verificado contra producción"), un día después de la fecha del propio
-  ADR-0007. La corrección introdujo `apps/api/src/plugins/clientIp.ts` (nuevo, commit
-  `fix(api): key the login rate limit on a proxy-verified client address`, 2026-08-30): un
-  `keyGenerator` que confía en `X-Forwarded-For` **solo** cuando la petición trae el secreto
-  compartido `PROXY_SHARED_SECRET` en `x-inventienda-proxy`, con `trustProxy` de Fastify
-  deliberadamente **apagado** (no la ruta que el ADR-0007 había anticipado, pero sí una que
-  resuelve el mismo problema de fondo: distinguir clientes reales del proxy compartido). Ninguno de
-  los tres términos (`clientIp`, `PROXY_SHARED_SECRET`, `ALLOW_INSECURE_COOKIES` — el fail-closed de
-  D-03) aparece en ningún ADR, en `docs/TECH-DESIGNv2.md` ni en `docs/PRD.md` — únicamente en
-  `docs/SECURITY.md`, que es un reporte de auditoría de seguridad, no un documento de decisión de
-  arquitectura.
-- **Por qué importa:** dos cosas distintas, ambas reales. Primero, hay un mecanismo de producción
-  (probado — `apps/api/src/plugins/clientIp.test.ts`, y verificado contra Render en vivo) que
-  ninguna ADR describe, así que un lector que llegue al ADR-0007 buscando "¿cómo se protege el login
-  contra IPs falsificadas?" no lo va a encontrar ahí. Segundo, y más concreto: el propio ADR-0007
-  puso una condición explícita y verificable ("una vez corregido SEC-003") para retomar la decisión
-  de bloqueo por IP, esa condición lleva **cumplida más de una semana** (SEC-003 resuelto el
-  2026-08-30; esta auditoría es del 2026-09-09), y no hay evidencia en `docs/BACKLOG.md` ni en el
-  propio ADR de que alguien haya vuelto a evaluarla. No es que la decisión de no bloquear por IP
-  esté mal — es que el ADR se comprometió a una fecha de revisión implícita ("una vez corregido
-  SEC-003") y esa fecha ya pasó sin que el documento lo refleje.
+- **Severidad:** Sugerencia (bajada desde Advertencia).
+- **Tipo:** Regla omitida (revisión comprometida y no realizada).
+- **Estado:** **Sigue abierto, con alcance reducido.**
+- **Lo que se resolvió:** la mitad de "feature no documentada". `docs/adrs/0007-sesion-cookie-rbac-propio.md:100-116`
+  documenta `apps/api/src/plugins/clientIp.ts`, `PROXY_SHARED_SECRET` y `trustProxy` apagado, y
+  `docs/TECH-DESIGNv2.md:407-415` documenta `ALLOW_INSECURE_COOKIES`.
+- **Lo que sigue abierto:** el ADR-0007 dejó el bloqueo por IP *"disponible como refuerzo posterior,
+  una vez corregido SEC-003"* (`:81-84`). SEC-003 se corrigió el 2026-08-30, y el addendum del
+  2026-09-09 registra explícitamente que *"nadie volvió a evaluar"* esa decisión y que *"queda para el
+  propietario"* (`:118-122`). A la fecha sigue sin evaluarse: ningún documento posterior la retoma, y
+  `docs/BACKLOG.md:34` sigue diciendo que 2.6 *"Habilita además el bloqueo por IP"* sin decisión. Un
+  dato nuevo para esa decisión: el código ya considera la resolución de IP real *"only partially
+  verifiable"* detrás de Render + Vercel (`apps/api/src/plugins/sessionRateLimit.ts:6-9`).
+- **Por qué importa:** ya no engaña a nadie (el ADR dice honestamente que está abierto), pero es un
+  condicional de seguridad que el propio ADR se comprometió a cerrar.
 - **Opciones:**
-  - `CORREGIR CÓDIGO` — no aplica al mecanismo en sí (está probado y funcionando); si el propietario
-    decide que el bloqueo por IP como refuerzo de SEC-001 ya vale la pena ahora que SEC-003 está
-    resuelto, sería un cambio de código nuevo y separado.
-  - `ACTUALIZAR PRD/ADR` — actualizar el ADR-0007 con una sección que documente `clientIp.ts`/
-    `PROXY_SHARED_SECRET` como la forma en que SEC-003 se resolvió (sin adoptar `trustProxy` en sí),
-    y registrar explícitamente si el propietario decide agregar bloqueo por IP ahora o diferirlo con
-    una razón nueva — en cualquier caso, cerrar el condicional abierto en vez de dejarlo flotando.
-  - **Recomendación:** actualizar el ADR-0007. Es una decisión de producto/seguridad pequeña pero
-    real (¿corresponde ahora el refuerzo que el propio ADR previó?), y closing the loop cuesta un
-    párrafo.
+  - `CORREGIR CÓDIGO` — si el propietario decide que el refuerzo vale la pena, sería un cambio nuevo.
+  - `ACTUALIZAR PRD/ADR` — registrar en el ADR-0007 la decisión de no agregarlo (p. ej. con el
+    argumento de `sessionRateLimit.ts:6-9`) o de diferirlo con una condición nueva.
+  - **Recomendación:** que el propietario decida y el ADR lo registre; cualquiera de las dos opciones
+    cierra el hallazgo.
 
-### D-17 (nuevo, 2026-10-02) — El ADR-0007 dice que una contraseña correcta da acceso aunque la cuenta esté bloqueada; el código responde `423 ACCOUNT_LOCKED`
+### D-17 — El ADR-0007 (y ahora también el TECH-DESIGNv2) dice que una contraseña correcta da acceso aunque la cuenta esté bloqueada; el código responde `423 ACCOUNT_LOCKED`
 
 - **Severidad:** Advertencia
-- **Tipo:** Documentación que describe el sistema de forma inexacta (ADR vs código)
+- **Tipo:** Documentación que describe el sistema de forma inexacta (ADR vs código).
+- **Estado:** Sigue abierto, **y se extendió**: el commit `537865c` copió la misma afirmación al
+  TECH-DESIGNv2.
 - **Prometido/afirmado:** *"una credencial correcta concede acceso aunque la cuenta esté bloqueada, y
   limpia el contador... quien sabe su contraseña nunca queda fuera"*
-  (`docs/adrs/0007-sesion-cookie-rbac-propio.md:76-79`).
+  (`docs/adrs/0007-sesion-cookie-rbac-propio.md:76-79`). El TECH-DESIGNv2 lo repite en la entidad
+  Usuario: *"una credencial correcta concede acceso y limpia el contador"*
+  (`docs/TECH-DESIGNv2.md:95-97`).
 - **Real:** con la contraseña correcta y `bloqueado_hasta` en el futuro, `login` lanza
-  `accountLocked(retryAfter)` (`423 ACCOUNT_LOCKED`) y no crea sesión
-  (`apps/api/src/auth/service.ts:102-107`); el comentario de `apps/api/src/auth/service.ts:96-101`
-  lo declara deliberado. La spec vigente lo ratifica en el escenario *"Locked account, correct
-  password"* (`openspec/specs/auth-sessions/spec.md:47-50`). El cambio viene de la resolución de S01
-  de `SECURITY-REPORT.md` (`SECURITY-REPORT.md:162-166`), que el comentario de
-  `apps/api/src/auth/service.ts:73-81` registra como ratificada por el propietario el 2026-09-01; el
-  ADR no se actualizó. La misma afirmación desactualizada se repite en `docs/SECURITY.md:218-221`
-  (nota de resolución de SEC-001) y en `docs/BACKLOG.md:31` (ítem 2.3).
-- **Por qué importa:** quien lea el ADR para saber qué le pasa al titular legítimo de una cuenta
-  bloqueada concluye que entra; en realidad recibe `423` hasta que vence el bloqueo o hasta que
-  alguien le restablece la contraseña. El comportamiento del código es el correcto (cierra un oráculo
-  de enumeración); lo que está mal es el documento de decisión.
+  `accountLocked(retryAfter)` y no crea sesión (`apps/api/src/auth/service.ts:102-107`); el comentario
+  de `:96-101` lo declara deliberado, y el de `:73-81` registra la resolución de S01
+  (`SECURITY-REPORT.md:161-165`), ratificada por el propietario el 2026-09-01. La spec vigente lo
+  fija en el escenario *"Locked account, correct password"*
+  (`openspec/specs/auth-sessions/spec.md:47-50`). La afirmación vieja sigue además en
+  `docs/SECURITY.md:218-221` y `:1214`, y en `docs/BACKLOG.md:31`. El propio encabezado de `login`
+  en el código quedó desactualizado: *"lockout is checked before the password verify"*
+  (`apps/api/src/auth/service.ts:36-40`).
+- **Por qué importa:** quien consulte el ADR o el modelo de datos para saber qué le pasa al titular
+  legítimo de una cuenta bloqueada concluye que entra; en realidad recibe `423` hasta que vence el
+  bloqueo o alguien le restablece la contraseña.
 - **Opciones:**
   - `CORREGIR CÓDIGO` — no aplica: el comportamiento actual es el que ratifica la spec.
-  - `ACTUALIZAR PRD/ADR` — agregar al ADR-0007 un addendum que registre la resolución de S01: la
-    contraseña se sigue verificando antes de evaluar el bloqueo, pero una contraseña correcta sobre
-    una cuenta bloqueada recibe `423` con `retryAfter`, no acceso.
-  - **Recomendación:** actualizar el ADR.
+  - `ACTUALIZAR PRD/ADR` — addendum en el ADR-0007 con la resolución de S01, y corregir
+    `TECH-DESIGNv2.md:95-97`.
+  - **Recomendación:** actualizar el ADR y el TECH-DESIGNv2.
 
-### D-18 (nuevo, 2026-10-02) — `seed-encargado.ts` guarda el correo sin normalizar, y el login lo busca normalizado
+### D-18 — `seed-encargado.ts` guarda el correo sin normalizar, y el login lo busca normalizado
 
 - **Severidad:** Advertencia
-- **Tipo:** Regla omitida
-- **Prometido/afirmado:** el login normaliza el correo (`trim().toLowerCase()`) antes de buscarlo
-  (`apps/api/src/auth/service.ts:45-46`), y el alta de usuarios desde la aplicación lo guarda
-  normalizado (`apps/api/src/usuarios/repository.ts:280`). `findByEmail` compara por igualdad exacta
+- **Tipo:** Regla omitida.
+- **Estado:** Sigue abierto, sin cambios.
+- **Prometido/afirmado:** el login normaliza el correo antes de buscarlo
+  (`apps/api/src/auth/service.ts:32-34` y `:45`), el alta desde la aplicación lo guarda normalizado
+  (`apps/api/src/usuarios/repository.ts:280`), y `findByEmail` compara por igualdad exacta
   (`apps/api/src/usuarios/repository.ts:132-139`).
-- **Real:** `apps/api/scripts/seed-encargado.ts:85` inserta `email: input.email` tal como llega de
-  `--email` o de `SEED_ENCARGADO_EMAIL`; el esquema solo valida el formato
-  (`apps/api/scripts/seed-encargado.ts:18`), no normaliza.
-- **Por qué importa:** un primer encargado sembrado con mayúsculas (`Admin@Tienda.com`) nunca puede
-  iniciar sesión: el login busca `admin@tienda.com` y no lo encuentra. Tampoco se puede volver a
-  sembrar, porque el seed no hace nada si ya existe un encargado
-  (`apps/api/scripts/seed-encargado.ts:76-78`), y el rescate de D-02 no lo repara: busca con la misma
-  normalización que el login (`apps/api/src/usuarios/rescate.ts:51-53`) y responde "no encontrado".
-  El runbook de `docs/DEPLOY-PLAN.md` lo documenta como fuera de su alcance.
+- **Real:** `apps/api/scripts/seed-encargado.ts:85` inserta `email: input.email` tal como llega; el
+  esquema solo valida el formato (`apps/api/scripts/seed-encargado.ts:18`).
+- **Por qué importa:** un primer encargado sembrado con mayúsculas nunca puede iniciar sesión. No se
+  puede volver a sembrar (`apps/api/scripts/seed-encargado.ts:76-78` no hace nada si ya existe un
+  encargado), y el rescate de D-02 tampoco lo repara: busca con la misma normalización
+  (`apps/api/src/usuarios/rescate.ts:51-53`) y responde "no encontrado".
 - **Opciones:**
   - `CORREGIR CÓDIGO` — normalizar el correo en `seedEncargado` antes del `insert`, con un test que
     siembre un correo con mayúsculas y pruebe el login.
   - `ACTUALIZAR PRD/ADR` — no aplica: ningún documento promete guardar el correo tal como se escribe.
   - **Recomendación:** corregir el código.
 
-## Resueltos desde la auditoría anterior (2026-09-04)
+### D-19 (nuevo) — La Venta no tiene los campos fiscales reservados que el ADR-0003 y el TECH-DESIGNv2 dan por existentes
 
-- **D-04 (Advertencia) — la decisión de backup seguía sin tomarse.** Resuelto: ver detalle en D-04
-  arriba. Decisión tomada y workflow desplegado el mismo día que se escribió el reporte anterior
-  (2026-09-04, vía `deploy-pass`, PRs #176/#177), con cuatro correcciones operativas posteriores
-  (PRs #178-#182) que no cambian la conclusión, solo la endurecen.
-- **D-01 (Crítico) — el rastro de auditoría no tenía lector en la aplicación.** Resuelto el
-  2026-09-15, después de esta pasada: `GET /api/auditoria` (PRs #185–#187). Ver detalle en D-01
-  arriba.
-- **D-02 (Crítico) — no existía el procedimiento de rescate del último encargado.** Resuelto el
-  2026-10-02, después de esta pasada: script `rescatar:encargado` y runbook en `docs/DEPLOY-PLAN.md`
-  § Recovery → *Rescate del último encargado* (PRs #190–#194). Ver detalle en D-02 arriba.
+- **Severidad:** Advertencia
+- **Tipo:** Feature fantasma (decisión de modelo de datos no implementada).
+- **Prometido:** el ADR-0003 fija como consecuencia que *"El modelo de la venta se diseña... con
+  campos reservados para la futura factura fiscal (etapa 2), sin implementarla en v1"*
+  (`docs/adrs/0003-postgres-stock-guardado-ledger.md:55-56`). El TECH-DESIGNv2 los nombra: *"Campos
+  reservados para etapa 2 (factura fiscal), no usados en v1: `tipo_comprobante`, `cae`,
+  `numero_fiscal`"* (`docs/TECH-DESIGNv2.md:153-156`), y su registro de riesgos los cuenta como
+  puerta ya abierta: *"los campos fiscales reservados en Venta... reducen el costo futuro"*
+  (`docs/TECH-DESIGNv2.md:424-427`). El PRD pide tenerlo *"en cuenta en el modelo de datos de la venta
+  desde v1"* (`docs/PRD.md:198-200`).
+- **Real:** la tabla `ventas` (`apps/api/src/db/schema.ts:293-331`) tiene `id`, `numero_correlativo`,
+  `usuario_id`, `estado`, `total`, `creado_en`, `anulada_por`, `anulada_en` y `motivo_anulacion` —
+  ninguno de los tres campos reservados. La spec del POS solo excluye el `numero_fiscal` como contador
+  futuro (`openspec/specs/point-of-sale/spec.md:20-21`); no registra la decisión de no reservar las
+  columnas. Desajuste menor en la misma entidad: el TECH-DESIGNv2 la llama `fecha` y el esquema
+  `creado_en` (`apps/api/src/db/schema.ts:305`).
+- **Por qué importa:** el TECH-DESIGNv2 presenta como mitigación de riesgo de etapa 2 algo que no
+  existe. El costo técnico real de agregarlas después es bajo (columnas nulas, migración aditiva), así
+  que lo que está mal es más la promesa que el código.
+- **Opciones:**
+  - `CORREGIR CÓDIGO` — agregar `tipo_comprobante`, `cae` y `numero_fiscal` nulos a `ventas` (una
+    migración aditiva más, aplicada a mano contra Neon).
+  - `ACTUALIZAR PRD/ADR` — registrar que los campos se agregarán en etapa 2 con una migración
+    aditiva, y quitar la afirmación de `TECH-DESIGNv2.md:424-427`. Justificable: reservar columnas
+    sin uso no ahorra nada que una migración aditiva no dé.
+  - **Recomendación:** actualizar los documentos; reservar columnas vacías no tiene valor propio.
 
-## Corregidos desde la auditoría anterior (evidencia, no severidad)
+### D-20 (nuevo) — La enumeración del ADR-0004 omite rutas de transición que ya existían, y `POST /alertas/marcar-vistas` no encaja en la forma documentada
 
-- **D-03 — la línea de código citada como evidencia ya no era la que corría en producción al
-  momento de escribir el reporte anterior.** El fix fail-closed de `secure` (commit `5520779`) es
-  del 2026-09-01; el reporte anterior, fechado 2026-09-04, citó la línea pre-fix como si siguiera
-  vigente. La conclusión del hallazgo (el TECH-DESIGNv2 sigue describiendo mal el riesgo) no cambia,
-  pero la evidencia sí — ver D-03 arriba para el detalle y la cita corregida.
-- **D-10 — el conteo de instancias del patrón POST de transición estaba subestimado.** La auditoría
-  anterior contó tres (`usuarios`, `proveedores`, `ventas`); existe una cuarta (`alertas.ts:150`,
-  `/alertas/:id/resolver`) mergeada el 2026-09-02, dos días antes de esa auditoría. Ver D-10 arriba.
+- **Severidad:** Sugerencia
+- **Tipo:** Feature no documentada (drift inverso).
+- **Prometido/afirmado:** *"El patrón se asentó de forma independiente en cuatro dominios"*: usuarios
+  (`password-reset`), proveedores (`deactivate`, `reactivate`), ventas (`anular`) y alertas
+  (`resolver`) (`docs/adrs/0004-rest-json-openapi.md:32-37`). La excepción aceptada tiene la forma
+  `POST /<recurso>/:id/<transición>` (`:32`).
+- **Real:**
+  - `POST /productos/:id/deactivate` y `/reactivate` (`apps/api/src/routes/productos.ts:223-228`,
+    desde el 2026-08-29, commit `d431d7b`) — un quinto dominio.
+  - `POST /usuarios/:id/deactivate` y `/reactivate` (`apps/api/src/routes/usuarios.ts:275-280`, desde
+    el 2026-08-28, commit `67cb657`) — no figuran en la lista de usuarios.
+  - `POST /alertas/marcar-vistas` (`apps/api/src/routes/alertas.ts:178-179`, desde el 2026-09-02,
+    commit `e80a125`) es una acción sobre la colección, sin `:id`: no cae dentro de la forma que el
+    ADR acepta.
+  - Las tres existían antes del addendum del 2026-09-09, y antes de la pasada que contó "cuatro
+    instancias".
+- **Por qué importa:** las rutas con `:id` ya están cubiertas por la regla general, así que es solo
+  una lista inexacta. `marcar-vistas` es distinto: es una segunda forma de acción no-CRUD sin ninguna
+  línea que la autorice.
+- **Opciones:**
+  - `CORREGIR CÓDIGO` — no recomendable; cambiar rutas publicadas rompe el contrato.
+  - `ACTUALIZAR PRD/ADR` — completar la enumeración (o quitarla y dejar solo la regla), y decidir si
+    las acciones sobre colección (`POST /<recurso>/<acción>`) son una excepción aceptada.
+  - **Recomendación:** actualizar el ADR-0004.
+
+### D-21 (nuevo) — La seudonimización del correo usa `COOKIE_SECRET` como clave, y ningún documento de decisión ni de operación lo registra
+
+- **Severidad:** Sugerencia
+- **Tipo:** Feature no documentada (drift inverso).
+- **Prometido/afirmado:** el PRD decide que *"Las instantáneas `datos_previos` / `datos_posteriores`
+  seudonimizan el correo"* (`docs/PRD.md:202-205`), sin fijar el mecanismo. Ningún ADR, ni el PRD, ni
+  el TECH-DESIGNv2 mencionan `COOKIE_SECRET` como clave de nada que no sea la cookie.
+  `docs/DEPLOY-PLAN.md:150` describe `COOKIE_SECRET` solo como *"Firma de la cookie de sesión"*, y
+  documenta que rotarlo *"invalida todas las sesiones activas"* (`:176-179`, también `:891`).
+- **Real:** `recordAudit` reemplaza el correo por un HMAC-SHA256 con etiqueta de dominio
+  (`apps/api/src/auditoria/service.ts:51-55`, `:75-91`) cuya clave es `process.env.COOKIE_SECRET`
+  (`apps/api/src/auditoria/service.ts:101-121`). Desde el 2026-10-02 (commit `aabed0d`, PR #191) la
+  clave se resuelve solo cuando una instantánea contiene un string a seudonimizar
+  (`apps/api/src/auditoria/service.ts:72-74`, `:111-112`), y eso permite que el script de rescate
+  corra sin `COOKIE_SECRET`. Solo `docs/BACKLOG.md:33` (ítem 2.5) y `:51` (ítem 16) lo cuentan, y
+  `render.yaml:22-23` genera el secreto automáticamente (`generateValue: true`).
+- **Por qué importa:** rotar `COOKIE_SECRET` (el procedimiento de incidente de
+  `DEPLOY-PLAN.md:891`), o recrear el servicio de Render, que genera un valor nuevo, también cambia
+  los seudónimos: el mismo correo produce un valor distinto antes y después de la rotación, y se
+  pierde la propiedad que justificó seudonimizar en vez de omitir ("el mismo correo siempre produce
+  el mismo seudónimo", `BACKLOG.md:33`). Hoy ese efecto no figura en ninguna parte donde lo vea quien
+  rota la clave.
+- **Opciones:**
+  - `CORREGIR CÓDIGO` — usar un secreto propio para la seudonimización, separado de la cookie.
+  - `ACTUALIZAR PRD/ADR` — registrar el mecanismo (clave compartida, resolución diferida) en el
+    ADR-0012 o en una nota del PRD, y agregar el efecto sobre los seudónimos a la fila de rotación de
+    `docs/DEPLOY-PLAN.md`.
+  - **Recomendación:** actualizar los documentos; la reutilización de la clave fue una decisión
+    explícita del ítem 2.5, lo que falta es su consecuencia operativa.
+
+### D-22 (nuevo) — El rastro de auditoría guarda en claro el nombre de los usuarios, aunque el PRD afirma que "no conserva datos personales"
+
+- **Severidad:** Advertencia
+- **Tipo:** Regla omitida.
+- **Prometido:** *"el rastro de auditoría es permanente... pero **no conserva datos personales**.
+  Las instantáneas `datos_previos` / `datos_posteriores` seudonimizan el correo... Ante una solicitud
+  de supresión se limpia el dato personal en `usuarios` y el rastro sobrevive apuntando a un
+  identificador vacío: se satisface la supresión sin perder la prueba de que la acción ocurrió"*
+  (`docs/PRD.md:202-209`).
+- **Real:**
+  - Para `usuarios`, `nombre` está entre los `auditableFields` y solo `email` está en
+    `pseudonymizedFields` (`apps/api/src/auditoria/fields.ts:30-48`, `'nombre'` en `:33`, `email` en
+    `:47`).
+  - El alta escribe la fila entera como estado posterior: `datosPosteriores: { ...creado }`
+    (`apps/api/src/usuarios/service.ts:149-157`), y una edición de nombre guarda el valor anterior y
+    el nuevo (`apps/api/src/usuarios/service.ts:206-222`).
+  - `AuditoriaRepo` no tiene operación de borrado ni de reescritura (`apps/api/src/auditoria/repository.ts:46-56`),
+    y `GET /api/auditoria` devuelve las instantáneas tal cual (`apps/api/src/routes/auditoria.ts:29-32`,
+    `:45-46`).
+  - Consecuencia: limpiar el dato en `usuarios` ante una supresión deja el nombre completo en cada
+    fila `crear` (y en cada cambio de nombre) del rastro permanente.
+  - Caso parecido, menos claro: `proveedores.contacto` también se audita en claro
+    (`apps/api/src/auditoria/fields.ts:52`). Es texto libre que puede contener el nombre o el teléfono
+    de una persona; se señala, sin afirmar que lo contenga.
+- **Por qué importa:** la decisión del PRD que cerró SEC-012 se apoya en que el rastro no retiene datos
+  personales. Hoy retiene al menos uno, y la supresión que el PRD da por satisfecha no lo alcanza.
+- **Opciones:**
+  - `CORREGIR CÓDIGO` — agregar `nombre` a `pseudonymizedFields` de `usuarios` (las filas ya escritas
+    siguen con el valor en claro; reescribirlas sería una decisión aparte), con un test de integración
+    que pruebe que ninguna instantánea nueva contiene el nombre.
+  - `ACTUALIZAR PRD/ADR` — acotar la decisión del PRD a "no conserva el correo" y aceptar por escrito
+    que el nombre sobrevive a una supresión.
+  - **Recomendación:** decisión del propietario (gobierno del dato). La opción de código es chica y
+    tiene precedente directo (el ítem 2.5).
+
+### D-23 (nuevo) — Tres rutas autenticadas tienen rate-limit por sesión, y los documentos de decisión solo conocen el del login
+
+- **Severidad:** Sugerencia
+- **Tipo:** Feature no documentada (drift inverso).
+- **Prometido/afirmado:** el ADR-0007 habla de rate-limit/lockout del login (`:57-58`) y acota el
+  costo de argon2 *"por el rate-limit de la ruta de login"* (`:86-87`); el TECH-DESIGNv2 nombra solo
+  *"rate-limit de login con `@fastify/rate-limit`"* (`docs/TECH-DESIGNv2.md:51`).
+- **Real:** desde el 2026-09-01 (commit `d82dca0`, S02 de `SECURITY-REPORT.md`), `POST
+  /auth/password`, `POST /usuarios` y `POST /usuarios/:id/password-reset` llevan un rate-limit con
+  clave = id del usuario autenticado, no IP (`apps/api/src/plugins/sessionRateLimit.ts:1-26`;
+  `apps/api/src/routes/auth.ts:127-145`; `apps/api/src/routes/usuarios.ts:165-179` y `:209-219`). El
+  comentario de `apps/api/src/app.ts:136-137` sigue diciendo *"currently only POST /api/auth/login"*.
+- **Por qué importa:** es un control de seguridad real (limita el costo de argon2 que puede disparar
+  cualquier sesión, incluso `deposito`) y una decisión de diseño (clave por sesión porque la IP no es
+  confiable) que no está donde se buscan esas decisiones.
+- **Opciones:**
+  - `CORREGIR CÓDIGO` — no aplica al mecanismo; solo el comentario de `app.ts:136-137`.
+  - `ACTUALIZAR PRD/ADR` — un párrafo en el ADR-0007 con las tres rutas y el criterio de clave por
+    sesión.
+  - **Recomendación:** actualizar el ADR-0007.
+
+### D-24 (nuevo) — El código de error del permiso por campo es `FIELD_RESERVED_FOR_ENCARGADO`; el ADR-0007 y el TECH-DESIGNv2 siguen prometiendo `campo_reservado_encargado`
+
+- **Severidad:** Advertencia
+- **Tipo:** Decisión de arquitectura violada (desvío aprobado, no registrado en el ADR).
+- **Prometido:** *"la operación responde 403 con código `campo_reservado_encargado`"*
+  (`docs/adrs/0007-sesion-cookie-rbac-propio.md:50-53`); el TECH-DESIGNv2 lo repite en el modelo
+  (`docs/TECH-DESIGNv2.md:129-131`), en el criterio de aceptación A7 (`:259-261`) y en la tabla de
+  cambios (`:435`), y `docs/BACKLOG.md:40` también.
+- **Real:** `fieldReservedForEncargado()` devuelve `'FIELD_RESERVED_FOR_ENCARGADO'`
+  (`apps/api/src/lib/errors.ts:208-214`), y la spec vigente lo usa
+  (`openspec/specs/product-management/spec.md:21`). El comentario de `apps/api/src/lib/errors.ts:205-207`
+  lo declara *"Owner-approved deviation"*, registrada en la propuesta del ciclo, y cita
+  `docs/TECH-DESIGNv2.md:235`, una línea que hoy no contiene ese texto.
+- **Por qué importa:** es un código de contrato. Un consumidor que se guíe por el ADR (la integración
+  fiscal de etapa 2 es el consumidor externo que el ADR-0004 anticipa) compararía contra un código que
+  la API nunca devuelve. `CLAUDE.md` advierte que renombrar códigos después es un cambio de spec.
+- **Opciones:**
+  - `CORREGIR CÓDIGO` — no recomendable: revertiría una decisión aprobada y rompería la SPA y el
+    contrato.
+  - `ACTUALIZAR PRD/ADR` — registrar el código real en el ADR-0007 y en el TECH-DESIGNv2 (las cuatro
+    menciones), con la razón (convención de códigos en inglés UPPER_SNAKE), y corregir la cita del
+    comentario de `errors.ts`.
+  - **Recomendación:** actualizar los documentos.
+
+### D-25 (nuevo) — Ningún punto del sistema avisa que un producto sin `stock_minimo` no va a generar alertas
+
+- **Severidad:** Sugerencia
+- **Tipo:** Regla omitida.
+- **Prometido:** *"Un producto sin `stock_minimo` definido se guarda, y el sistema indica que **no**
+  generará alertas de stock bajo hasta definirlo (no lanza falsos disparos)"*
+  (`docs/TECH-DESIGNv2.md:275-276`), en respuesta al caso borde *"Datos incompletos"* del PRD
+  (`docs/PRD.md:185`).
+- **Real:** la mitad de "se guarda y no lanza falsos disparos" se cumple
+  (`openspec/specs/product-management/spec.md:158-161`). La mitad de "el sistema indica" no aparece en
+  ningún lado: el formulario muestra el campo sin ninguna leyenda, salvo el candado de depósito
+  (`apps/web/src/features/productos/ProductoForm.tsx:107-120`), y la tabla no muestra ningún chip
+  cuando el mínimo es nulo (`apps/web/src/features/productos/ProductosTable.tsx:62-67`, ratificado en
+  `openspec/specs/productos-ui/spec.md:31-33`). Tampoco la API devuelve ningún aviso.
+- **Por qué importa:** un producto sin mínimo queda fuera de las alertas sin que nadie lo note, que es
+  justo el riesgo que el TECH-DESIGNv2 deja abierto (*"validar con la operación si conviene forzar un
+  mínimo al alta"*, `docs/TECH-DESIGNv2.md:388-389`).
+- **Opciones:**
+  - `CORREGIR CÓDIGO` — una leyenda en el formulario y/o un indicador en la tabla cuando
+    `stock_minimo` es nulo.
+  - `ACTUALIZAR PRD/ADR` — quitar "el sistema indica" del criterio si la ausencia de chip se considera
+    aviso suficiente.
+  - **Recomendación:** corregir el código; es una leyenda.
 
 ## Deuda técnica detectada
 
 - **`apps/api/src/productos/service.ts:231`, `apps/api/src/proveedores/service.ts:124,161`,
-  `apps/api/src/usuarios/service.ts:207,248`** — re-verificado, sin cambios: el doble casteo
-  `previo as unknown as Record<string, unknown>` sigue en exactamente los mismos tres dominios y
-  líneas que en la auditoría anterior. Ningún commit desde entonces tocó estos archivos.
-- **`openspec/changes/archive/2026-08-24-fundaciones-monorepo/tasks.md:75-82`** — las mismas cuatro
-  tareas manuales sin marcar (ver D-09) siguen sin marcar.
-- **`docs/adrs/0010-despliegue-tiers-gratuitos.md:79`** — la línea "Pendiente" sigue literal.
+  `apps/api/src/usuarios/service.ts:207,248`** — re-verificado: el doble casteo
+  `previo as unknown as Record<string, unknown>` sigue en los mismos tres dominios y líneas. Lo que
+  se audita (el diff de `changedFields`) depende de una forma que el compilador ya no comprueba.
+- **Comentarios de código que contradicen el código en decisiones documentadas** — no es una
+  promesa rota, pero vuelven a sembrar el drift de los documentos:
+  `apps/api/src/auth/service.ts:36-40` (bloqueo "antes" de la contraseña; ver D-17),
+  `apps/api/src/app.ts:136-137` (rate-limit "solo" en login; ver D-23), `render.yaml:14-15`
+  (`NODE_ENV` controla `Secure`; ver D-03), `apps/api/src/lib/errors.ts:205-207` (cita
+  `TECH-DESIGNv2.md:235`; ver D-24), y `apps/api/src/auditoria/service.ts:17` (*"Entries today:
+  'usuarios', 'proveedores', 'productos'"*, aunque `fields.ts:87` ya tiene `alertas`).
+- **`openspec/changes/archive/2026-08-24-fundaciones-monorepo/tasks.md:77-79,82`** y
+  **`docs/adrs/0010-despliegue-tiers-gratuitos.md:79-81`** — ver D-09.
+- No hay `TODO`/`FIXME`/`HACK` en `apps/api/src`, `apps/api/scripts` ni `apps/web/src`.
 
 ## Features no documentadas (drift inverso)
 
-Además de la unicidad case-insensitive (D-06), las rutas de acción POST (D-10, ahora con conteo
-corregido), la fuente Alerta-table del dashboard (D-13), y el mecanismo de IP verificada por proxy +
-`secure` fail-closed (D-16, nuevo):
+Además de los hallazgos D-20 (rutas de acción fuera de la enumeración del ADR-0004), D-21 (clave de
+seudonimización) y D-23 (rate-limit por sesión):
 
-- **`ACCOUNT_INACTIVE` (401) en el login** (`apps/api/src/lib/errors.ts:96`,
-  `apps/api/src/auth/service.ts:39`) — sin cambios.
+- **`ACCOUNT_INACTIVE` (401) en el login** (`apps/api/src/lib/errors.ts:96`, lanzado en
+  `apps/api/src/auth/service.ts:109-111`) — sin cambios; ningún ADR lo menciona.
 - **`Cache-Control: no-store`** en las respuestas con contraseña temporal
-  (`apps/api/src/routes/usuarios.ts:202,239`) — sin cambios.
-- **`proveedores.creado_en`** expuesta en el DTO (`apps/api/src/routes/proveedores.ts:23,68`) —
-  sin cambios.
-- **Bloqueo de acciones sobre la propia cuenta en la SPA** — sin cambios, ya declarado como
-  afordancia de UI en `openspec/specs/usuarios-ui/spec.md`.
+  (`apps/api/src/routes/usuarios.ts:202`, `:239`) — sin cambios.
+- **`proveedores.creado_en`** expuesta en el DTO (`apps/api/src/routes/proveedores.ts:23`, `:68`),
+  no listada en la entidad Proveedor (`docs/TECH-DESIGNv2.md:103`) — sin cambios.
+- **Bloqueo de acciones sobre la propia cuenta en la SPA** — declarado como afordancia de UI en
+  `openspec/specs/usuarios-ui/spec.md:102-103`; sin cambios.
+
+Verificado explícitamente, y **no es drift**:
+
+- **`GET /api/auditoria`** — lo respalda el ADR-0012 (*"una tabla pensada para que el encargado la
+  lea"*, `:50-53`) y el ítem 15 de `docs/BACKLOG.md:50`; restringirlo a `encargado` es coherente con
+  la matriz del PRD. Lo que devuelve es materia de D-22, no la ruta en sí.
+- **`rescatar:encargado`** — documentado en el addendum del ADR-0007 (`:156-178`); se verificó que lo
+  que el addendum afirma coincide con el código (simulación sin `--confirmar`, rechazos sin escritura,
+  `origen: 'rescate'`, sesiones cerradas en `apps/api/src/usuarios/service.ts:303`).
+- **Harness `claims-gate`** (`harnesses/claims-gate/`) — es tooling del proceso de desarrollo, fuera
+  del alcance del PRD/ADR, documentado en `CLAUDE.md` y en su propio README; sin commits desde el
+  2026-09-05, después de los cuales la pasada del 2026-09-09 ya lo verificó.
 
 ## Alcance planificado (no es drift)
 
 - **Recuperación de contraseña por email (#3.5)** — sigue bloqueada por infraestructura
-  (`docs/BACKLOG.md:37`), y el PRD sigue sin prometer este flujo en su Alcance. No hay
-  PRD-vs-código mismatch — el único drift asociado es la premisa de Firebase (D-11).
-- Todo lo que ya se archivó como código real (backup independiente, D-04) dejó de estar en esta
-  sección.
+  (`docs/BACKLOG.md:37`), y el PRD no la promete en su Alcance; el ADR-0007 la deja fuera de v1
+  (`:61-62`).
 
 ## Próximos pasos
 
 Priorizados por consecuencia, no por esfuerzo:
 
-1. ~~**D-02 (Crítico) — decisión del dueño del producto, hoy.**~~ Resuelto el 2026-10-02: el rescate
-   del último encargado tiene script probado y runbook. Ver D-02 arriba.
-2. ~~**D-01 (Crítico) — decisión de producto/arquitectura.**~~ Resuelto el 2026-09-15: el rastro se
-   lee desde la app (`GET /api/auditoria`). Ver D-01 arriba.
-3. **D-16 (Advertencia, nuevo) — cerrar el condicional del ADR-0007.** La condición que el propio ADR
-   fijó para revisar el bloqueo por IP ya se cumplió hace más de una semana.
-4. **D-15 (Advertencia, nuevo) — una edición de cinco minutos.** Reconciliar las dos secciones de
-   `docs/DEPLOY-PLAN.md` sobre el backup antes de que alguien las lea por separado.
-5. **D-13 (Advertencia) — sin cambios desde la auditoría anterior.** Separar la nota de trazabilidad
-   del TECH-DESIGNv2 en chips (Producto) vs KPIs (Alerta).
-6. **D-05, D-06 (Advertencia) — sin cambios.** Completar el modelo de datos y subir la unicidad
-   case-insensitive al TECH-DESIGNv2.
-7. **D-10 (Advertencia) — ratificar la convención antes del próximo dominio.** Ahora con cuatro
-   réplicas confirmadas, no tres.
-8. **D-03, D-09 (Advertencia) — sin cambios.** Cerrar el riesgo de despliegue local (con la
-   evidencia corregida esta vez) y registrar el smoke test 5.9.
-9. **D-14 (Sugerencia) — un cambio de tiempo verbal.** Sin cambios.
-10. **D-08, D-11 (Sugerencia) — sin cambios.** Color de avatar por rol; corregir la premisa de
-    Firebase del #3.5.
-11. **D-18, D-17 (Advertencia, nuevos el 2026-10-02; agregados después de esta pasada, sin
-    priorizar contra el resto).** Normalizar el correo en `seed-encargado.ts`, que hoy puede dejar un
-    primer encargado que nunca inicia sesión; y registrar en el ADR-0007 la resolución de S01 sobre
-    la cuenta bloqueada con contraseña correcta.
+1. **D-22 (Advertencia) — decisión del propietario, gobierno del dato.** Seudonimizar `nombre` en las
+   instantáneas o acotar la promesa del PRD. Mientras tanto, cada alta de usuario agrega un nombre en
+   claro al rastro permanente.
+2. **D-18 (Advertencia) — corregir el código.** Normalizar el correo en `seed-encargado.ts`; el fallo
+   deja un primer encargado que no puede entrar y que ni el seed ni el rescate reparan.
+3. **D-24, D-17 (Advertencia) — actualizar ADR-0007 y TECH-DESIGNv2.** Las dos son desvíos ya
+   aprobados que el ADR contradice; D-17 ya se propagó una vez a un documento nuevo.
+4. **D-19 (Advertencia) — decisión de arquitectura.** Agregar las columnas fiscales o reescribir la
+   promesa del ADR-0003/TECH-DESIGNv2.
+5. **D-09 (Advertencia) — una verificación manual.** Ejecutar 5.9 y registrar el resultado en el
+   ADR-0010.
+6. **D-16 (Sugerencia) — decisión del propietario.** Cerrar el condicional del bloqueo por IP en el
+   ADR-0007.
+7. **D-03, D-15, D-20, D-21, D-23 (Sugerencia) — ediciones de documentación.** Cada una es un
+   párrafo; D-21 incluye una línea en la fila de rotación de `docs/DEPLOY-PLAN.md`.
+8. **D-08, D-25 (Sugerencia) — cambios chicos de UI.** Color de avatar por rol; aviso de producto sin
+   mínimo.
 
-La pasada del 2026-09-09 no modificó `docs/PRD.md` ni código; su commit (`537865c`) sí corrigió
-`docs/BACKLOG.md`, `docs/DEPLOY-PLAN.md`, `docs/TECH-DESIGNv2.md` y los ADR 0004 y 0007.
+Esta pasada solo modificó `docs/DRIFT.md`: no se tocaron `docs/PRD.md`, los ADRs, el TECH-DESIGNv2 ni
+el código.
