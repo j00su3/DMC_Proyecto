@@ -61,6 +61,11 @@ pnpm dev                        # API en :3000, SPA en :5173
 `SEED_ENCARGADO_PASSWORD` (mínimo 12 caracteres) del entorno — nunca por argumento de línea de
 comandos.
 
+Si el único encargado pierde su contraseña, se rescata fuera de la aplicación con
+`pnpm --filter @inventienda/api rescatar:encargado --email <correo>` (primero simula; aplica el
+rescate con `--confirmar`), siguiendo el procedimiento de [`docs/DEPLOY-PLAN.md`](docs/DEPLOY-PLAN.md)
+§ Recovery → *Rescate del último encargado*.
+
 ### Comandos útiles
 
 ```bash

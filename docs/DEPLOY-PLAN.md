@@ -385,6 +385,9 @@ tiene que existir antes— y se ejecuta una sola vez por base de datos. La contr
 `SEED_ENCARGADO_PASSWORD` y el script **rechaza** recibirla por argumento de CLI
 (`apps/api/scripts/seed-encargado.ts:34-40`).
 
+Si el único encargado pierde el acceso, no se vuelve a sembrar (el seed no hace nada si ya existe un
+encargado): se usa el procedimiento de **Recovery → Rescate del último encargado**.
+
 ### Deploy gates
 
 **Aquí hay que ser precisos, porque el proyecto tiene una CI buena y, aun así, no tiene una
@@ -529,6 +532,109 @@ de una sola persona que se revisa una vez al día), Neon ya no lo tiene. Neon no
 propia descargable — el único camino portable es `pg_dump` contra el connection string, igual que
 cualquier Postgres (confirmado en `neon.com/docs/manage/backup-pg-dump-automate`, que Neon mismo
 recomienda automatizar así para retención más allá del plan).
+
+#### Rescate del último encargado
+
+Procedimiento administrativo fuera de la aplicación que el ADR-0007 promete
+(`docs/adrs/0007-sesion-cookie-rbac-propio.md:61-63`) y que cierra el hallazgo D-02 de
+`docs/DRIFT.md`. Lo ejecuta el script `apps/api/scripts/rescatar-encargado.ts`.
+
+**Cuándo usarlo.** Un encargado perdió su contraseña y no hay otro encargado activo que pueda
+restablecérsela desde la aplicación (pantalla de usuarios, `POST /api/usuarios/:id/password-reset`).
+Si existe otro encargado activo, esa es la vía normal; el script igual funciona, pero lo avisa.
+
+**El operador es el único control.** El script no tiene un usuario autenticado detrás: no puede saber
+quién pidió el rescate. **Antes de ejecutarlo, confirme la identidad de quien lo solicita por un canal
+independiente** (en persona, o por un teléfono ya conocido de antemano), nunca solo por el mismo
+mensaje que pide el rescate. Si no puede confirmarla, no lo ejecute.
+
+**Qué hace un rescate confirmado**, en una sola transacción junto con su fila de auditoría: genera una
+contraseña temporal nueva, marca la cuenta para que deba cambiarla en el primer inicio de sesión,
+limpia el bloqueo (`intentos_fallidos = 0`, `bloqueado_hasta = null`) y cierra todas las sesiones de
+esa cuenta. La fila de auditoría (`accion: 'cambiar_password'`) tiene como actor a la propia cuenta
+rescatada y lleva `origen: 'rescate'` en el estado posterior, lo que la distingue de un
+restablecimiento hecho desde la aplicación. Se puede leer con `GET /api/auditoria`.
+
+**Requisitos.**
+
+- Un `DATABASE_URL` **con permiso de escritura** sobre la base de destino. La URL de solo lectura
+  que usan los workflows de CI (`NEON_READONLY_DATABASE_URL`) no sirve para el rescate confirmado.
+- `DATABASE_URL` se define **solo en la terminal del operador y solo para esta ejecución**; no se
+  agrega a ningún archivo. No hace falta `COOKIE_SECRET` ni ninguna otra variable.
+- **Nunca pase una contraseña como argumento.** El script rechaza `--password`, `-p`, `--contrasena`
+  y `--clave` (código 2), pero `pnpm` imprime la línea de comandos completa, argumentos incluidos,
+  al lanzar el script (`$ tsx scripts/rescatar-encargado.ts …`) y otra vez en su mensaje de error
+  cuando el script termina con un código distinto de cero: la contraseña quedaría en la terminal,
+  además de en el historial del shell. La contraseña temporal la genera el script; no se elige.
+
+**Comando** (desde la raíz del repositorio):
+
+```bash
+pnpm --filter @inventienda/api rescatar:encargado --email <correo> [--confirmar]
+```
+
+**Secuencia: primero simular, después confirmar.**
+
+```bash
+read -rs DATABASE_URL && export DATABASE_URL   # pegar la cadena de escritura; no se muestra ni queda en el historial
+pnpm --filter @inventienda/api rescatar:encargado --email <correo>                # 1. simulación
+pnpm --filter @inventienda/api rescatar:encargado --email <correo> --confirmar    # 2. rescate
+unset DATABASE_URL
+```
+
+1. **Simulación** (sin `--confirmar`). No escribe nada y termina con código 0. Muestra la base de
+   destino, la cuenta encontrada (`Cuenta a rescatar: <nombre> <<correo>>`), el aviso de otro
+   encargado activo si corresponde, y `SIMULACIÓN: no se escribió nada. Repita con --confirmar para
+   aplicar el rescate.`
+2. **Leer la línea de base de datos antes de confirmar.** La primera línea que imprime el script
+   (después del eco del comando que hace `pnpm`) es
+   `Base de datos objetivo: <host[:puerto]/base>`, impresa antes de cualquier consulta (la salida la
+   repite como `Base de datos: …`). Muestra solo host, puerto y nombre de la base, nunca usuario ni
+   contraseña. **Compruebe que es la base que pretende rescatar** —el host de Neon para producción,
+   `localhost` para el contenedor local— antes de usar `--confirmar`. Es la única confirmación fiable
+   del destino: como los scripts de seed, este script también carga la configuración local de
+   desarrollo si existe, y una variable definida en la terminal tiene prioridad sobre ella.
+3. **Rescate** (con `--confirmar`). Termina con código 0 y muestra
+   `Contraseña temporal (se muestra una sola vez): …` seguida de
+   `Deberá cambiarla en su primer inicio de sesión.` La contraseña aparece **una sola vez** y no se
+   puede volver a consultar: entréguela al titular por un canal seguro, no la pegue en chats ni en
+   tickets, y limpie la terminal después. Al iniciar sesión con ella, la aplicación exige el cambio de
+   contraseña antes de cualquier otra cosa.
+
+**Códigos de salida.**
+
+| Código | Significado |
+| --- | --- |
+| 0 | Simulación completada, o rescate aplicado |
+| 3 | Rechazado: no se escribió nada (ver abajo) |
+| 2 | Error de uso (falta `--email`, argumento desconocido, contraseña por argumento) o `DATABASE_URL` ausente o inválida; no se llega a consultar la base |
+| 1 | Error inesperado (por ejemplo, la base no responde o falla la escritura de auditoría); si ocurre durante el rescate, la transacción se revierte entera |
+
+**Rechazos** (código 3, siempre seguidos de `Rechazado: no se escribió nada.`):
+
+- `No se encontró ningún usuario con ese correo.` — el correo no existe. **Caso particular: correo
+  almacenado con mayúsculas.** El script busca el correo normalizado (sin espacios y en minúsculas),
+  igual que el login. Una cuenta cuyo correo quedó guardado con mayúsculas (por ejemplo, sembrada con
+  `--email Admin@Tienda.com`) se informa como no encontrada aunque se escriba el correo exactamente
+  como está guardado. Esa cuenta tampoco pudo iniciar sesión nunca: no es una contraseña perdida
+  sino un alta defectuosa (D-18 en `docs/DRIFT.md`), y **repararla queda fuera de este
+  procedimiento**.
+- `La cuenta existe pero no es de un encargado; este script solo rescata encargados.` — para una
+  cuenta de depósito, la vía es el restablecimiento desde la aplicación por un encargado.
+- `La cuenta de encargado está inactiva; este script no la reactiva.` — el script **no reactiva
+  cuentas**. Siguiente paso del operador: pedir a un encargado activo que la reactive desde la
+  pantalla de usuarios (la invariante `LAST_ACTIVE_ENCARGADO` garantiza que siempre exista al menos
+  uno) y que después le restablezca la contraseña desde la aplicación. Si ese encargado activo es
+  justamente quien perdió el acceso, rescátelo primero a él con este mismo procedimiento.
+
+**Otro encargado activo.** Si hay más de un encargado activo, la simulación y el rescate muestran
+`Hay otro encargado activo: restablecer la contraseña desde la aplicación es la vía normal.` El
+rescate no se bloquea por eso y no toca la cuenta ni las sesiones del otro encargado, pero conviene
+usar la vía de la aplicación, que deja como actor en la auditoría al encargado que la ejecutó.
+
+**Dos operadores a la vez.** Si dos personas ejecutan el rescate de la misma cuenta al mismo tiempo,
+ambos terminan bien, uno después del otro, y cada uno ve una contraseña distinta: **la primera que se
+imprimió deja de funcionar** y solo vale la última. Acuerden quién lo ejecuta antes de empezar.
 
 ### Backup independiente — decisión pendiente (backlog #14, mitad B)
 

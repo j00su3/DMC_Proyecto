@@ -221,8 +221,9 @@ describe('rescatarEncargado (integration, real Postgres, no COOKIE_SECRET)', () 
     // No secret in any column that exists: not the hash, not the email, not
     // the temporary password.
     const everything = JSON.stringify([
-      rows,
-      await db.select().from(usuarios).where(eq(usuarios.id, target.id)),
+      await db.select().from(usuarios),
+      await db.select().from(sesiones),
+      (await db.execute(sql`select * from auditoria`)).rows,
     ]);
     expect(JSON.stringify(rows)).not.toContain('hashContrasena');
     expect(JSON.stringify(rows)).not.toContain(target.hashContrasena);
@@ -248,6 +249,32 @@ describe('rescatarEncargado (integration, real Postgres, no COOKIE_SECRET)', () 
       await verifyPassword(row?.hashContrasena ?? '', result.passwordTemporal),
     ).toBe(true);
     expect(await auditRows(target.id)).toHaveLength(1);
+  });
+
+  it('rescues the encargado stored as ana@tienda.com when given "  Ana@Tienda.COM "', async () => {
+    const target = await seedUsuario('encargado', { email: 'ana@tienda.com' });
+
+    const result = await rescued('  Ana@Tienda.COM ');
+
+    expect(result.objetivo.id).toBe(target.id);
+    expectRescueRow(await auditRows(target.id), target.id);
+  });
+
+  it('rescuing twice prints two passwords and only the second one works', async () => {
+    const target = await seedUsuario('encargado');
+
+    const first = await rescued(target.email);
+    const second = await rescued(target.email);
+
+    expect(second.passwordTemporal).not.toBe(first.passwordTemporal);
+    const [row] = await db
+      .select()
+      .from(usuarios)
+      .where(eq(usuarios.id, target.id));
+    const hash = row?.hashContrasena ?? '';
+    expect(await verifyPassword(hash, second.passwordTemporal)).toBe(true);
+    expect(await verifyPassword(hash, first.passwordTemporal)).toBe(false);
+    expect(await auditRows(target.id)).toHaveLength(2);
   });
 
   it.each([

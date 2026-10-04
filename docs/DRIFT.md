@@ -43,12 +43,18 @@ contra `claims_gate.py`), así que no hay drift ahí pese a ser un cambio recien
 
 | Severidad | Cantidad |
 |---|---|
-| Crítico | 1 |
-| Advertencia | 8 |
+| Crítico | 0 |
+| Advertencia | 10 |
 | Sugerencia | 3 |
 
-La tabla cuenta los hallazgos abiertos. **Actualización 2026-09-15:** D-01 se resolvió después de
+La tabla cuenta los hallazgos que este reporte todavía marca como abiertos. **Aclaración 2026-10-03:**
+el mensaje del commit `537865c` (2026-09-09) dice que cerró D-03, D-05, D-06, D-10, D-11, D-13, D-14
+y D-15, pero sus entradas no se marcaron como resueltas; reconciliarlas queda para una nueva pasada
+de esta auditoría. **Actualización 2026-09-15:** D-01 se resolvió después de
 esta pasada (ciclo `auditoria-lectura`, PRs #185–#187) y ya no se cuenta; ver D-01 abajo.
+**Actualización 2026-10-02:** D-02 se resolvió (ciclo `rescate-encargado`, PRs #190–#194) y ya no
+se cuenta; ese ciclo registró dos hallazgos nuevos, D-17 y D-18 (ambos Advertencia), que sí se
+cuentan.
 
 ## Hallazgos
 
@@ -75,25 +81,34 @@ esta pasada (ciclo `auditoria-lectura`, PRs #185–#187) y ya no se cuenta; ver 
   con la forma exacta que proponía: `AuditoriaRepo.list` + `GET /api/auditoria` solo para
   `encargado`, paginado y con esos dos filtros.
 
-### D-02 — Sigue sin existir el procedimiento de rescate del último encargado que el ADR-0007 dice documentar
+### D-02 — El procedimiento de rescate del último encargado ya existe y está probado: RESUELTO
 
-- **Severidad:** Crítico
-- **Tipo:** Regla omitida
-- **Estado:** Abierto (sin cambios).
-- **Prometido:** *"como vía de rescate si el único encargado pierde su contraseña, **se documenta
-  un procedimiento administrativo manual** (resetear el hash directo en base) fuera de la
-  aplicación"* (`docs/adrs/0007-sesion-cookie-rbac-propio.md:61-63`).
-- **Real:** re-verificado — `grep -rni "rescate|--rescue"` sobre `docs/`, `openspec/` y la raíz solo
-  encuentra la propia promesa del ADR-0007 y sus referencias en `docs/REVISION-ADVERSARIAL.md` y
-  `docs/SECURITY.md`, nunca un runbook. `docs/SECURITY.md:205` lo sigue listando como recomendación
-  #4 sin resolver.
-- **Por qué importa:** sin cambios — sigue siendo la única promesa del set cuyo incumplimiento puede
-  dejar el sistema desplegado sin vía de acceso.
-- **Opciones:**
-  - `CORREGIR CÓDIGO` — escribir el runbook, o dar al script de seed un modo `--rescue` explícito y
-    testeable.
-  - `ACTUALIZAR PRD/ADR` — retirar la promesa del ADR-0007 y asumir el riesgo por escrito.
-  - **Recomendación:** sin cambios — corregir el código.
+- **Severidad:** ~~Crítico~~ — cerrado.
+- **Estado:** **RESUELTO el 2026-10-02**, por el ciclo `rescate-encargado` (PRs #190 a #194,
+  mergeados a `main`), después de la fecha de esta pasada.
+- **Lo que estaba abierto:** el ADR-0007 promete que, *"como vía de rescate si el único encargado
+  pierde su contraseña, **se documenta un procedimiento administrativo manual** (resetear el hash
+  directo en base) fuera de la aplicación"* (`docs/adrs/0007-sesion-cookie-rbac-propio.md:61-63`).
+  Al 2026-09-09 no existía ningún runbook, y `docs/SECURITY.md:207` listaba el rescate como
+  recomendación #4 de SEC-001 sin resolver.
+- **Lo que se verificó el 2026-10-02:**
+  - `apps/api/package.json:17` declara el script `rescatar:encargado`
+    (`tsx scripts/rescatar-encargado.ts`).
+  - `apps/api/src/usuarios/rescate.ts:51-62` busca el correo normalizado y rechaza, antes de
+    cualquier escritura, un correo inexistente, una cuenta que no es de encargado y una cuenta
+    inactiva; sin `--confirmar` devuelve una simulación (`apps/api/src/usuarios/rescate.ts:72-78`);
+    con `--confirmar` llama a `resetUsuarioPassword` con la propia cuenta como actor y la marca
+    `'rescate'` (`apps/api/src/usuarios/rescate.ts:82-86`), que solo se agrega al estado posterior
+    de la fila de auditoría (`apps/api/src/usuarios/service.ts:318-323`).
+  - `apps/api/scripts/rescatar-encargado.ts:190` imprime la base de destino antes de cualquier
+    consulta, y `apps/api/scripts/rescatar-encargado.ts:120-159` muestra la contraseña temporal solo
+    en el resultado `rescatado`.
+  - Runbook en `docs/DEPLOY-PLAN.md:536-637` (§ Recovery → *Rescate del último encargado*), con
+    addendum en el ADR-0007 (`docs/adrs/0007-sesion-cookie-rbac-propio.md:156-178`).
+- **Por qué se cierra:** se adoptó la opción `CORREGIR CÓDIGO` que este mismo hallazgo recomendaba,
+  en su variante de script explícito y testeable (separado de `seed-encargado.ts`, no un modo de
+  él), más el runbook.
+- **Ver también:** D-17 y D-18, dos hallazgos que este ciclo encontró y registró sin resolverlos.
 
 ### D-03 — El TECH-DESIGNv2 sigue describiendo la cookie de sesión sin `Secure`; la evidencia de la auditoría anterior ya estaba desactualizada cuando se escribió
 
@@ -147,7 +162,7 @@ esta pasada (ciclo `auditoria-lectura`, PRs #185–#187) y ya no se cuenta; ver 
   - `docs/BACKLOG.md` fila #14 (mitad B) documenta la decisión, la investigación previa contra la
     documentación oficial de Neon (PITR de 6 horas, sin export propio), y cita este mismo reporte
     por su ID D-04 como el hueco que cierra.
-  - `docs/DEPLOY-PLAN.md:1005-1043` (entrada "2026-09-04 — Backup independiente... decisión tomada
+  - `docs/DEPLOY-PLAN.md:1101-1139` (entrada "2026-09-04 — Backup independiente... decisión tomada
     vía `deploy-pass`") documenta el diseño completo y la restauración.
   - Reutiliza el mismo rol/secreto read-only de `consistencia-stock.yml` (`NEON_READONLY_DATABASE_URL`)
     sin credencial nueva — el único paso manual pendiente (crear el rol en Neon + cargar el secreto)
@@ -261,12 +276,12 @@ esta pasada (ciclo `auditoria-lectura`, PRs #185–#187) y ya no se cuenta; ver 
 - **Severidad:** Advertencia
 - **Tipo:** Documentación que describe el sistema de forma inexacta (auto-contradicción dentro del
   mismo documento, no PRD/ADR vs código)
-- **Prometido/afirmado:** `docs/DEPLOY-PLAN.md:533` abre una sección titulada **"Backup
+- **Prometido/afirmado:** `docs/DEPLOY-PLAN.md:639` abre una sección titulada **"Backup
   independiente — decisión pendiente (backlog #14, mitad B)"** y dice textualmente: *"Dos caminos,
   ninguno adoptado todavía"* (`:537`), cerrando con *"es una decisión del dueño, no mía: confirmar
   antes de generar el workflow"* (`:549`).
 - **Real:** el mismo archivo, en su entrada fechada **"2026-09-04 — Backup independiente (backlog
-  #14, mitad B) — decisión tomada vía `deploy-pass`"** (`:1005-1043`), registra que **Opción B fue
+  #14, mitad B) — decisión tomada vía `deploy-pass`"** (`:1101-1139`), registra que **Opción B fue
   adoptada** y que el workflow **ya fue generado**: `.github/workflows/backup-neon.yml` existe en el
   repositorio (verificado arriba, D-04) con exactamente el diseño que esa segunda entrada describe.
   Las dos secciones coexisten en el mismo archivo describiendo el mismo backlog item con
@@ -280,8 +295,8 @@ esta pasada (ciclo `auditoria-lectura`, PRs #185–#187) y ya no se cuenta; ver 
 - **Opciones:**
   - `CORREGIR CÓDIGO` — no aplica.
   - `ACTUALIZAR PRD/ADR` — no aplica en sentido estricto (no es PRD ni ADR), pero el mismo principio
-    corre: reemplazar la sección `:533-549` por una referencia corta a la entrada `:1005` ("decisión
-    tomada, ver más abajo"), o fusionar ambas en una sola sección fechada.
+    corre: reemplazar la sección "Backup independiente — decisión pendiente" por una referencia corta a
+    la entrada que registra la decisión ("decisión tomada, ver más abajo"), o fusionar ambas en una sola sección fechada.
   - **Recomendación:** actualizar el documento. Es la propia inconsistencia que el ítem 3 de "Próximos
     pasos" de la auditoría anterior ya advertía en general (D-13) — este es el mismo patrón, dentro
     de un documento distinto.
@@ -328,6 +343,56 @@ esta pasada (ciclo `auditoria-lectura`, PRs #185–#187) y ya no se cuenta; ver 
     real (¿corresponde ahora el refuerzo que el propio ADR previó?), y closing the loop cuesta un
     párrafo.
 
+### D-17 (nuevo, 2026-10-02) — El ADR-0007 dice que una contraseña correcta da acceso aunque la cuenta esté bloqueada; el código responde `423 ACCOUNT_LOCKED`
+
+- **Severidad:** Advertencia
+- **Tipo:** Documentación que describe el sistema de forma inexacta (ADR vs código)
+- **Prometido/afirmado:** *"una credencial correcta concede acceso aunque la cuenta esté bloqueada, y
+  limpia el contador... quien sabe su contraseña nunca queda fuera"*
+  (`docs/adrs/0007-sesion-cookie-rbac-propio.md:76-79`).
+- **Real:** con la contraseña correcta y `bloqueado_hasta` en el futuro, `login` lanza
+  `accountLocked(retryAfter)` (`423 ACCOUNT_LOCKED`) y no crea sesión
+  (`apps/api/src/auth/service.ts:102-107`); el comentario de `apps/api/src/auth/service.ts:96-101`
+  lo declara deliberado. La spec vigente lo ratifica en el escenario *"Locked account, correct
+  password"* (`openspec/specs/auth-sessions/spec.md:47-50`). El cambio viene de la resolución de S01
+  de `SECURITY-REPORT.md` (`SECURITY-REPORT.md:162-166`), que el comentario de
+  `apps/api/src/auth/service.ts:73-81` registra como ratificada por el propietario el 2026-09-01; el
+  ADR no se actualizó. La misma afirmación desactualizada se repite en `docs/SECURITY.md:218-221`
+  (nota de resolución de SEC-001) y en `docs/BACKLOG.md:31` (ítem 2.3).
+- **Por qué importa:** quien lea el ADR para saber qué le pasa al titular legítimo de una cuenta
+  bloqueada concluye que entra; en realidad recibe `423` hasta que vence el bloqueo o hasta que
+  alguien le restablece la contraseña. El comportamiento del código es el correcto (cierra un oráculo
+  de enumeración); lo que está mal es el documento de decisión.
+- **Opciones:**
+  - `CORREGIR CÓDIGO` — no aplica: el comportamiento actual es el que ratifica la spec.
+  - `ACTUALIZAR PRD/ADR` — agregar al ADR-0007 un addendum que registre la resolución de S01: la
+    contraseña se sigue verificando antes de evaluar el bloqueo, pero una contraseña correcta sobre
+    una cuenta bloqueada recibe `423` con `retryAfter`, no acceso.
+  - **Recomendación:** actualizar el ADR.
+
+### D-18 (nuevo, 2026-10-02) — `seed-encargado.ts` guarda el correo sin normalizar, y el login lo busca normalizado
+
+- **Severidad:** Advertencia
+- **Tipo:** Regla omitida
+- **Prometido/afirmado:** el login normaliza el correo (`trim().toLowerCase()`) antes de buscarlo
+  (`apps/api/src/auth/service.ts:45-46`), y el alta de usuarios desde la aplicación lo guarda
+  normalizado (`apps/api/src/usuarios/repository.ts:280`). `findByEmail` compara por igualdad exacta
+  (`apps/api/src/usuarios/repository.ts:132-139`).
+- **Real:** `apps/api/scripts/seed-encargado.ts:85` inserta `email: input.email` tal como llega de
+  `--email` o de `SEED_ENCARGADO_EMAIL`; el esquema solo valida el formato
+  (`apps/api/scripts/seed-encargado.ts:18`), no normaliza.
+- **Por qué importa:** un primer encargado sembrado con mayúsculas (`Admin@Tienda.com`) nunca puede
+  iniciar sesión: el login busca `admin@tienda.com` y no lo encuentra. Tampoco se puede volver a
+  sembrar, porque el seed no hace nada si ya existe un encargado
+  (`apps/api/scripts/seed-encargado.ts:76-78`), y el rescate de D-02 no lo repara: busca con la misma
+  normalización que el login (`apps/api/src/usuarios/rescate.ts:51-53`) y responde "no encontrado".
+  El runbook de `docs/DEPLOY-PLAN.md` lo documenta como fuera de su alcance.
+- **Opciones:**
+  - `CORREGIR CÓDIGO` — normalizar el correo en `seedEncargado` antes del `insert`, con un test que
+    siembre un correo con mayúsculas y pruebe el login.
+  - `ACTUALIZAR PRD/ADR` — no aplica: ningún documento promete guardar el correo tal como se escribe.
+  - **Recomendación:** corregir el código.
+
 ## Resueltos desde la auditoría anterior (2026-09-04)
 
 - **D-04 (Advertencia) — la decisión de backup seguía sin tomarse.** Resuelto: ver detalle en D-04
@@ -337,6 +402,9 @@ esta pasada (ciclo `auditoria-lectura`, PRs #185–#187) y ya no se cuenta; ver 
 - **D-01 (Crítico) — el rastro de auditoría no tenía lector en la aplicación.** Resuelto el
   2026-09-15, después de esta pasada: `GET /api/auditoria` (PRs #185–#187). Ver detalle en D-01
   arriba.
+- **D-02 (Crítico) — no existía el procedimiento de rescate del último encargado.** Resuelto el
+  2026-10-02, después de esta pasada: script `rescatar:encargado` y runbook en `docs/DEPLOY-PLAN.md`
+  § Recovery → *Rescate del último encargado* (PRs #190–#194). Ver detalle en D-02 arriba.
 
 ## Corregidos desde la auditoría anterior (evidencia, no severidad)
 
@@ -386,8 +454,8 @@ corregido), la fuente Alerta-table del dashboard (D-13), y el mecanismo de IP ve
 
 Priorizados por consecuencia, no por esfuerzo:
 
-1. **D-02 (Crítico) — decisión del dueño del producto, hoy.** Sigue siendo la única promesa
-   incumplida que puede dejar el sistema desplegado sin vía de acceso.
+1. ~~**D-02 (Crítico) — decisión del dueño del producto, hoy.**~~ Resuelto el 2026-10-02: el rescate
+   del último encargado tiene script probado y runbook. Ver D-02 arriba.
 2. ~~**D-01 (Crítico) — decisión de producto/arquitectura.**~~ Resuelto el 2026-09-15: el rastro se
    lee desde la app (`GET /api/auditoria`). Ver D-01 arriba.
 3. **D-16 (Advertencia, nuevo) — cerrar el condicional del ADR-0007.** La condición que el propio ADR
@@ -405,6 +473,10 @@ Priorizados por consecuencia, no por esfuerzo:
 9. **D-14 (Sugerencia) — un cambio de tiempo verbal.** Sin cambios.
 10. **D-08, D-11 (Sugerencia) — sin cambios.** Color de avatar por rol; corregir la premisa de
     Firebase del #3.5.
+11. **D-18, D-17 (Advertencia, nuevos el 2026-10-02; agregados después de esta pasada, sin
+    priorizar contra el resto).** Normalizar el correo en `seed-encargado.ts`, que hoy puede dejar un
+    primer encargado que nunca inicia sesión; y registrar en el ADR-0007 la resolución de S01 sobre
+    la cuenta bloqueada con contraseña correcta.
 
-Ningún archivo de `docs/PRD.md`, ningún ADR, ni ningún archivo de código fue modificado durante esta
-auditoría, salvo la reescritura de este mismo reporte.
+La pasada del 2026-09-09 no modificó `docs/PRD.md` ni código; su commit (`537865c`) sí corrigió
+`docs/BACKLOG.md`, `docs/DEPLOY-PLAN.md`, `docs/TECH-DESIGNv2.md` y los ADR 0004 y 0007.
