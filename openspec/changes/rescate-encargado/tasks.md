@@ -137,11 +137,11 @@ Branch from PR 3. Must be last: D-02 is only true once the script exists on main
 - [x] 4.6 `README.md` (after `:60-62`): one sentence plus the command, pointing to the runbook. `docs/BACKLOG.md`: new row after `:50` closing D-02, same shape as row 15.
 - [x] 4.7 Citation audit: for every `file:line` cited or edited in 4.1-4.6, open the cited lines and confirm they land on the text claimed (rule: a claim is proven by reading the lines). Include the ADR `61-63` and `SECURITY.md:207` targets.
 - [x] 4.8 `openspec/changes/rescate-encargado/verify-report.md`: requirement-by-requirement evidence (spec scenario -> test name / command output), test counts, mutation-probe results from 1.5, 1.9, 1.11, 2.8, 2.16, 3.7, manual rehearsal result from 3.8, and the gaps listed in the coverage notes below as ACCEPTED or deferred, with the owner's decision.
-- [ ] 4.9 `openspec/changes/rescate-encargado/claims-report.md` via the `claims-gate` skill: one row per verifiable claim (CONFIRMED / REFUTED / UNVERIFIABLE accepted on the record), `Verified revision` recorded; commit the report on top of the verified revision. Do not merge with a refuted or unaccepted-unverifiable claim and do not work around the `gh pr merge` hook.
+- [x] 4.9 `openspec/changes/rescate-encargado/claims-report.md` via the `claims-gate` skill: one row per verifiable claim (CONFIRMED / REFUTED / UNVERIFIABLE accepted on the record), `Verified revision` recorded; commit the report on top of the verified revision. Do not merge with a refuted or unaccepted-unverifiable claim and do not work around the `gh pr merge` hook.
 
 ### Gate 4
 
-- [ ] 4.10 Gate: `pnpm -r test`, `pnpm typecheck`, `pnpm lint` (`biome ci .` also covers markdown-adjacent config; docs are not linted but run it), `pnpm contract:check` (byte-identical). `pnpm test:integration` only if code changed in this PR (expected: no). Measure the raw diff against ~400 and apply the PR 4 flag above.
+- [x] 4.10 Gate: `pnpm -r test`, `pnpm typecheck`, `pnpm lint` (`biome ci .` also covers markdown-adjacent config; docs are not linted but run it), `pnpm contract:check` (byte-identical). `pnpm test:integration` only if code changed in this PR (expected: no). Measure the raw diff against ~400 and apply the PR 4 flag above.
 
 ---
 
