@@ -48,6 +48,22 @@ describe('seedEncargado', () => {
     expect(insertedValues?.hashContrasena).not.toBe(validInput.password);
   });
 
+  // D-18: login looks the email up trimmed and lowercased, so
+  // a seed that stored `Admin@Tienda.COM` as typed could never log in.
+  it('stores the email normalized the way login looks it up', async () => {
+    const { db, chain } = createFakeDb([]);
+
+    const result = await seedEncargado(db, {
+      ...validInput,
+      email: '  Admin@Tienda.COM ',
+    });
+
+    expect(chain.values.mock.calls[0]?.[0]).toMatchObject({
+      email: 'admin@tienda.com',
+    });
+    expect(result.email).toBe('admin@tienda.com');
+  });
+
   it('refuses to run and does not insert when an encargado already exists', async () => {
     const { db, chain } = createFakeDb([{ id: 'existing-id' }]);
 

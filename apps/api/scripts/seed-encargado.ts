@@ -6,6 +6,7 @@ import { hashPassword } from '../src/auth/password.js';
 import type { Db } from '../src/db/client.js';
 import { getDb } from '../src/db/pool.js';
 import { usuarios } from '../src/db/schema.js';
+import { normalizeEmail } from '../src/usuarios/service.js';
 
 // Out-of-band bootstrap for the first `encargado` user (design.md "Bootstrap
 // Encargado Script"). Human-invoked, not part of the API — the user-management
@@ -66,6 +67,10 @@ export async function seedEncargado(
   db: Db,
   input: SeedInput,
 ): Promise<SeedResult> {
+  // Stored exactly the way login looks it up (D-18): an email kept as typed,
+  // e.g. `Admin@Tienda.com`, could never log in, and neither the seed nor
+  // the rescue script could then reach it.
+  const email = normalizeEmail(input.email);
   return db.transaction(async (tx) => {
     const existing = await tx
       .select({ id: usuarios.id })
@@ -74,7 +79,7 @@ export async function seedEncargado(
       .limit(1);
 
     if (existing.length > 0) {
-      return { created: false, email: input.email, rol: 'encargado' as const };
+      return { created: false, email, rol: 'encargado' as const };
     }
 
     const hashContrasena = await hashPassword(input.password);
@@ -82,13 +87,13 @@ export async function seedEncargado(
       .insert(usuarios)
       .values({
         nombre: input.nombre,
-        email: input.email,
+        email,
         hashContrasena,
         rol: 'encargado',
       })
       .onConflictDoNothing({ target: usuarios.email });
 
-    return { created: true, email: input.email, rol: 'encargado' as const };
+    return { created: true, email, rol: 'encargado' as const };
   });
 }
 

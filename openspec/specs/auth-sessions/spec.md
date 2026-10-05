@@ -211,7 +211,7 @@ An `onRequest` hook MUST resolve the session cookie to `request.user` (via `Sesi
 - THEN the response code is `PASSWORD_CHANGE_REQUIRED`, not `FORBIDDEN`
 
 ### Requirement: Bootstrap Encargado Script
-`apps/api/scripts/seed-encargado.ts` MUST create exactly one `encargado` user from credentials supplied via environment variables or CLI arguments (not hardcoded), MUST be idempotent (safe to re-run with no duplicate side effects), and MUST refuse to run if any `encargado` user already exists.
+`apps/api/scripts/seed-encargado.ts` MUST create exactly one `encargado` user from credentials supplied via environment variables or CLI arguments (not hardcoded), MUST be idempotent (safe to re-run with no duplicate side effects), and MUST refuse to run if any `encargado` user already exists. It MUST store the email trimmed and lowercased, the same normalization login applies before looking it up (added 2026-10-05, closes drift finding D-18).
 
 #### Scenario: First run creates the encargado
 - GIVEN no user with `rol = encargado` exists
@@ -227,6 +227,11 @@ An `onRequest` hook MUST resolve the session cookie to `request.user` (via `Sesi
 - GIVEN the script has already succeeded once for a given target email
 - WHEN it is invoked again with the same input before any other encargado exists
 - THEN it does not create a duplicate user for that email
+
+#### Scenario: Mixed-case email is stored normalized
+- GIVEN no user with `rol = encargado` exists
+- WHEN the script runs with the email `Admin@Tienda.COM`
+- THEN the created row's email is `admin@tienda.com`, so login with any casing of that address finds it
 
 ### Requirement: Password Hashing
 Passwords MUST be hashed with argon2id before storage; the system MUST NOT log or persist a plaintext password at any point, including in error details or application logs.
