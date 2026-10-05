@@ -44,18 +44,19 @@ instantáneas seudonimizan el nombre de los usuarios desde ese día, y las filas
 conservan en claro. El caso de `proveedores.contacto`, que D-22 señalaba de paso, sale de ese
 hallazgo y queda registrado como **D-26** (Sugerencia), fuera del alcance de aquel ciclo por
 decisión del propietario del 2026-10-04. D-21 se amplió: rotar `COOKIE_SECRET` ahora también cambia
-los seudónimos del nombre.
+los seudónimos del nombre. **Actualización 2026-10-05 (segunda):** D-18 quedó RESUELTO:
+`seed-encargado.ts` guarda el correo normalizado, igual que lo busca el login.
 
 | Severidad | Cantidad |
 |---|---|
 | Crítico | 0 |
-| Advertencia | 5 |
+| Advertencia | 4 |
 | Sugerencia | 9 |
 
-La tabla cuenta **exactamente los 14 hallazgos que este reporte deja abiertos al 2026-10-05**:
-Advertencia — D-09, D-17, D-18, D-19, D-24; Sugerencia — D-03, D-08, D-15, D-16, D-20, D-21, D-23,
-D-25, D-26. Los resueltos (D-01, D-02, D-04, D-05, D-06, D-10, D-11, D-13, D-14, D-22) no se
-cuentan.
+La tabla cuenta **exactamente los 13 hallazgos que este reporte deja abiertos al 2026-10-05**:
+Advertencia — D-09, D-17, D-19, D-24; Sugerencia — D-03, D-08, D-15, D-16, D-20, D-21, D-23,
+D-25, D-26. Los resueltos (D-01, D-02, D-04, D-05, D-06, D-10, D-11, D-13, D-14, D-18, D-22) no
+se cuentan.
 
 ### Estado de cada hallazgo pre-existente
 
@@ -76,7 +77,7 @@ cuentan.
 | D-15 | Sigue abierto, reducido → Sugerencia | nota agregada, pero el título `DEPLOY-PLAN.md:639` sigue diciendo "decisión pendiente" |
 | D-16 | Sigue abierto, reducido → Sugerencia | mecanismo documentado en `ADR-0007:100-116`; la decisión sobre bloqueo por IP sigue sin tomarse (`:118-122`) |
 | D-17 | Sigue abierto | `ADR-0007:76-79` (y ahora también `TECH-DESIGNv2.md:95-97`) vs `auth/service.ts:102-107` |
-| D-18 | Sigue abierto | `seed-encargado.ts:85` inserta el correo sin normalizar |
+| D-18 | RESUELTO (2026-10-05) | `seed-encargado.ts:73` normaliza el correo antes del alta |
 
 ## Hallazgos
 
@@ -336,26 +337,27 @@ cuentan.
     `TECH-DESIGNv2.md:95-97`.
   - **Recomendación:** actualizar el ADR y el TECH-DESIGNv2.
 
-### D-18 — `seed-encargado.ts` guarda el correo sin normalizar, y el login lo busca normalizado
+### D-18 — `seed-encargado.ts` ya guarda el correo normalizado: RESUELTO
 
-- **Severidad:** Advertencia
-- **Tipo:** Regla omitida.
-- **Estado:** Sigue abierto, sin cambios.
-- **Prometido/afirmado:** el login normaliza el correo antes de buscarlo
-  (`apps/api/src/auth/service.ts:32-34` y `:45`), el alta desde la aplicación lo guarda normalizado
-  (`apps/api/src/usuarios/repository.ts:280`), y `findByEmail` compara por igualdad exacta
-  (`apps/api/src/usuarios/repository.ts:132-139`).
-- **Real:** `apps/api/scripts/seed-encargado.ts:85` inserta `email: input.email` tal como llega; el
-  esquema solo valida el formato (`apps/api/scripts/seed-encargado.ts:18`).
-- **Por qué importa:** un primer encargado sembrado con mayúsculas nunca puede iniciar sesión. No se
-  puede volver a sembrar (`apps/api/scripts/seed-encargado.ts:76-78` no hace nada si ya existe un
-  encargado), y el rescate de D-02 tampoco lo repara: busca con la misma normalización
-  (`apps/api/src/usuarios/rescate.ts:51-53`) y responde "no encontrado".
-- **Opciones:**
-  - `CORREGIR CÓDIGO` — normalizar el correo en `seedEncargado` antes del `insert`, con un test que
-    siembre un correo con mayúsculas y pruebe el login.
-  - `ACTUALIZAR PRD/ADR` — no aplica: ningún documento promete guardar el correo tal como se escribe.
-  - **Recomendación:** corregir el código.
+- **Severidad:** ~~Advertencia~~ — cerrado.
+- **Estado:** **RESUELTO el 2026-10-05**, con un cambio directo (sin ciclo SDD, por decisión del
+  propietario).
+- **Lo que estaba abierto:** el login normaliza el correo antes de buscarlo
+  (`apps/api/src/auth/service.ts:32-34` y `:45`) y `findByEmail` compara por igualdad exacta
+  (`apps/api/src/usuarios/repository.ts:132-139`), pero el seed insertaba el correo tal como
+  llegaba. Un primer encargado sembrado con mayúsculas nunca podía iniciar sesión, y ni el seed
+  (que no hace nada si ya existe un encargado) ni el rescate de D-02 lo reparaban.
+- **Re-verificado el 2026-10-05:**
+  - `apps/api/scripts/seed-encargado.ts:73` calcula `normalizeEmail(input.email)` (la misma función
+    que exporta `apps/api/src/usuarios/service.ts:61`) y `:90` inserta ese valor; el resultado del
+    script también lo informa normalizado.
+  - Test: `apps/api/scripts/seed-encargado.test.ts:53` (*"stores the email normalized the way login
+    looks it up"*), que falla si se quita la normalización.
+  - Spec: escenario *"Mixed-case email is stored normalized"*
+    (`openspec/specs/auth-sessions/spec.md:231`).
+  - Las cuentas sembradas antes de este cambio no se corrigen: si alguna quedó con mayúsculas, el
+    rescate la sigue informando como no encontrada (`docs/DEPLOY-PLAN.md`, *Rescate del último
+    encargado*).
 
 ### D-19 (nuevo) — La Venta no tiene los campos fiscales reservados que el ADR-0003 y el TECH-DESIGNv2 dan por existentes
 
@@ -626,8 +628,8 @@ Priorizados por consecuencia, no por esfuerzo:
 1. **D-22 — RESUELTO el 2026-10-05** por el ciclo `nombre-seudonimizado`: las instantáneas nuevas
    seudonimizan el nombre; las filas escritas antes lo conservan en claro por decisión del
    propietario. El caso de `proveedores.contacto` sigue abierto como D-26 (punto 9).
-2. **D-18 (Advertencia) — corregir el código.** Normalizar el correo en `seed-encargado.ts`; el fallo
-   deja un primer encargado que no puede entrar y que ni el seed ni el rescate reparan.
+2. ~~**D-18 (Advertencia) — corregir el código.**~~ Resuelto el 2026-10-05: el seed guarda el correo
+   normalizado.
 3. **D-24, D-17 (Advertencia) — actualizar ADR-0007 y TECH-DESIGNv2.** Las dos son desvíos ya
    aprobados que el ADR contradice; D-17 ya se propagó una vez a un documento nuevo.
 4. **D-19 (Advertencia) — decisión de arquitectura.** Agregar las columnas fiscales o reescribir la

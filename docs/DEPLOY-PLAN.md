@@ -615,7 +615,7 @@ unset DATABASE_URL
 - `No se encontró ningún usuario con ese correo.` — el correo no existe. **Caso particular: correo
   almacenado con mayúsculas.** El script busca el correo normalizado (sin espacios y en minúsculas),
   igual que el login. Una cuenta cuyo correo quedó guardado con mayúsculas (por ejemplo, sembrada con
-  `--email Admin@Tienda.com`) se informa como no encontrada aunque se escriba el correo exactamente
+  `--email Admin@Tienda.com` antes del 2026-10-05, cuando el seed todavía no normalizaba el correo) se informa como no encontrada aunque se escriba el correo exactamente
   como está guardado. Esa cuenta tampoco pudo iniciar sesión nunca: no es una contraseña perdida
   sino un alta defectuosa (D-18 en `docs/DRIFT.md`), y **repararla queda fuera de este
   procedimiento**.
