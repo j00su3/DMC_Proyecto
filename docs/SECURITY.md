@@ -997,7 +997,7 @@ El propio paso de CI es la verificación.
 **Confidence**: HIGH
 **Category**: Brecha de privacidad; operación irreversible sin salvaguarda declarada
 **Affected artifact**: Esquema de base de datos, requisitos de producto
-**Location**: `apps/api/src/db/schema.ts:113-115`, `apps/api/src/auditoria/fields.ts:55-75`,
+**Location**: `apps/api/src/db/schema.ts:116-118`, `apps/api/src/auditoria/fields.ts:55-75`,
 `apps/api/src/usuarios/service.ts:215-222`, `openspec/specs/record-audit-trail/spec.md:7`
 
 **Status (2026-09-01)**: la mitad del correo del hallazgo está implementada — backlog #2.5,
@@ -1022,7 +1022,7 @@ fila ya no puede eliminarse de la base. El sistema solo ofrece baja lógica; el 
 inalcanzable por diseño, y esa consecuencia no está escrita en ninguna spec ni ADR.
 
 **Evidence**
-- `apps/api/src/db/schema.ts:113-115` — `usuarioId ... .references(() => usuarios.id, { onDelete: 'restrict' })`.
+- `apps/api/src/db/schema.ts:116-118` — `usuarioId ... .references(() => usuarios.id, { onDelete: 'restrict' })`.
 - `apps/api/src/auditoria/fields.ts:56-66` — `email` figura entre los `auditableFields` de `usuarios`,
   y `excludedFields` contiene únicamente `hashContrasena` (`apps/api/src/auditoria/fields.ts:67`).
 - `apps/api/src/usuarios/service.ts:215-222` — cada actualización escribe el diff en `datosPrevios` y

@@ -429,7 +429,7 @@ cuentan.
   (commit `aabed0d`, PR #191) la clave se resuelve solo cuando una instantánea contiene un string a
   seudonimizar (`apps/api/src/auditoria/service.ts:77-79`, `:116-117`), y eso permite que el script
   de rescate corra sin `COOKIE_SECRET`. Solo `docs/BACKLOG.md:33` (ítem 2.5), `:51` (ítem 16) y
-  `:52` (ítem 17) lo cuentan, y `render.yaml:22-23` genera el secreto automáticamente
+  `:52` (ítem 17), y el Status 2026-10-05 de SEC-012 (`docs/SECURITY.md:1009-1014`), lo cuentan, y `render.yaml:22-23` genera el secreto automáticamente
   (`generateValue: true`).
 - **Por qué importa:** rotar `COOKIE_SECRET` (el procedimiento de incidente de
   `DEPLOY-PLAN.md:891`), o recrear el servicio de Render, que genera un valor nuevo, también cambia
