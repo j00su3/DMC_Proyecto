@@ -77,10 +77,11 @@ pnpm test:integration   # requiere pnpm db:up
 
 ## Estado del proyecto
 
-Backlog #1 al #16 archivados y en producción (fundaciones, autenticación, usuarios, proveedores con
+Backlog #1 al #17 archivados y en producción (fundaciones, autenticación, usuarios, proveedores con
 vista maestro-detalle, productos, movimientos de inventario, punto de venta, recibo interno,
 anulación de venta, motor de alertas de stock, sugerencia de reposición, reportes, panel general
 con KPIs, verificación periódica de consistencia stock ↔ ledger, backup semanal de la base, y
-lectura del rastro de auditoría, rescate del último encargado). El #3.5 (recuperación de contraseña por email) está bloqueado
+lectura del rastro de auditoría, rescate del último encargado, seudonimización del nombre en el
+rastro de auditoría). El #3.5 (recuperación de contraseña por email) está bloqueado
 por infraestructura (falta un dominio propio con DNS que soporte SPF/DKIM), no por esfuerzo.
 Ver [`docs/BACKLOG.md`](docs/BACKLOG.md) para el detalle completo.
