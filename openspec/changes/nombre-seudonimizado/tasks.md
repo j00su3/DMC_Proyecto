@@ -29,7 +29,7 @@ Risk: if B's diff measures above 800, move the two reports to a follow-up commit
 ## Phase 1: PR B - Pin today's email digest (UNCHANGED code, first)
 
 - [x] 1.1 T1: in `apps/api/src/auditoria/service.test.ts` pin `pseudonymizeFields({ email: 'ana@example.com' }, ['email'], KEY)` to a literal `hmac-sha256:<hex>`. Compute the hex with `node -e` + `createHmac('sha256', KEY).update('audit-email-pseudonym:ana@example.com').digest('hex')`. Satisfies: "Email pseudonym is stable across the change".
-- [x] 1.2 Run the file: green on unchanged code. Commit `test(auditoria): pin email pseudonym digest` BEFORE any refactor.
+- [x] 1.2 Run the file: green on unchanged code. Commit it BEFORE any refactor (done as `510af8f`, `test(auditoria): pin today's email pseudonym before the tag change`).
 - [x] 1.3 [M] T1 probe: change one character of the email tag in `service.ts:54` -> T1 red; swap to `value + tag` -> red; `git diff` empty after revert.
 
 ## Phase 2: RED - tests that fail on current code
