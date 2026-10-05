@@ -4,7 +4,11 @@ import { auditWriteFailed } from '../lib/errors.js';
 import type { ProductosRepo } from '../productos/repository.js';
 import type { ProveedoresRepo } from '../proveedores/repository.js';
 import type { UsuariosRepo } from '../usuarios/repository.js';
-import { FIELD_CLASSIFICATION } from './fields.js';
+import {
+  FIELD_CLASSIFICATION,
+  PSEUDONYM_DOMAIN_TAGS,
+  type PseudonymizedField,
+} from './fields.js';
 import type {
   AuditoriaRepo,
   EntidadAuditoria,
@@ -48,19 +52,20 @@ function filterExcluded(
   );
 }
 
-// Domain-separation tag (backlog #2.5): scopes this HMAC to exactly this
-// use, so it can never collide with another use of the same key (e.g. a
-// future HMAC-shaped session token keyed off the same COOKIE_SECRET).
-const PSEUDONYM_DOMAIN_TAG = 'audit-email-pseudonym:';
+// Each field's HMAC is scoped by its own domain-separation tag from
+// `PSEUDONYM_DOMAIN_TAGS` (backlog #2.5, D-22): it can never collide with
+// another use of the same key (e.g. a future HMAC-shaped session token keyed
+// off the same COOKIE_SECRET), nor with the same string under another field.
 const PSEUDONYM_PREFIX = 'hmac-sha256:';
 
 // Replaces each listed field's value, when present and a string, with a
 // keyed HMAC-SHA256 pseudonym (SEC-012 / backlog #2.5, owner-ratified
 // 2026-09-01: pseudonymize, not omit). Deterministic under a fixed key, so
-// the SAME value always produces the SAME pseudonym — an email-only change
-// still shows a visible diff between `datosPrevios` and `datosPosteriores`,
-// which is the exact edge case that blocked this backlog item when the
-// alternative (moving `email` to `excludedFields`) was tried instead: both
+// the SAME value always produces the SAME pseudonym — an email-only or
+// name-only change still shows a visible diff between `datosPrevios` and
+// `datosPosteriores`, which is the exact edge case that blocked this backlog
+// item when the alternative (moving `email` to `excludedFields`) was tried
+// instead: both
 // snapshots would drop the key entirely and read as identical/empty.
 //
 // A real HMAC, not `crypto.createHash`: a bare hash of an email is
@@ -74,7 +79,7 @@ const PSEUDONYM_PREFIX = 'hmac-sha256:';
 // needs the key at all (rescate-encargado design.md D1).
 function pseudonymizeWith(
   data: Record<string, unknown>,
-  pseudonymizedFields: readonly string[],
+  pseudonymizedFields: readonly PseudonymizedField[],
   getKey: () => string,
 ): Record<string, unknown> {
   const result = { ...data };
@@ -82,7 +87,7 @@ function pseudonymizeWith(
     const value = result[field];
     if (typeof value === 'string') {
       const digest = createHmac('sha256', getKey())
-        .update(PSEUDONYM_DOMAIN_TAG + value)
+        .update(PSEUDONYM_DOMAIN_TAGS[field] + value)
         .digest('hex');
       result[field] = `${PSEUDONYM_PREFIX}${digest}`;
     }
@@ -92,7 +97,7 @@ function pseudonymizeWith(
 
 export function pseudonymizeFields(
   data: Record<string, unknown>,
-  pseudonymizedFields: readonly string[],
+  pseudonymizedFields: readonly PseudonymizedField[],
   key: string,
 ): Record<string, unknown> {
   return pseudonymizeWith(data, pseudonymizedFields, () => key);
@@ -106,8 +111,8 @@ export function pseudonymizeFields(
 // DATABASE_URL et al. into every unit test that exercises `recordAudit`
 // (see that file's comment). The unit test suite sets COOKIE_SECRET in
 // `vitest.config.ts` for exactly this reason (every test whose snapshot
-// carries `email` needs it); production sets it as a real deployment
-// secret, validated by `lib/env.ts` before the server accepts any request.
+// carries `email` or `nombre` needs it); production sets it as a real
+// deployment secret, validated by `lib/env.ts` before the server accepts any request.
 // It is only read when a snapshot actually holds a string to pseudonymize,
 // so an operator script with no COOKIE_SECRET can record a password reset.
 function resolvePseudonymKey(): string {

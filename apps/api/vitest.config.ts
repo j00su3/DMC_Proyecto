@@ -24,9 +24,10 @@ export default defineConfig({
     testTimeout: 15_000,
     // backlog #2.5: `auditoria/service.ts` reuses COOKIE_SECRET (via
     // `process.env`, not `lib/env.ts` — see that file's comment) as the HMAC
-    // key that pseudonymizes `usuarios.email` in audit snapshots. Every unit
-    // test that exercises `recordAudit` for the `usuarios` entity with a
-    // snapshot that carries `email` needs a value present, same as
+    // key that pseudonymizes `usuarios.email` and `usuarios.nombre` in audit
+    // snapshots. Every unit test that exercises `recordAudit` for the
+    // `usuarios` entity with a snapshot that carries either needs a value
+    // present, same as
     // `vitest.integration.config.ts` already sets one for the cookie plugin.
     env: {
       COOKIE_SECRET: 'unit-test-cookie-secret-at-least-32-characters',

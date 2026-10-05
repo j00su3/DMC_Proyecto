@@ -9,6 +9,29 @@
 
 export const HASH_CONTRASENA_DENYLIST_FIELD = 'hashContrasena';
 
+// Domain-separation tag per pseudonymized field (backlog #2.5, D-22): each
+// field's HMAC input is `tag + value`, so the same string under two fields
+// never yields the same pseudonym, and one use of COOKIE_SECRET can never
+// collide with another. The tags differ early and none is a prefix of
+// another (`fields.test.ts` checks both), so no `tag + value` input can
+// collide across fields.
+//
+// The map is keyed by FIELD name, not by entity: a future entity that
+// pseudonymizes a field also called `nombre` would share
+// `audit-nombre-pseudonym:`, so its pseudonyms could be linked with users'
+// names. Owner decision: recorded, not solved; if it comes up, the tag key
+// should include the entity.
+//
+// `email`'s tag is the one that shipped with #2.5. Changing its bytes would
+// silently re-pseudonymize every historical email (`service.test.ts` pins
+// the digest).
+export const PSEUDONYM_DOMAIN_TAGS = {
+  email: 'audit-email-pseudonym:',
+  nombre: 'audit-nombre-pseudonym:',
+} as const;
+
+export type PseudonymizedField = keyof typeof PSEUDONYM_DOMAIN_TAGS;
+
 interface EntityFieldClassification {
   auditableFields: readonly string[];
   excludedFields: readonly string[];
@@ -19,8 +42,10 @@ interface EntityFieldClassification {
   // each listed field's value with a keyed HMAC pseudonym after exclusion
   // filtering, so a change to the field still shows a visible diff (unlike
   // omitting it outright, which the owner rejected 2026-09-01) without ever
-  // storing the plaintext.
-  pseudonymizedFields?: readonly string[];
+  // storing the plaintext. Only fields with an entry in
+  // `PSEUDONYM_DOMAIN_TAGS` can be listed: an untagged field is a
+  // `pnpm typecheck` error through the `satisfies` below.
+  pseudonymizedFields?: readonly PseudonymizedField[];
 }
 
 // `usuarios` classified now; `proveedores`/`productos` join here when #4/#5
@@ -43,8 +68,10 @@ export const FIELD_CLASSIFICATION = {
     // SEC-012 / backlog #2.5, owner-ratified 2026-09-01: the actor's
     // identity already lives in the UUID `auditoria.usuario_id`; `email`
     // stays auditable (a changed value should show in the trail) but never
-    // in plaintext.
-    pseudonymizedFields: ['email'],
+    // in plaintext. D-22 extends the same treatment to `nombre`, a person's
+    // name being personal data too. Rows written before that change keep
+    // their plaintext name and are not rewritten.
+    pseudonymizedFields: ['email', 'nombre'],
   },
   // #4 gives this entity its call site (S4). No excluded field — nothing on
   // `proveedores` is secret (design.md D5).
