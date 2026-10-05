@@ -388,6 +388,12 @@ describe('recordAudit pseudonym key resolution', () => {
     });
 
     expect(record).toHaveBeenCalledTimes(1);
+    // A proveedor's `nombre` is a business name, not a person's: it stays
+    // in plaintext, untouched by the usuarios-only pseudonymization (D-22).
+    expect(record.mock.calls[0]?.[0].datosPrevios).toEqual({ nombre: 'Old' });
+    expect(record.mock.calls[0]?.[0].datosPosteriores).toEqual({
+      nombre: 'New',
+    });
   });
 
   it('T4: rejects without COOKIE_SECRET when a nombre is the only string to pseudonymize, and records nothing', async () => {
