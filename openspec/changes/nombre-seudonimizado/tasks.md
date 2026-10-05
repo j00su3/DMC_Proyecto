@@ -70,8 +70,8 @@ Risk: if B's diff measures above 800, move the two reports to a follow-up commit
 
 ## Phase 6: Gate, reports
 
-- [ ] 6.1 Gate: `pnpm -r test`, `pnpm typecheck`, `pnpm lint`, `pnpm contract:check` (expect byte-identical; if it reports drift, stage artifacts and re-run), `pnpm test:integration` (WARNING: truncates the developer's local `inventienda` database; needs `pnpm db:up`). Measure raw diff against 800.
-- [ ] 6.2 `openspec/changes/nombre-seudonimizado/verify-report.md`: scenario -> test evidence, counts, probe results (1.3, 4.1-4.3), gaps ACCEPTED/deferred.
+- [x] 6.1 Gate: `pnpm -r test`, `pnpm typecheck`, `pnpm lint`, `pnpm contract:check` (expect byte-identical; if it reports drift, stage artifacts and re-run), `pnpm test:integration` (WARNING: truncates the developer's local `inventienda` database; needs `pnpm db:up`). Measure raw diff against 800.
+- [x] 6.2 `openspec/changes/nombre-seudonimizado/verify-report.md`: scenario -> test evidence, counts, probe results (1.3, 4.1-4.3), gaps ACCEPTED/deferred.
 - [ ] 6.3 `claims-report.md` via the `claims-gate` skill; `Verified revision` = the last commit touching anything outside the cycle folder (reports sit inside it, so commit them on top). No merge with a refuted or unaccepted-unverifiable claim.
 
 ## Coverage: spec scenario -> tasks
