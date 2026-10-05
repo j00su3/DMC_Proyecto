@@ -58,7 +58,7 @@ Risk: if B's diff measures above 800, move the two reports to a follow-up commit
 - [x] 4.1 Unlist `email` -> T6 (A2, A3, A6) red. Unlist `nombre` -> T2, T3, T4, T7, I1, I2, I3, I5 red.
 - [x] 4.2 Pseudonymize `datosPosteriores` only -> T3 and I3 (skip `datosPrevios`) red. Set the `nombre` tag equal to the email tag -> T5, T8 red. Widen `PseudonymizedField` to `string` -> `pnpm typecheck` reports an unused `@ts-expect-error`.
 - [x] 4.3 Resolve the key eagerly at the top of `recordAudit` -> U-extra and rescue suite red. In the audit read path (locate at apply) rewrite `nombre` -> I6 red.
-- [ ] 4.4 Record each probe result for the verify report.
+- [x] 4.4 Record each probe result for the verify report.
 
 ## Phase 5: Docs (re-read every cited line when writing it; docs in Spanish, owner reviews wording)
 
@@ -72,7 +72,7 @@ Risk: if B's diff measures above 800, move the two reports to a follow-up commit
 
 - [x] 6.1 Gate: `pnpm -r test`, `pnpm typecheck`, `pnpm lint`, `pnpm contract:check` (expect byte-identical; if it reports drift, stage artifacts and re-run), `pnpm test:integration` (WARNING: truncates the developer's local `inventienda` database; needs `pnpm db:up`). Measure raw diff against 800.
 - [x] 6.2 `openspec/changes/nombre-seudonimizado/verify-report.md`: scenario -> test evidence, counts, probe results (1.3, 4.1-4.3), gaps ACCEPTED/deferred.
-- [ ] 6.3 `claims-report.md` via the `claims-gate` skill; `Verified revision` = the last commit touching anything outside the cycle folder (reports sit inside it, so commit them on top). No merge with a refuted or unaccepted-unverifiable claim.
+- [x] 6.3 `claims-report.md` via the `claims-gate` skill; `Verified revision` = the last commit touching anything outside the cycle folder (reports sit inside it, so commit them on top). No merge with a refuted or unaccepted-unverifiable claim.
 
 ## Coverage: spec scenario -> tasks
 
