@@ -201,12 +201,13 @@ Que la tienda tenga una fuente única y actualizada de su inventario, de modo qu
 - **Decisión tomada**: el producto es una **aplicación web** (uso desde navegador).
 - **Decisión tomada (2026-08-29, cierra SEC-012 de `SECURITY.md`)**: el **rastro de auditoría es
   permanente** —el no repudio del flujo de contraseña temporal lo exige— pero **no conserva datos
-  personales**. Las instantáneas `datos_previos` / `datos_posteriores` seudonimizan el correo; la
-  identidad del actor queda en `auditoria.usuario_id`, que es un UUID sin significado por sí mismo y
-  basta para probar quién hizo qué. Ante una solicitud de supresión se limpia el dato personal en
-  `usuarios` y el rastro sobrevive apuntando a un identificador vacío: se satisface la supresión sin
-  perder la prueba de que la acción ocurrió. Se descartó una ventana de retención con purga
-  programada, porque le pondría fecha de vencimiento al no repudio.
+  personales**. Las instantáneas `datos_previos` / `datos_posteriores` seudonimizan el correo y el
+  nombre (el nombre desde el 2026-10-05: las filas escritas antes conservan el nombre en claro y no
+  se reescriben); la identidad del actor queda en `auditoria.usuario_id`, que es un UUID sin
+  significado por sí mismo y basta para probar quién hizo qué. Ante una solicitud de supresión se
+  limpia el dato personal en `usuarios` y el rastro sobrevive apuntando a un identificador vacío: se
+  satisface la supresión sin perder la prueba de que la acción ocurrió. Se descartó una ventana de
+  retención con purga programada, porque le pondría fecha de vencimiento al no repudio.
   Consecuencia que hasta ahora no estaba escrita en ninguna parte: `auditoria.usuario_id` lleva
   `onDelete: 'restrict'`, de modo que **un usuario que haya realizado una sola operación auditada ya
   no puede borrarse de la base**. El sistema ofrece baja lógica; el borrado físico es inalcanzable

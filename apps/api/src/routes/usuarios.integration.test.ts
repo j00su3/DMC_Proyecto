@@ -1,7 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import { eq, sql } from 'drizzle-orm';
-import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import { buildApp } from '../app.js';
+import { pseudonymizeFields } from '../auditoria/service.js';
 import { hashPassword } from '../auth/password.js';
 import { getDb, getPool } from '../db/pool.js';
 import { usuarios } from '../db/schema.js';
@@ -305,6 +314,10 @@ describe('usuarios write routes (integration, real app + real Postgres)', () => 
     expect(JSON.stringify(rows[0]?.datos_posteriores)).not.toContain(
       'hashContrasena',
     );
+    // D-22: the created name is a pseudonym, never plaintext.
+    expect(JSON.stringify(rows[0]?.datos_posteriores)).not.toContain(
+      'Beto Deposito',
+    );
   });
 
   it('rescues a locked account: the reset password logs in immediately', async () => {
@@ -552,6 +565,7 @@ describe('usuarios activo and update routes (integration, real app + real Postgr
   });
 
   afterEach(async () => {
+    vi.unstubAllEnvs();
     await app?.close();
     app = undefined;
   });
@@ -595,9 +609,117 @@ describe('usuarios activo and update routes (integration, real app + real Postgr
     expect(rows[0]?.accion).toBe('actualizar');
     expect(rows[0]?.usuario_id).toBe(encargado.id);
     // Changed fields only: email and rol did not move, so they are in
-    // neither snapshot.
-    expect(rows[0]?.datos_previos).toEqual({ nombre: 'Nombre Viejo' });
-    expect(rows[0]?.datos_posteriores).toEqual({ nombre: 'Nombre Nuevo' });
+    // neither snapshot. `nombre` is stored as its keyed pseudonym (D-22),
+    // derived here from the same COOKIE_SECRET the HMAC reads, which is the
+    // process env, not the `cookieSecret` option given to `buildApp`.
+    const key = process.env.COOKIE_SECRET as string;
+    expect(rows[0]?.datos_previos).toEqual(
+      pseudonymizeFields({ nombre: 'Nombre Viejo' }, ['nombre'], key),
+    );
+    expect(rows[0]?.datos_posteriores).toEqual(
+      pseudonymizeFields({ nombre: 'Nombre Nuevo' }, ['nombre'], key),
+    );
+  });
+
+  // D-22's own test: no name, old or new, appears anywhere in the stored
+  // rows after a real create followed by a real rename.
+  it('stores no plaintext name in the audit rows after a create then a rename', async () => {
+    const encargado = await seedUsuario('encargado');
+    app = await buildApp({ cookieSecret: COOKIE_SECRET });
+    await app.ready();
+    const sid = await loginAs(app, encargado.email);
+
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/usuarios',
+      payload: {
+        nombre: 'Primer Nombre',
+        email: 'primer@example.com',
+        rol: 'deposito',
+      },
+      cookies: { sid },
+    });
+    expect(created.statusCode).toBe(201);
+    const id = created.json().usuario.id as string;
+
+    const renamed = await app.inject({
+      method: 'PATCH',
+      url: `/api/usuarios/${id}`,
+      payload: { nombre: 'Segundo Nombre' },
+      cookies: { sid },
+    });
+    expect(renamed.statusCode).toBe(200);
+
+    const result = await db.execute(
+      sql`select datos_previos::text as previos, datos_posteriores::text as posteriores
+            from auditoria where entidad_id = ${id}`,
+    );
+    const rows = (
+      result as unknown as {
+        rows: { previos: string | null; posteriores: string }[];
+      }
+    ).rows;
+    expect(rows).toHaveLength(2);
+    const stored = JSON.stringify(rows);
+    expect(stored).not.toContain('Primer Nombre');
+    expect(stored).not.toContain('Segundo Nombre');
+  });
+
+  it('refuses a name-only PATCH when COOKIE_SECRET is missing: the name is unchanged and no audit row exists', async () => {
+    const encargado = await seedUsuario('encargado');
+    const objetivo = await seedUsuario('deposito', 'Nombre Intacto');
+    app = await buildApp({ cookieSecret: COOKIE_SECRET });
+    await app.ready();
+    // Log in first: the session cookie is signed with the `cookieSecret`
+    // option, while the audit HMAC reads `process.env.COOKIE_SECRET`.
+    const sid = await loginAs(app, encargado.email);
+    vi.stubEnv('COOKIE_SECRET', undefined);
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: `/api/usuarios/${objetivo.id}`,
+      payload: { nombre: 'Nombre Que No Debe Quedar' },
+      cookies: { sid },
+    });
+
+    expect(response.statusCode).toBe(500);
+    const [row] = await db
+      .select()
+      .from(usuarios)
+      .where(eq(usuarios.id, objetivo.id));
+    expect(row?.nombre).toBe('Nombre Intacto');
+    expect(await auditRowsFor(objetivo.id)).toHaveLength(0);
+  });
+
+  // Spec "No update path to existing rows": a row written before the change
+  // keeps its plaintext name, and the read path returns it as stored.
+  it('returns a pre-change audit row with a plaintext nombre unchanged', async () => {
+    const encargado = await seedUsuario('encargado');
+    const objetivo = await seedUsuario('deposito', 'Nombre Actual');
+    await db.execute(
+      sql`insert into auditoria (entidad, entidad_id, accion, usuario_id, datos_previos, datos_posteriores)
+            values ('usuarios', ${objetivo.id}, 'actualizar', ${encargado.id},
+                    '{"nombre": "Nombre Historico"}'::jsonb,
+                    '{"nombre": "Nombre Anterior"}'::jsonb)`,
+    );
+    app = await buildApp({ cookieSecret: COOKIE_SECRET });
+    await app.ready();
+    const sid = await loginAs(app, encargado.email);
+
+    const audit = await app.inject({
+      method: 'GET',
+      url: `/api/auditoria?entidad=usuarios&entidadId=${objetivo.id}`,
+      cookies: { sid },
+    });
+
+    expect(audit.statusCode).toBe(200);
+    expect(audit.json().data).toHaveLength(1);
+    expect(audit.json().data[0].datosPrevios).toEqual({
+      nombre: 'Nombre Historico',
+    });
+    expect(audit.json().data[0].datosPosteriores).toEqual({
+      nombre: 'Nombre Anterior',
+    });
   });
 
   it('deactivates a user, kills the session it was holding, and files baja_logica', async () => {

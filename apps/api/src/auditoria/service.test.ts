@@ -19,8 +19,11 @@ const baseEvent: AuditEvent = {
   entidadId: 'a3b1c2d3-0000-4000-8000-000000000001',
   accion: 'actualizar',
   usuarioId: 'a3b1c2d3-0000-4000-8000-000000000002',
-  datosPrevios: { nombre: 'Old Name' },
-  datosPosteriores: { nombre: 'New Name' },
+  // `rol` is a plain auditable field: these defaults must not reach a
+  // pseudonymized field, or a key-requirement test below could pass for the
+  // wrong reason (nombre-seudonimizado T6).
+  datosPrevios: { rol: 'deposito' },
+  datosPosteriores: { rol: 'encargado' },
 };
 
 describe('pseudonymizeFields', () => {
@@ -34,6 +37,22 @@ describe('pseudonymizeFields', () => {
     );
 
     expect(result.email).toMatch(/^hmac-sha256:[0-9a-f]{64}$/);
+  });
+
+  // Hard-coded on purpose: captured from the code before the per-field tag
+  // map (nombre-seudonimizado), so it also catches a changed prefix,
+  // encoding or concatenation order, which re-deriving it with createHmac
+  // here would not.
+  it('pins the exact email pseudonym digest, so the pseudonym is stable across releases', () => {
+    const result = pseudonymizeFields(
+      { email: 'ana@example.com' },
+      ['email'],
+      KEY,
+    );
+
+    expect(result.email).toBe(
+      'hmac-sha256:97451326ef8e08feb4254e560c793525b599fd9616b5aa851d017e4f048dcd58',
+    );
   });
 
   it('is deterministic: the same value and key always produce the same pseudonym', () => {
@@ -67,6 +86,15 @@ describe('pseudonymizeFields', () => {
     // between datosPrevios/datosPosteriores instead of two identical values
     // (backlog #2.5).
     expect(ana.email).not.toBe(beto.email);
+  });
+
+  it('T5: gives the same string different pseudonyms under email and nombre', () => {
+    const asEmail = pseudonymizeFields({ email: 'ana' }, ['email'], KEY);
+    const asNombre = pseudonymizeFields({ nombre: 'ana' }, ['nombre'], KEY);
+
+    expect(asEmail.email).toMatch(/^hmac-sha256:[0-9a-f]{64}$/);
+    expect(asNombre.nombre).toMatch(/^hmac-sha256:[0-9a-f]{64}$/);
+    expect(asNombre.nombre).not.toBe(asEmail.email);
   });
 
   it('leaves a field not listed in pseudonymizedFields untouched', () => {
@@ -138,8 +166,35 @@ describe('recordAudit', () => {
     expect(captured?.datosPrevios).toBeNull();
     expect(captured?.datosPosteriores).toEqual({
       id: baseEvent.entidadId,
-      nombre: 'New User',
+      nombre: expect.stringMatching(/^hmac-sha256:[0-9a-f]{64}$/),
     });
+    expect(JSON.stringify(captured?.datosPosteriores)).not.toContain(
+      'New User',
+    );
+  });
+
+  // nombre-seudonimizado (D-22): a rename leaves two different pseudonyms,
+  // never plaintext, so the trail still shows that the name changed.
+  it('pseudonymizes usuarios.nombre in both snapshots with two different pseudonyms on a rename', async () => {
+    let captured: AuditEvent | undefined;
+    const repo = stubRepo(async (event) => {
+      captured = event;
+    });
+
+    await recordAudit(repo, {
+      ...baseEvent,
+      datosPrevios: { nombre: 'Old Name' },
+      datosPosteriores: { nombre: 'New Name' },
+    });
+
+    const before = captured?.datosPrevios as Record<string, unknown>;
+    const after = captured?.datosPosteriores as Record<string, unknown>;
+
+    expect(before.nombre).toMatch(/^hmac-sha256:[0-9a-f]{64}$/);
+    expect(after.nombre).toMatch(/^hmac-sha256:[0-9a-f]{64}$/);
+    expect(before.nombre).not.toBe(after.nombre);
+    expect(JSON.stringify(captured)).not.toContain('Old Name');
+    expect(JSON.stringify(captured)).not.toContain('New Name');
   });
 
   // Regression test for backlog #2.5's exact edge case: an evaluation on
@@ -253,7 +308,7 @@ describe('recordAudit pseudonym key resolution', () => {
     await expect(
       recordAudit(stubRepo(record), {
         ...baseEvent,
-        datosPrevios: { nombre: 'Old Name' },
+        datosPrevios: { rol: 'deposito' },
         datosPosteriores: { email: 'new@example.com' },
       }),
     ).rejects.toThrow(/COOKIE_SECRET must be set/);
@@ -268,7 +323,7 @@ describe('recordAudit pseudonym key resolution', () => {
       recordAudit(stubRepo(record), {
         ...baseEvent,
         datosPrevios: { email: 'old@example.com' },
-        datosPosteriores: { nombre: 'New Name' },
+        datosPosteriores: { rol: 'encargado' },
       }),
     ).rejects.toThrow(/COOKIE_SECRET must be set/);
     expect(record).not.toHaveBeenCalled();
@@ -333,7 +388,65 @@ describe('recordAudit pseudonym key resolution', () => {
     });
 
     expect(record).toHaveBeenCalledTimes(1);
+    // A proveedor's `nombre` is a business name, not a person's: it stays
+    // in plaintext, untouched by the usuarios-only pseudonymization (D-22).
+    expect(record.mock.calls[0]?.[0].datosPrevios).toEqual({ nombre: 'Old' });
+    expect(record.mock.calls[0]?.[0].datosPosteriores).toEqual({
+      nombre: 'New',
+    });
   });
+
+  it('T4: rejects without COOKIE_SECRET when a nombre is the only string to pseudonymize, and records nothing', async () => {
+    vi.stubEnv('COOKIE_SECRET', undefined);
+    const record = vi.fn(async (_event: AuditEvent) => {});
+
+    await expect(
+      recordAudit(stubRepo(record), {
+        ...baseEvent,
+        datosPrevios: { nombre: 'Old Name' },
+        datosPosteriores: { nombre: 'New Name' },
+      }),
+    ).rejects.toThrow(/COOKIE_SECRET must be set/);
+    expect(record).not.toHaveBeenCalled();
+  });
+
+  // The existing usuarios/service.test.ts cases only pin these snapshot
+  // shapes against a mocked `record`; this proves the real `recordAudit`
+  // records them with no key (spec: "Deactivate, reactivate and operator
+  // rescue record without the key").
+  it.each([
+    ['baja_logica', { activo: true }, { activo: false }],
+    ['reactivar', { activo: false }, { activo: true }],
+    [
+      'actualizar',
+      { activo: false, bloqueadoHasta: null, intentosFallidos: 5 },
+      {
+        activo: true,
+        bloqueadoHasta: null,
+        intentosFallidos: 0,
+        debeCambiarPassword: true,
+        origen: 'rescate',
+      },
+    ],
+  ] as const)(
+    'records a %s usuarios snapshot without COOKIE_SECRET',
+    async (accion, datosPrevios, datosPosteriores) => {
+      vi.stubEnv('COOKIE_SECRET', undefined);
+      const record = vi.fn(async (_event: AuditEvent) => {});
+
+      await recordAudit(stubRepo(record), {
+        ...baseEvent,
+        accion,
+        datosPrevios,
+        datosPosteriores,
+      });
+
+      expect(record).toHaveBeenCalledTimes(1);
+      expect(record.mock.calls[0]?.[0].datosPosteriores).toEqual(
+        datosPosteriores,
+      );
+    },
+  );
 
   it('with a key available, stores the HMAC pseudonym of usuarios.email, not the plaintext', async () => {
     const key = 'a-test-hmac-key-that-is-at-least-32-characters-long';

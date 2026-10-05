@@ -1,7 +1,11 @@
 import { getTableColumns } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import { productos, proveedores, usuarios } from '../db/schema.js';
-import { FIELD_CLASSIFICATION } from './fields.js';
+import {
+  FIELD_CLASSIFICATION,
+  PSEUDONYM_DOMAIN_TAGS,
+  type PseudonymizedField,
+} from './fields.js';
 import type { AuditoriaRepo } from './repository.js';
 import { recordAudit } from './service.js';
 
@@ -28,21 +32,58 @@ describe('FIELD_CLASSIFICATION', () => {
     expect(excludedFields).toContain('hashContrasena');
   });
 
-  // backlog #2.5 / SEC-012: `pseudonymizedFields` sits outside the
-  // exclude/auditable partition above — `email` stays listed in
-  // `auditableFields` (it is NOT omitted), so the exhaustiveness assertion
+  // backlog #2.5 / SEC-012 and D-22: `pseudonymizedFields` sits outside the
+  // exclude/auditable partition above — `email` and `nombre` stay listed in
+  // `auditableFields` (they are NOT omitted), so the exhaustiveness assertion
   // above needs no change. This just proves `pseudonymizedFields` names a
   // real subset of it, so `recordAudit` never gets asked to pseudonymize a
   // field it also excludes.
-  it('lists usuarios pseudonymizedFields as a subset of auditableFields, including email', () => {
+  it('lists usuarios pseudonymizedFields as a subset of auditableFields, including email and nombre', () => {
     const { auditableFields, pseudonymizedFields } =
       FIELD_CLASSIFICATION.usuarios;
 
-    expect(pseudonymizedFields).toEqual(['email']);
+    expect(pseudonymizedFields).toEqual(['email', 'nombre']);
     for (const field of pseudonymizedFields ?? []) {
       expect(auditableFields).toContain(field);
     }
   });
+
+  // nombre-seudonimizado D1-D3: every listed field resolves to its own
+  // domain-separation tag, and no tag can be a prefix of another, so no
+  // `tag + value` input can collide across fields.
+  it('gives every pseudonymized field a distinct, well-formed tag, none a prefix of another', () => {
+    const listed = new Set<string>();
+    for (const entity of Object.values(FIELD_CLASSIFICATION)) {
+      for (const field of entity.pseudonymizedFields ?? []) {
+        listed.add(field);
+      }
+    }
+    const tags = Object.values(PSEUDONYM_DOMAIN_TAGS);
+
+    expect(listed.size).toBeGreaterThan(0);
+    for (const field of listed) {
+      expect(Object.keys(PSEUDONYM_DOMAIN_TAGS)).toContain(field);
+    }
+    expect(new Set(tags).size).toBe(tags.length);
+    for (const tag of tags) {
+      expect(tag).toMatch(/^audit-[a-z]+-pseudonym:$/);
+      for (const other of tags) {
+        if (other !== tag) {
+          expect(other.startsWith(tag)).toBe(false);
+        }
+      }
+    }
+  });
+
+  // Compile-level: a field with no tag cannot be listed (D3). Never called;
+  // its only job is to make `pnpm typecheck` fail if `PseudonymizedField`
+  // widens to `string`.
+  function _untaggedFieldIsRejected() {
+    // @ts-expect-error — 'contacto' has no entry in PSEUDONYM_DOMAIN_TAGS
+    const _x: PseudonymizedField = 'contacto';
+    return _x;
+  }
+  void _untaggedFieldIsRejected;
 
   // design.md D5: the proposal's "call site, nothing more" claim about the
   // audit trail was wrong — `AuditableEntidad = keyof typeof
