@@ -62,11 +62,11 @@ Risk: if B's diff measures above 800, move the two reports to a follow-up commit
 
 ## Phase 5: Docs (re-read every cited line when writing it; docs in Spanish, owner reviews wording)
 
-- [ ] 5.1 `docs/PRD.md:202-209`: "correo" -> "correo y nombre" plus one sentence: rows written before the change keep the plaintext name and are not rewritten. Orchestrator drafts the Spanish.
-- [ ] 5.2 `docs/SECURITY.md`: SEC-012 Status line after `:1003-1007`; summary row `:1216` (says correo only).
-- [ ] 5.3 `docs/DRIFT.md`: D-22 (`:437-470`) RESUELTO in D-01/D-02 format; D-21 (`:411-428`) widened (rotation changes `nombre` pseudonyms too); new **D-26** `proveedores.contacto`, severity Sugerencia (move the `:458-460` bullet; report ends at D-25 `:517`); recount the severity table by reading each severity line; update `:22`, `:34-49` and next step 1 (`:594-596`).
-- [ ] 5.4 `docs/BACKLOG.md:33` (item 2.5) or a new row: correo and nombre, D-22 date.
-- [ ] 5.5 Citation audit: open every `file:line` cited or edited in 5.1-5.4 and confirm it lands on the claimed text.
+- [x] 5.1 `docs/PRD.md:202-209`: "correo" -> "correo y nombre" plus one sentence: rows written before the change keep the plaintext name and are not rewritten. Orchestrator drafts the Spanish.
+- [x] 5.2 `docs/SECURITY.md`: SEC-012 Status line after `:1003-1007`; summary row `:1216` (says correo only).
+- [x] 5.3 `docs/DRIFT.md`: D-22 (`:437-470`) RESUELTO in D-01/D-02 format; D-21 (`:411-428`) widened (rotation changes `nombre` pseudonyms too); new **D-26** `proveedores.contacto`, severity Sugerencia (move the `:458-460` bullet; report ends at D-25 `:517`); recount the severity table by reading each severity line; update `:22`, `:34-49` and next step 1 (`:594-596`).
+- [x] 5.4 `docs/BACKLOG.md:33` (item 2.5) or a new row: correo and nombre, D-22 date.
+- [x] 5.5 Citation audit: open every `file:line` cited or edited in 5.1-5.4 and confirm it lands on the claimed text.
 
 ## Phase 6: Gate, reports
 

@@ -91,7 +91,7 @@ Estos controles ya funcionan y no deberían tocarse al remediar lo demás:
   (`apps/api/src/usuarios/repository.ts:93-101`), tipo de retorno sin el campo
   (`apps/api/src/usuarios/repository.ts:28-36`), esquema Zod de respuesta que descarta claves
   desconocidas (`apps/api/src/routes/usuarios.ts:30-38`) y denylist en la auditoría
-  (`apps/api/src/auditoria/fields.ts:10,42`). El comentario de `apps/api/src/routes/usuarios.ts:21-29`
+  (`apps/api/src/auditoria/fields.ts:10,67`). El comentario de `apps/api/src/routes/usuarios.ts:21-29`
   documenta que la redundancia fue medida, no supuesta.
 - **Defensa contra enumeración por temporización en el login.**
   `apps/api/src/auth/service.ts:48-53` verifica contra un hash señuelo fijo para un correo
@@ -997,7 +997,7 @@ El propio paso de CI es la verificación.
 **Confidence**: HIGH
 **Category**: Brecha de privacidad; operación irreversible sin salvaguarda declarada
 **Affected artifact**: Esquema de base de datos, requisitos de producto
-**Location**: `apps/api/src/db/schema.ts:113-115`, `apps/api/src/auditoria/fields.ts:30-48`,
+**Location**: `apps/api/src/db/schema.ts:113-115`, `apps/api/src/auditoria/fields.ts:55-75`,
 `apps/api/src/usuarios/service.ts:215-222`, `openspec/specs/record-audit-trail/spec.md:7`
 
 **Status (2026-09-01)**: la mitad del correo del hallazgo está implementada — backlog #2.5,
@@ -1005,6 +1005,13 @@ El propio paso de CI es la verificación.
 `usuarios.email` con HMAC-SHA256 keyed en ambas instantáneas antes de escribirlas; el correo en
 claro ya no llega a `auditoria`. La segunda mitad — la FK `onDelete: 'restrict'` que hace
 irreversible el borrado real de un usuario auditado — sigue sin resolver.
+
+**Status (2026-10-05)**: `recordAudit` también seudonimiza `usuarios.nombre`, con una etiqueta de
+dominio propia (`audit-nombre-pseudonym:`) para que el mismo texto guardado como `email` y como
+`nombre` no produzca el mismo seudónimo; los seudónimos de correo ya escritos no cambian. Cierra
+D-22 de `docs/DRIFT.md`. Las filas escritas antes de este cambio conservan el nombre en claro y no
+se reescriben. Un nombre tiene poca entropía: quien tenga `COOKIE_SECRET` puede probar nombres
+candidatos. La FK `onDelete: 'restrict'` sigue sin resolver.
 
 **Description**
 Dos propiedades combinadas producen un efecto que ningún documento del proyecto declara. Primera: las
@@ -1016,8 +1023,8 @@ inalcanzable por diseño, y esa consecuencia no está escrita en ninguna spec ni
 
 **Evidence**
 - `apps/api/src/db/schema.ts:113-115` — `usuarioId ... .references(() => usuarios.id, { onDelete: 'restrict' })`.
-- `apps/api/src/auditoria/fields.ts:31-41` — `email` figura entre los `auditableFields` de `usuarios`,
-  y `excludedFields` contiene únicamente `hashContrasena` (`apps/api/src/auditoria/fields.ts:42`).
+- `apps/api/src/auditoria/fields.ts:56-66` — `email` figura entre los `auditableFields` de `usuarios`,
+  y `excludedFields` contiene únicamente `hashContrasena` (`apps/api/src/auditoria/fields.ts:67`).
 - `apps/api/src/usuarios/service.ts:215-222` — cada actualización escribe el diff en `datosPrevios` y
   `datosPosteriores`; un cambio de correo deja ambos valores registrados de forma permanente.
 - `apps/api/src/auditoria/repository.ts:46-56` — el puerto expone `record` y una consulta de solo
@@ -1040,9 +1047,9 @@ crezca.
 
 **Existing mitigation**
 El hash de contraseña está excluido de ambas instantáneas
-(`apps/api/src/auditoria/fields.ts:42`), y `recordAudit` aplica la denylist en tiempo de ejecución
-(`filterExcluded`, `apps/api/src/auditoria/service.ts:41-49`, invocada en
-`apps/api/src/auditoria/service.ts:146-162`). Es decir, el dato más sensible sí está protegido; lo
+(`apps/api/src/auditoria/fields.ts:67`), y `recordAudit` aplica la denylist en tiempo de ejecución
+(`filterExcluded`, `apps/api/src/auditoria/service.ts:45-53`, invocada en
+`apps/api/src/auditoria/service.ts:151-167`). Es decir, el dato más sensible sí está protegido; lo
 que falta es la política sobre el resto.
 
 **Recommended remediation**
@@ -1213,7 +1220,7 @@ propuesta; ninguno se cerró declarándolo tolerable por cuenta de este análisi
 | --- | --- | --- |
 | SEC-001 | Verificar la contraseña **antes** de rechazar por bloqueo: una credencial correcta concede acceso aunque la cuenta esté bloqueada, y limpia el contador. Descartado el bloqueo por IP mientras no exista `trustProxy` (SEC-003), porque hoy todos los clientes comparten la IP del proxy de Vercel. | `docs/adrs/0007-sesion-cookie-rbac-propio.md` § Actualizado 2026-08-29 |
 | SEC-008 | Almacenar `sha256(token)` como clave primaria de `sesiones`; el token en claro viaja sólo en la cookie. La justificación original del ADR se conserva: un hash no es un secreto, así que no hay nada que sincronizar. | `docs/adrs/0007-sesion-cookie-rbac-propio.md` § Actualizado 2026-08-29 |
-| SEC-012 | Rastro permanente **sin datos personales**: las instantáneas seudonimizan el correo y la identidad del actor queda en el UUID `auditoria.usuario_id`. Una supresión limpia el dato en `usuarios` y el rastro sobrevive. Descartada la ventana de retención con purga, que le pondría vencimiento al no repudio. | `docs/PRD.md` § Supuestos y riesgos abiertos |
+| SEC-012 | Rastro permanente **sin datos personales**: las instantáneas seudonimizan el correo y el nombre, y la identidad del actor queda en el UUID `auditoria.usuario_id`. Una supresión limpia el dato en `usuarios` y el rastro sobrevive. Descartada la ventana de retención con purga, que le pondría vencimiento al no repudio. | `docs/PRD.md` § Supuestos y riesgos abiertos |
 
 **SEC-001 y SEC-008 siguen sin implementar.** Esta sección registra decisiones, no código. Ningún
 hallazgo de este pase quedó cerrado declarándolo tolerable.

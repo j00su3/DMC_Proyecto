@@ -19,7 +19,8 @@ esos casos el hallazgo sigue abierto con el alcance reducido a lo que falta, y l
 cuando lo que falta pesa menos que lo original (D-03, D-15, D-16). Los IDs `D-NN` se conservan
 exactamente — `docs/BACKLOG.md`, `docs/DEPLOY-PLAN.md` y el ADR-0007 los citan por número. D-07 y
 D-12 se cerraron en la pasada del 2026-09-04 y no se reutilizan. Los hallazgos nuevos toman los IDs
-D-19 a D-25.
+D-19 a D-25. **Actualización 2026-10-05:** D-26 se agregó después de esta pasada, al cerrar D-22
+(ver el Resumen ejecutivo).
 
 ## Resumen ejecutivo
 
@@ -38,15 +39,23 @@ ADR-0003 y el TECH-DESIGNv2 dan por existentes (D-19). No hay hallazgos crítico
 es casi todo documentación que se quedó atrás de decisiones ya tomadas, más dos reglas (D-18, D-22)
 que piden una decisión del propietario.
 
+**Actualización 2026-10-05:** D-22 quedó RESUELTO por el ciclo `nombre-seudonimizado`: las
+instantáneas seudonimizan el nombre de los usuarios desde ese día, y las filas escritas antes lo
+conservan en claro. El caso de `proveedores.contacto`, que D-22 señalaba de paso, sale de ese
+hallazgo y queda registrado como **D-26** (Sugerencia), fuera del alcance de aquel ciclo por
+decisión del propietario del 2026-10-04. D-21 se amplió: rotar `COOKIE_SECRET` ahora también cambia
+los seudónimos del nombre.
+
 | Severidad | Cantidad |
 |---|---|
 | Crítico | 0 |
-| Advertencia | 6 |
-| Sugerencia | 8 |
+| Advertencia | 5 |
+| Sugerencia | 9 |
 
-La tabla cuenta **exactamente los 14 hallazgos que este reporte deja abiertos**: Advertencia — D-09,
-D-17, D-18, D-19, D-22, D-24; Sugerencia — D-03, D-08, D-15, D-16, D-20, D-21, D-23, D-25. Los
-resueltos (D-01, D-02, D-04, D-05, D-06, D-10, D-11, D-13, D-14) no se cuentan.
+La tabla cuenta **exactamente los 14 hallazgos que este reporte deja abiertos al 2026-10-05**:
+Advertencia — D-09, D-17, D-18, D-19, D-24; Sugerencia — D-03, D-08, D-15, D-16, D-20, D-21, D-23,
+D-25, D-26. Los resueltos (D-01, D-02, D-04, D-05, D-06, D-10, D-11, D-13, D-14, D-22) no se
+cuentan.
 
 ### Estado de cada hallazgo pre-existente
 
@@ -404,28 +413,30 @@ resueltos (D-01, D-02, D-04, D-05, D-06, D-10, D-11, D-13, D-14) no se cuentan.
     las acciones sobre colección (`POST /<recurso>/<acción>`) son una excepción aceptada.
   - **Recomendación:** actualizar el ADR-0004.
 
-### D-21 (nuevo) — La seudonimización del correo usa `COOKIE_SECRET` como clave, y ningún documento de decisión ni de operación lo registra
+### D-21 (nuevo) — La seudonimización del correo y del nombre usa `COOKIE_SECRET` como clave, y ningún documento de decisión ni de operación lo registra
 
 - **Severidad:** Sugerencia
 - **Tipo:** Feature no documentada (drift inverso).
 - **Prometido/afirmado:** el PRD decide que *"Las instantáneas `datos_previos` / `datos_posteriores`
-  seudonimizan el correo"* (`docs/PRD.md:202-205`), sin fijar el mecanismo. Ningún ADR, ni el PRD, ni
-  el TECH-DESIGNv2 mencionan `COOKIE_SECRET` como clave de nada que no sea la cookie.
+  seudonimizan el correo y el nombre"* (`docs/PRD.md:202-205`), sin fijar el mecanismo. Ningún ADR,
+  ni el PRD, ni el TECH-DESIGNv2 mencionan `COOKIE_SECRET` como clave de nada que no sea la cookie.
   `docs/DEPLOY-PLAN.md:150` describe `COOKIE_SECRET` solo como *"Firma de la cookie de sesión"*, y
   documenta que rotarlo *"invalida todas las sesiones activas"* (`:176-179`, también `:891`).
-- **Real:** `recordAudit` reemplaza el correo por un HMAC-SHA256 con etiqueta de dominio
-  (`apps/api/src/auditoria/service.ts:51-55`, `:75-91`) cuya clave es `process.env.COOKIE_SECRET`
-  (`apps/api/src/auditoria/service.ts:101-121`). Desde el 2026-10-02 (commit `aabed0d`, PR #191) la
-  clave se resuelve solo cuando una instantánea contiene un string a seudonimizar
-  (`apps/api/src/auditoria/service.ts:72-74`, `:111-112`), y eso permite que el script de rescate
-  corra sin `COOKIE_SECRET`. Solo `docs/BACKLOG.md:33` (ítem 2.5) y `:51` (ítem 16) lo cuentan, y
-  `render.yaml:22-23` genera el secreto automáticamente (`generateValue: true`).
+- **Real:** `recordAudit` reemplaza el correo y, desde el 2026-10-05 (ciclo `nombre-seudonimizado`,
+  que cerró D-22), también el nombre por un HMAC-SHA256 con una etiqueta de dominio por campo
+  (`apps/api/src/auditoria/fields.ts:28-31`; `apps/api/src/auditoria/service.ts:80-96`) cuya clave
+  es `process.env.COOKIE_SECRET` (`apps/api/src/auditoria/service.ts:106-126`). Desde el 2026-10-02
+  (commit `aabed0d`, PR #191) la clave se resuelve solo cuando una instantánea contiene un string a
+  seudonimizar (`apps/api/src/auditoria/service.ts:77-79`, `:116-117`), y eso permite que el script
+  de rescate corra sin `COOKIE_SECRET`. Solo `docs/BACKLOG.md:33` (ítem 2.5), `:51` (ítem 16) y
+  `:52` (ítem 17) lo cuentan, y `render.yaml:22-23` genera el secreto automáticamente
+  (`generateValue: true`).
 - **Por qué importa:** rotar `COOKIE_SECRET` (el procedimiento de incidente de
   `DEPLOY-PLAN.md:891`), o recrear el servicio de Render, que genera un valor nuevo, también cambia
-  los seudónimos: el mismo correo produce un valor distinto antes y después de la rotación, y se
-  pierde la propiedad que justificó seudonimizar en vez de omitir ("el mismo correo siempre produce
-  el mismo seudónimo", `BACKLOG.md:33`). Hoy ese efecto no figura en ninguna parte donde lo vea quien
-  rota la clave.
+  los seudónimos: el mismo correo produce un valor distinto antes y después de la rotación, y desde
+  el 2026-10-05 lo mismo vale para el nombre. Se pierde la propiedad que justificó seudonimizar en
+  vez de omitir ("el mismo correo siempre produce el mismo seudónimo", `BACKLOG.md:33`). Hoy ese
+  efecto no figura en ninguna parte donde lo vea quien rota la clave.
 - **Opciones:**
   - `CORREGIR CÓDIGO` — usar un secreto propio para la seudonimización, separado de la cookie.
   - `ACTUALIZAR PRD/ADR` — registrar el mecanismo (clave compartida, resolución diferida) en el
@@ -434,40 +445,33 @@ resueltos (D-01, D-02, D-04, D-05, D-06, D-10, D-11, D-13, D-14) no se cuentan.
   - **Recomendación:** actualizar los documentos; la reutilización de la clave fue una decisión
     explícita del ítem 2.5, lo que falta es su consecuencia operativa.
 
-### D-22 (nuevo) — El rastro de auditoría guarda en claro el nombre de los usuarios, aunque el PRD afirma que "no conserva datos personales"
+### D-22 — El rastro de auditoría ya no guarda en claro el nombre de los usuarios: RESUELTO
 
-- **Severidad:** Advertencia
-- **Tipo:** Regla omitida.
-- **Prometido:** *"el rastro de auditoría es permanente... pero **no conserva datos personales**.
-  Las instantáneas `datos_previos` / `datos_posteriores` seudonimizan el correo... Ante una solicitud
-  de supresión se limpia el dato personal en `usuarios` y el rastro sobrevive apuntando a un
-  identificador vacío: se satisface la supresión sin perder la prueba de que la acción ocurrió"*
-  (`docs/PRD.md:202-209`).
-- **Real:**
-  - Para `usuarios`, `nombre` está entre los `auditableFields` y solo `email` está en
-    `pseudonymizedFields` (`apps/api/src/auditoria/fields.ts:30-48`, `'nombre'` en `:33`, `email` en
-    `:47`).
-  - El alta escribe la fila entera como estado posterior: `datosPosteriores: { ...creado }`
-    (`apps/api/src/usuarios/service.ts:149-157`), y una edición de nombre guarda el valor anterior y
-    el nuevo (`apps/api/src/usuarios/service.ts:206-222`).
-  - `AuditoriaRepo` no tiene operación de borrado ni de reescritura (`apps/api/src/auditoria/repository.ts:46-56`),
-    y `GET /api/auditoria` devuelve las instantáneas tal cual (`apps/api/src/routes/auditoria.ts:29-32`,
-    `:45-46`).
-  - Consecuencia: limpiar el dato en `usuarios` ante una supresión deja el nombre completo en cada
-    fila `crear` (y en cada cambio de nombre) del rastro permanente.
-  - Caso parecido, menos claro: `proveedores.contacto` también se audita en claro
-    (`apps/api/src/auditoria/fields.ts:52`). Es texto libre que puede contener el nombre o el teléfono
-    de una persona; se señala, sin afirmar que lo contenga.
-- **Por qué importa:** la decisión del PRD que cerró SEC-012 se apoya en que el rastro no retiene datos
-  personales. Hoy retiene al menos uno, y la supresión que el PRD da por satisfecha no lo alcanza.
-- **Opciones:**
-  - `CORREGIR CÓDIGO` — agregar `nombre` a `pseudonymizedFields` de `usuarios` (las filas ya escritas
-    siguen con el valor en claro; reescribirlas sería una decisión aparte), con un test de integración
-    que pruebe que ninguna instantánea nueva contiene el nombre.
-  - `ACTUALIZAR PRD/ADR` — acotar la decisión del PRD a "no conserva el correo" y aceptar por escrito
-    que el nombre sobrevive a una supresión.
-  - **Recomendación:** decisión del propietario (gobierno del dato). La opción de código es chica y
-    tiene precedente directo (el ítem 2.5).
+- **Severidad:** ~~Advertencia~~ — cerrado.
+- **Estado:** **RESUELTO el 2026-10-05**, por el ciclo `nombre-seudonimizado`.
+- **Lo que estaba abierto:** el PRD decide que el rastro de auditoría es permanente pero *"no
+  conserva datos personales"* (`docs/PRD.md:202-204`). Para `usuarios`, sin embargo, solo `email`
+  estaba en `pseudonymizedFields`: el alta y cada cambio de nombre escribían el nombre completo en
+  claro en el rastro permanente, y la supresión que el PRD da por satisfecha no lo alcanzaba. El
+  propietario eligió la opción de código: seudonimizar `nombre`, sin reescribir las filas ya
+  escritas.
+- **Re-verificado el 2026-10-05:**
+  - `PSEUDONYM_DOMAIN_TAGS` asigna a cada campo su propia etiqueta de dominio: `email` conserva
+    `audit-email-pseudonym:` y `nombre` usa `audit-nombre-pseudonym:`
+    (`apps/api/src/auditoria/fields.ts:28-31`); `usuarios` declara
+    `pseudonymizedFields: ['email', 'nombre']` (`apps/api/src/auditoria/fields.ts:74`).
+  - `pseudonymizeWith` busca la etiqueta de cada campo y calcula el HMAC sobre
+    `PSEUDONYM_DOMAIN_TAGS[field] + value` (`apps/api/src/auditoria/service.ts:89-90`), así que el
+    mismo texto guardado como `email` y como `nombre` no produce el mismo seudónimo.
+  - El test de integración *"stores no plaintext name in the audit rows after a create then a
+    rename"* (`apps/api/src/routes/usuarios.integration.test.ts:626`) hace un alta y un cambio de
+    nombre reales contra Postgres y comprueba que ninguna de las dos instantáneas guardadas contiene
+    el nombre anterior ni el nuevo.
+  - Las filas escritas antes del cambio conservan el nombre en claro y no se reescriben, por
+    decisión del propietario; `GET /api/auditoria` las devuelve tal como están
+    (`apps/api/src/routes/usuarios.integration.test.ts:696`).
+- **Ver también:** D-26 — `proveedores.contacto`, que este hallazgo señalaba de paso, quedó fuera
+  del ciclo y se registra aparte.
 
 ### D-23 (nuevo) — Tres rutas autenticadas tienen rate-limit por sesión, y los documentos de decisión solo conocen el del login
 
@@ -538,6 +542,34 @@ resueltos (D-01, D-02, D-04, D-05, D-06, D-10, D-11, D-13, D-14) no se cuentan.
     aviso suficiente.
   - **Recomendación:** corregir el código; es una leyenda.
 
+### D-26 (nuevo, 2026-10-05) — `proveedores.contacto` se audita en claro
+
+- **Severidad:** Sugerencia
+- **Tipo:** Regla omitida.
+- **Prometido:** el PRD decide que el rastro de auditoría *"no conserva datos personales"*
+  (`docs/PRD.md:202-204`), y nombra como seudonimizados solo el correo y el nombre
+  (`docs/PRD.md:204-206`).
+- **Real:**
+  - Para `proveedores`, `contacto` está entre los `auditableFields` y `pseudonymizedFields` está
+    vacío (`apps/api/src/auditoria/fields.ts:79`, `:85`). La columna es texto libre
+    (`apps/api/src/db/schema.ts:55`).
+  - El alta escribe la fila entera como estado posterior
+    (`apps/api/src/proveedores/service.ts:101-108`), y una edición guarda el valor anterior y el
+    nuevo de cada campo cambiado (`apps/api/src/proveedores/service.ts:132-139`).
+  - `contacto` puede contener el nombre o el teléfono de una persona; se señala, sin afirmar que lo
+    contenga.
+- **Origen:** D-22 lo señalaba de paso como un caso parecido y menos claro. El propietario decidió
+  el 2026-10-04 dejarlo fuera del alcance del ciclo que cerró D-22 y registrarlo aquí como hallazgo
+  propio.
+- **Por qué importa:** si un proveedor es una persona física, o si el contacto nombra a una persona,
+  el rastro permanente conserva ese dato aunque se limpie en `proveedores`.
+- **Opciones:**
+  - `CORREGIR CÓDIGO` — agregar `contacto` a `pseudonymizedFields` de `proveedores`, con su propia
+    etiqueta de dominio en `PSEUDONYM_DOMAIN_TAGS` (las filas ya escritas seguirían en claro).
+  - `ACTUALIZAR PRD/ADR` — acotar la decisión del PRD a los datos de `usuarios` y aceptar por
+    escrito que `contacto` es un dato de negocio que el rastro conserva.
+  - **Recomendación:** decisión del propietario (gobierno del dato).
+
 ## Deuda técnica detectada
 
 - **`apps/api/src/productos/service.ts:231`, `apps/api/src/proveedores/service.ts:124,161`,
@@ -549,8 +581,8 @@ resueltos (D-01, D-02, D-04, D-05, D-06, D-10, D-11, D-13, D-14) no se cuentan.
   `apps/api/src/auth/service.ts:36-40` (bloqueo "antes" de la contraseña; ver D-17),
   `apps/api/src/app.ts:136-137` (rate-limit "solo" en login; ver D-23), `render.yaml:14-15`
   (`NODE_ENV` controla `Secure`; ver D-03), `apps/api/src/lib/errors.ts:205-207` (cita
-  `TECH-DESIGNv2.md:235`; ver D-24), y `apps/api/src/auditoria/service.ts:17` (*"Entries today:
-  'usuarios', 'proveedores', 'productos'"*, aunque `fields.ts:87` ya tiene `alertas`).
+  `TECH-DESIGNv2.md:235`; ver D-24), y `apps/api/src/auditoria/service.ts:21` (*"Entries today:
+  'usuarios', 'proveedores', 'productos'"*, aunque `fields.ts:114` ya tiene `alertas`).
 - **`openspec/changes/archive/2026-08-24-fundaciones-monorepo/tasks.md:77-79,82`** y
   **`docs/adrs/0010-despliegue-tiers-gratuitos.md:79-81`** — ver D-09.
 - No hay `TODO`/`FIXME`/`HACK` en `apps/api/src`, `apps/api/scripts` ni `apps/web/src`.
@@ -591,9 +623,9 @@ Verificado explícitamente, y **no es drift**:
 
 Priorizados por consecuencia, no por esfuerzo:
 
-1. **D-22 (Advertencia) — decisión del propietario, gobierno del dato.** Seudonimizar `nombre` en las
-   instantáneas o acotar la promesa del PRD. Mientras tanto, cada alta de usuario agrega un nombre en
-   claro al rastro permanente.
+1. **D-22 — RESUELTO el 2026-10-05** por el ciclo `nombre-seudonimizado`: las instantáneas nuevas
+   seudonimizan el nombre; las filas escritas antes lo conservan en claro por decisión del
+   propietario. El caso de `proveedores.contacto` sigue abierto como D-26 (punto 9).
 2. **D-18 (Advertencia) — corregir el código.** Normalizar el correo en `seed-encargado.ts`; el fallo
    deja un primer encargado que no puede entrar y que ni el seed ni el rescate reparan.
 3. **D-24, D-17 (Advertencia) — actualizar ADR-0007 y TECH-DESIGNv2.** Las dos son desvíos ya
@@ -608,6 +640,8 @@ Priorizados por consecuencia, no por esfuerzo:
    párrafo; D-21 incluye una línea en la fila de rotación de `docs/DEPLOY-PLAN.md`.
 8. **D-08, D-25 (Sugerencia) — cambios chicos de UI.** Color de avatar por rol; aviso de producto sin
    mínimo.
+9. **D-26 (Sugerencia) — decisión del propietario, gobierno del dato.** Seudonimizar
+   `proveedores.contacto` o aceptar por escrito que el rastro lo conserva.
 
 Esta pasada solo modificó `docs/DRIFT.md`: no se tocaron `docs/PRD.md`, los ADRs, el TECH-DESIGNv2 ni
 el código.
