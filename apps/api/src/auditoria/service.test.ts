@@ -36,6 +36,22 @@ describe('pseudonymizeFields', () => {
     expect(result.email).toMatch(/^hmac-sha256:[0-9a-f]{64}$/);
   });
 
+  // Hard-coded on purpose: captured from the code before the per-field tag
+  // map (nombre-seudonimizado), so it also catches a changed prefix,
+  // encoding or concatenation order, which re-deriving it with createHmac
+  // here would not.
+  it('pins the exact email pseudonym digest, so the pseudonym is stable across releases', () => {
+    const result = pseudonymizeFields(
+      { email: 'ana@example.com' },
+      ['email'],
+      KEY,
+    );
+
+    expect(result.email).toBe(
+      'hmac-sha256:97451326ef8e08feb4254e560c793525b599fd9616b5aa851d017e4f048dcd58',
+    );
+  });
+
   it('is deterministic: the same value and key always produce the same pseudonym', () => {
     const first = pseudonymizeFields(
       { email: 'ana@example.com' },
