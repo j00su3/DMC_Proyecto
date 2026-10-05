@@ -4,13 +4,14 @@
 | --- | --- |
 | Cycle | `nombre-seudonimizado` (record-audit-trail delta) |
 | Branch | `feat/nombre-seudonimizado-impl` |
-| Verified revision | `1a8f154` (the last commit touching anything outside the cycle folder) |
+| Verified revision | `f3063a3` (the last commit touching anything outside the cycle folder) |
 | Date | 2026-10-05 |
 | PRs | #198 (PR A, planning, open); PR B is this branch, not yet opened |
 | Verdict | **PASS WITH WARNINGS** (0 CRITICAL, 1 WARNING, 3 SUGGESTION) |
 
 A first verify pass ran at `fee320d`. It found that test A7 only counted the record call; `1a8f154`
-strengthened it (section 6). The rest of this report is at `1a8f154`.
+strengthened it (section 6). The claims gate then refuted two citations in `docs/`, fixed in
+`f3063a3` (docs only; the code is identical to `1a8f154`, where the gates below ran).
 
 ## 1. Task completion
 
